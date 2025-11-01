@@ -88,11 +88,11 @@ Asegúrate de tener instalado:
        pip install --upgrade pip
        pip install -r requirements.txt
        ```
-     - Ejecuta migraciones y arranca el servidor:
+     - Ejecuta migraciones y arranca el servidor ASGI:
        ```bash
        python manage.py makemigrations
        python manage.py migrate
-       python manage.py runserver
+       python3 -m daphne -b 0.0.0.0 -p 8080 app_passify.asgi:application
        ```
      - Navega en tu Windows a `http://127.0.0.1:8000/` para ver la app.
 
@@ -102,27 +102,30 @@ Asegúrate de tener instalado:
 ```bash
 git clone https://github.com/tu-usuario/paasify.git
 cd paasify
+```
 
 ### 2. Configura el Entorno Virtual
 
 ```bash
 python -m venv venv
 source venv/bin/activate  # En Windows sin "source": venv\Scripts\activate
+```
 
 ### 3. Instala las Dependencias
 
 ```bash
 pip install -r requirements.txt
+```
 
 ### 4. Ejecuta las Migraciones
 
 ```bash
 python manage.py makemigrations
 python manage.py migrate
+```
 
-### 5. Ejecutalo
+### 5. Inicia el servidor ASGI con Daphne
 
 ```bash
-python manage.py runserver
-
-
+python3 -m daphne -b 0.0.0.0 -p 8080 app_passify.asgi:application
+```
