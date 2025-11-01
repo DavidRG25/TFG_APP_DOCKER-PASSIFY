@@ -1,0 +1,25 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+{% block content %}
+  <h1>Resultado de prueba de imágenes</h1>
+
+  {% for r in results %}
+    <fieldset class="module aligned" style="margin-bottom:1.5rem">
+      <h2 style="margin-top:0">{{ r.image }} — 
+        {% if r.status == "ok" %}
+          <span style="color: #1f883d;">OK</span>
+        {% else %}
+          <span style="color: #d1242f;">ERROR</span>
+        {% endif %}
+      </h2>
+      <pre style="background:#0b1021;color:#d6ffe0;padding:1rem;border-radius:6px;white-space:pre-wrap">{{ r.log|join:"\n" }}</pre>
+      {% if r.error %}
+        <div class="errornote" style="margin-top:.5rem">{{ r.error }}</div>
+      {% endif %}
+    </fieldset>
+  {% empty %}
+    <p>No hay resultados.</p>
+  {% endfor %}
+
+  <p><a href="javascript:history.back()">« Volver</a></p>
+{% endblock %}

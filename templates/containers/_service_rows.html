@@ -1,0 +1,117 @@
+{% for s in services %}
+<tr id="service-{{ s.id }}">
+  <td>
+    <div class="fw-semibold">{{ s.name }}</div>
+    {% if s.subject %}
+      <small class="text-muted">Asignatura: {{ s.subject.name }}</small>
+    {% endif %}
+  </td>
+
+  <td>{{ s.image }}</td>
+
+  <td>{{ s.assigned_port|default:"—" }}</td>
+
+  <td>
+    <span
+      class="badge
+        {% if s.status == 'running' %} bg-success
+        {% elif s.status == 'stopped' %} bg-secondary
+        {% elif s.status == 'error' %} bg-danger
+        {% else %} bg-warning text-dark
+        {% endif %}">
+      {{ s.status|title }}
+    </span>
+  </td>
+
+  <td class="d-flex flex-wrap gap-1">
+
+    <!-- Start -->
+    <button
+      class="btn btn-sm btn-success"
+      {% if s.status == "running" %}disabled{% endif %}
+      hx-post="{% url 'service-start' s.id %}"
+      hx-target="#service-table"
+      hx-swap="innerHTML"
+      title="Iniciar">
+      ▶️
+    </button>
+
+    <!-- Stop -->
+    <button
+      class="btn btn-sm btn-warning"
+      {% if s.status != "running" %}disabled{% endif %}
+      hx-post="{% url 'service-stop' s.id %}"
+      hx-target="#service-table"
+      hx-swap="innerHTML"
+      title="Detener">
+      ⏸️
+    </button>
+
+    <!-- Remove (via POST) -->
+    <button
+      class="btn btn-sm btn-danger"
+      hx-post="{% url 'service-remove' s.id %}"
+      hx-target="#service-table"
+      hx-swap="innerHTML"
+      hx-confirm="¿Eliminar definitivamente?"
+      title="Eliminar">
+      🗑️
+    </button>
+
+    <!-- Logs -->
+    <button
+      class="btn btn-sm btn-secondary"
+      hx-get="{% url 'service-logs' s.id %}"
+      hx-target="#logs-body"
+      hx-swap="innerHTML"
+      data-bs-toggle="modal"
+      data-bs-target="#logsModal"
+      title="Ver logs">
+      Logs
+    </button>
+
+    {% if s.dockerfile %}
+    <!-- Dockerfile -->
+    <button
+      class="btn btn-sm btn-info"
+      hx-get="{% url 'service-dockerfile' s.id %}"
+      hx-target="#code-body"
+      hx-swap="innerHTML"
+      data-bs-toggle="modal"
+      data-bs-target="#codeModal"
+      title="Ver Dockerfile">
+      Dockerfile
+    </button>
+    {% endif %}
+
+    {% if s.compose %}
+    <!-- Compose -->
+    <button
+      class="btn btn-sm btn-info"
+      hx-get="{% url 'service-compose' s.id %}"
+      hx-target="#code-body"
+      hx-swap="innerHTML"
+      data-bs-toggle="modal"
+      data-bs-target="#codeModal"
+      title="Ver docker-compose">
+      Compose
+    </button>
+    {% endif %}
+
+    <!-- Terminal -->
+    <a
+      href="{% url 'terminal_view' s.id %}"
+      class="btn btn-sm btn-dark {% if not s.container_id or s.status != 'running' %}disabled{% endif %}"
+      title="Abrir terminal">
+      Terminal
+    </a>
+
+  </td>
+</tr>
+{% empty %}
+<tr>
+  <td colspan="5" class="text-center text-muted">
+    Aún no tienes servicios.
+  </td>
+</tr>
+{% endfor %}

@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block body %}
+<div class="container-fluid">
+    <h3 class="text-dark mb-4"> Proyectos y Servicios</h3>
+    <div class="card shadow">
+        <div class="card-header py-3">
+            <p class="text-primary m-0 font-weight-bold">Información de los proyectos</p>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive table mt-2" id="dataTable" role="grid" aria-describedby="dataTable_info">
+                <table class="table my-0" id="dataTable">
+                    <thead>
+                    <tr>
+                        <th>Lista de proyectos</th>
+                        <th>Asignado a </th>
+                        <th>Asignatura Asociada </th>
+                        <th>Fecha</th>
+                        <th>Hora</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for game in games %}
+                    <tr>
+                        <td>{{ game.place }}</td>  {# Utiliza 'place' para Nombre del Proyecto #}
+                        <td>{{ game.student }}</td>
+                        <td>{{ game.sport.name }}</td>  {# Asignatura Asociada #}
+                        <td>{{ game.date|date:"d/m/Y" }}</td>  {# Formatea la fecha #}
+                        <td>{{ game.time|time:"H:i" }}</td>  {# Formatea la hora #}
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="row">
+                <div class="col-md-6 align-self-center">
+                    <p id="dataTable_info" class="dataTables_info" role="status" aria-live="polite">Mostrando {{ current }} de {{ total }}</p>
+                </div>
+                <div class="col-md-6">
+                    <nav class="d-lg-flex justify-content-lg-end dataTables_paginate paging_simple_numbers">
+                        <ul class="pagination">
+                            {% if previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="{% url 'table' n=previous %}" aria-label="Previous">
+                                    <span aria-hidden="true">«</span>
+                                </a>
+                            </li>
+                            {% endif %}
+                            {% if previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="{% url 'table' n=previous %}">{{ previous }}</a>
+                            </li>
+                            {% endif %}
+                            <li class="page-item active">
+                                <a class="page-link" href="{% url 'table' n=n %}">{{ n }}</a>
+                            </li>
+                            {% if next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{% url 'table' n=next %}">{{ next }}</a>
+                            </li>
+                            {% endif %}
+                            {% if next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{% url 'table' n=next %}" aria-label="Next">
+                                    <span aria-hidden="true">»</span>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

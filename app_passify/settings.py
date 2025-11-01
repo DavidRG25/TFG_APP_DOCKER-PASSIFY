@@ -1,0 +1,163 @@
+from pathlib import Path
+
+# ---------------------------------------------------------------------
+# Rutas base
+# ---------------------------------------------------------------------
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# ---------------------------------------------------------------------
+# Seguridad / Debug
+# ---------------------------------------------------------------------
+SECRET_KEY = 'django-insecure-&c&&3g=3$4wr)a18dsfj)i*8(xz71v@dn%65w&_(2d6s+mz8$b'
+DEBUG = True
+ALLOWED_HOSTS = ["*"]
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1",
+    "http://127.0.0.1:8000",
+    "http://localhost",
+    "http://localhost:8000",
+]
+
+# ---------------------------------------------------------------------
+# Apps
+# ---------------------------------------------------------------------
+INSTALLED_APPS = [
+    # Django
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+
+    # Apps propias
+    'paasify.apps.PaasifysConfig',
+    'security.apps.SecurityConfig',
+    'containers',
+
+    # Terceros
+    'colorfield',
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'drf_spectacular',
+    'channels',
+]
+
+# ---------------------------------------------------------------------
+# Middleware (añadimos WhiteNoise para estáticos en prod)
+# ---------------------------------------------------------------------
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # <— IMPORTANTE
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+]
+
+# ---------------------------------------------------------------------
+# ASGI / WSGI
+# ---------------------------------------------------------------------
+ASGI_APPLICATION = "app_passify.asgi.application"
+WSGI_APPLICATION = 'app_passify.wsgi.application'
+
+# ---------------------------------------------------------------------
+# URLs / Templates
+# ---------------------------------------------------------------------
+ROOT_URLCONF = 'app_passify.urls'
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [BASE_DIR / 'templates'],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+# ---------------------------------------------------------------------
+# Base de datos
+# ---------------------------------------------------------------------
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
+
+# ---------------------------------------------------------------------
+# Password validators
+# ---------------------------------------------------------------------
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
+
+# ---------------------------------------------------------------------
+# I18N / TZ
+# ---------------------------------------------------------------------
+LANGUAGE_CODE = 'es-ar'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_L10N = True
+USE_TZ = True
+
+# ---------------------------------------------------------------------
+# Archivos estáticos (CSS/JS/Imágenes)
+# ---------------------------------------------------------------------
+# URL pública
+STATIC_URL = '/static/'
+
+# Carpeta real donde tienes "assets" (paasify/static/assets/…)
+STATICFILES_DIRS = [
+    BASE_DIR / "paasify" / "static",
+]
+
+# Carpeta a la que colecta en despliegue
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+# WhiteNoise: compresión y versionado (recomendado)
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+WHITENOISE_USE_FINDERS = True  # útil en dev para localizar estáticos dentro de apps
+
+# ---------------------------------------------------------------------
+# Defaults
+# ---------------------------------------------------------------------
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# ---------------------------------------------------------------------
+# DRF / JWT / Schema
+# ---------------------------------------------------------------------
+REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
+# ---------------------------------------------------------------------
+# Redirecciones tras login/logout
+# ---------------------------------------------------------------------
+LOGIN_URL = '/paasify/login/'
+LOGIN_REDIRECT_URL = '/post-login/'
+LOGOUT_REDIRECT_URL = '/paasify/login/'
+
+# ---------------------------------------------------------------------
+# Jazzmin (si lo usas)
+# ---------------------------------------------------------------------
+JAZZMIN_SETTINGS = {
+    "welcome_sign": "Bienvenido"
+}

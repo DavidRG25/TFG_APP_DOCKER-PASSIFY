@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block body %}
+<div class="container-fluid">
+    <!-- Sección de Bienvenida -->
+    <div class="row justify-content-center align-items-center" style="height: 80vh;">
+        <div class="col-md-8 text-center">
+            <!-- Imagen Circular del Logo -->
+            <img src='{% static 'assets/img/logo.jpeg' %}'
+                 alt="Logo de PaaSify"
+                 class="rounded-circle mb-4"
+                 style="width: 150px; height: 150px; object-fit: cover">
+            <h1 class="display-4 text-dark mb-4">Bienvenido a <strong>PaaSify</strong></h1>
+            <p class="lead text-dark mb-4">
+                PaaSify es una plataforma educativa diseñada para simplificar el despliegue de aplicaciones utilizando Docker y Docker Compose.
+                Con PaaSify, los estudiantes pueden desplegar y gestionar aplicaciones en contenedores de manera sencilla, sin necesidad de conocimientos avanzados en administración de servidores.
+            </p>
+            {% if not user_id %}
+            <div class="mt-5">
+                <a href="{% url 'login' %}" class="btn btn-primary btn-lg">
+                    <i class="fas fa-sign-in-alt"></i> Iniciar Sesión
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Sección de Funcionalidades -->
+    <div class="row justify-content-center bg-light py-5">
+        <div class="col-md-10">
+            <h2 class="text-center text-dark mb-5">¿Qué puedes hacer con PaaSify?</h2>
+            <div class="row">
+                <!-- Tarjeta 1: Despliegue de Aplicaciones -->
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                            <h5 class="card-title text-dark">Despliegue de Aplicaciones</h5>
+                            <p class="card-text text-dark">
+                                Despliega aplicaciones en contenedores Docker de manera sencilla, sin necesidad de configuraciones complejas.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 2: Gestión de Proyectos -->
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-project-diagram fa-3x text-primary mb-3"></i>
+                            <h5 class="card-title text-dark">Gestión de Proyectos</h5>
+                            <p class="card-text text-dark">
+                                Crea y gestiona proyectos asociados a asignaturas, y asigna estudiantes para colaborar en ellos.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 3: Integración con Docker -->
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-body text-center">
+                            <i class="fab fa-docker fa-3x text-primary mb-3"></i>
+                            <h5 class="card-title text-dark">Integración con Docker</h5>
+                            <p class="card-text text-dark">
+                                Utiliza Docker y Docker Compose para orquestar servicios y gestionar contenedores de forma dinámica.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sección de Roles -->
+    <div class="row justify-content-center py-5">
+        <div class="col-md-10">
+            <h2 class="text-center text-dark mb-5">Roles en PaaSify</h2>
+            <div class="row">
+                <!-- Tarjeta 1: ADMIN -->
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-user-shield fa-3x text-primary mb-3"></i>
+                            <h5 class="card-title text-dark">ADMIN</h5>
+                            <p class="card-text text-dark">
+                                Gestiona asignaturas, profesores y alumnos. Crea y asigna proyectos, y supervisa el uso de la plataforma.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 2: TEACHER -->
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-chalkboard-teacher fa-3x text-primary mb-3"></i>
+                            <h5 class="card-title text-dark">TEACHER</h5>
+                            <p class="card-text text-dark">
+                                Crea proyectos dentro de asignaturas, asigna estudiantes y supervisa el progreso de los proyectos.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tarjeta 3: STUDENT -->
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow h-100">
+                        <div class="card-body text-center">
+                            <i class="fas fa-user-graduate fa-3x text-primary mb-3"></i>
+                            <h5 class="card-title text-dark">STUDENT</h5>
+                            <p class="card-text text-dark">
+                                Despliega y gestiona servicios asociados a tus proyectos. Visualiza Dockerfiles y docker-compose.yml.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

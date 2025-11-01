@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block body %}
+<h2 class="mb-4">Mis asignaturas</h2>
+
+{% if subjects %}
+  <div class="list-group">
+    {% for s in subjects %}
+      <a
+        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+        href="{% url 'containers:student_services_in_subject' s.id %}">
+        <div>
+          <div class="fw-semibold">{{ s.name }}</div>
+          <small class="text-muted">
+            {{ s.get_category_display|default:s.category }}
+            · Curso {{ s.genero }}
+            {% if s.teacher_user %} · Prof.: {{ s.teacher_user.get_username }}{% endif %}
+          </small>
+        </div>
+
+        <div class="d-flex align-items-center gap-3">
+          {% if s.projects.all %}
+            <span class="badge bg-secondary">
+              {{ s.projects.count }} proyecto{{ s.projects.count|pluralize:"s" }}
+            </span>
+          {% endif %}
+          <span class="ms-1">&rsaquo;</span>
+        </div>
+      </a>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="alert alert-info mt-3">
+    No tienes asignaturas asignadas todavía. Pide a tu profesor o al administrador que te matriculen en una.
+  </div>
+{% endif %}
+
+<a href="{% url 'containers:student_subjects' %}" class="btn btn-outline-secondary mt-3">Volver</a>
+{% endblock %}
+

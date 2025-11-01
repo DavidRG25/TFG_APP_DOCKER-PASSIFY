@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="container mt-4">
+  <h2>Editar servicio: {{ service.name }}</h2>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <!-- Imagen permitida (opcional) -->
+    <div class="mb-3">
+      <label class="form-label">Imagen (catálogo permitido)</label>
+      <select name="image" class="form-select">
+        {% for img in images %}
+          <option value="{{ img.name }}:{{ img.tag }}"
+            {% if service.image == img.name|add:':'|add:img.tag %}selected{% endif %}>
+            {{ img.name }}:{{ img.tag }} – {{ img.description }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <!-- Puerto personalizado -->
+    <div class="mb-3">
+      <label for="custom_port" class="form-label">Puerto personalizado</label>
+      <input type="number" id="custom_port" name="custom_port" class="form-control"
+             min="40000" max="50000" value="{{ service.assigned_port|default:'' }}">
+      <div class="form-text">Entre 40000 y 50000. Si lo dejas vacío, se asigna automáticamente.</div>
+    </div>
+
+    <!-- Variables de entorno -->
+    <div class="mb-3">
+      <label for="env_vars" class="form-label">Variables de entorno (JSON)</label>
+      <textarea id="env_vars" name="env_vars" class="form-control" rows="5">{{ service.env_vars|default:"{}" }}</textarea>
+      <div class="form-text">Ejemplo: {"DEBUG": "true", "PORT": "8000"}</div>
+    </div>
+
+    <!-- Volúmenes -->
+    <div class="mb-3">
+      <label for="volumes" class="form-label">Volúmenes (JSON)</label>
+      <textarea id="volumes" name="volumes" class="form-control" rows="5">{{ service.volumes|default:"{}" }}</textarea>
+      <div class="form-text">Ejemplo: {"/host/path": {"bind": "/app", "mode": "rw"}}</div>
+    </div>
+
+    <!-- Archivos existentes -->
+    <div class="mb-3">
+      <strong>Archivos actuales:</strong><br>
+      {% if service.dockerfile %}<p>✓ Dockerfile subido</p>{% endif %}
+      {% if service.compose %}<p>✓ docker-compose.yml subido</p>{% endif %}
+      {% if service.code %}<p>✓ Código fuente ZIP subido</p>{% endif %}
+    </div>
+
+    <!-- Subir nuevos archivos -->
+    <div class="mb-3">
+      <label class="form-label">Reemplazar archivos (opcional)</label>
+      <input type="file" name="dockerfile" class="form-control mb-2" accept=".Dockerfile,text/plain">
+      <input type="file" name="compose" class="form-control mb-2" accept=".yml,.yaml">
+      <input type="file" name="code" class="form-control" accept=".zip">
+    </div>
+
+    <!-- Acciones -->
+    <button type="submit" class="btn btn-success">Guardar y reiniciar</button>
+    <a href="{% url 'student_panel' %}" class="btn btn-secondary ms-2">Cancelar</a>
+  </form>
+</div>
+{% endblock %}

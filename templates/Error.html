@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block body %}
+    <div class="container-fluid">
+                    <div class="text-center mt-5">
+                        <div class="error mx-auto" data-text="{{ type }}">
+                            <p class="m-0">{{ type }}</p>
+                        </div>
+                        <p class="text-dark mb-5 lead">{{ message }}</p>
+                        <p class="text-black-50 mb-0">{{ description }}</p><a href="{% url 'index' %}">← Volver al inicio</a>
+                    </div>
+    </div>
+{% endblock %}
