@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+
+{% block body %}
+    <div class="container-fluid">
+                    <h3 class="text-dark mb-4">Gestión de Usuarios</h3>
+                    <div class="card shadow">
+                        <div class="card-header py-3">
+                            <p class="text-primary m-0 font-weight-bold">Información de los Usuarios</p>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive table mt-2" id="user" role="grid" aria-describedby="dataTable_info">
+                                <table class="table my-0" id="user">
+                                    <thead>
+                                        <tr>
+                                            <th>Nombre</th>
+                                            <th>Profesor Asignado</th>
+                                            <th>Año</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for res in results %}
+                                            <tr>
+                                            <td>{{ res.game.sport.name }}</td>
+                                            <td>{{ res.game.place }}</td>
+                                            <td>{{ res.game.date.day }}/{{ res.game.date.month }}/{{ res.game.date.year }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tfoot>
+                                </table>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 align-self-center">
+                                    <p id="dataTable_info" class="dataTables_info" role="status" aria-live="polite">Mostrando {{ current }} de {{ total }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <nav class="d-lg-flex justify-content-lg-end dataTables_paginate paging_simple_numbers">
+                                        <ul class="pagination">
+                                            {% if previous %}<li class="page-item"><a class="page-link" href="{% url 'user' n=previous %}" aria-label="Previous"><span aria-hidden="true">«</span></a></li>{% endif %}
+                                            {% if previous %} <li class="page-item"><a class="page-link" href="{% url 'user' n=previous %}">{{ previous }}</a></li> {% endif %}
+                                            <li class="page-item active"><a class="page-link" href="{% url 'user' n=n %}">{{ n }}</a></li>
+                                            {% if next %} <li class="page-item"><a class="page-link" href="{% url 'user' n=next %}">{{ next }}</a></li> {% endif %}
+                                            {% if next %}<li class="page-item"><a class="page-link" href="{% url 'user' n=next %}" aria-label="Next"><span aria-hidden="true">»</span></a></li>{% endif %}
+                                        </ul>
+                                    </nav>
+                                </div>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary btn-block text-white btn-user" type="button" id="login">Crear</button>
+
+                    </div>
+                </div>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extrahead %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" />
+{% endblock %}
+
+{% block body %}
+<h2 class="mb-4">Terminal para {{ service.name }}</h2>
+
+<div id="terminal-container" style="height: 500px; width: 100%; background: black;"></div>
+
+<a href="{% url 'student_panel' %}" class="btn btn-secondary mt-3">Volver</a>
+{% endblock %}
+
+{% block extrascripts %}
+<script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const term = new Terminal({
+    cursorBlink: true,
+    scrollback: 1000,
+    tabStopWidth: 8,
+    theme: {
+      background: "#000000",
+      foreground: "#ffffff"
+    }
+  });
+  term.open(document.getElementById("terminal-container"));
+
+  function connectSocket() {
+    const scheme = (window.location.protocol === 'https:') ? 'wss' : 'ws';
+    const socket = new WebSocket(`${scheme}://${window.location.host}/ws/terminal/{{ service.id }}/`);
+
+    socket.onopen = () => {
+      term.writeln("Conexión establecida con el contenedor.");
+    };
+
+    socket.onmessage = (event) => {
+      term.write(event.data);
+    };
+
+    socket.onerror = (event) => {
+      term.writeln("\r\n[ERROR DE CONEXIÓN WEBSOCKET]\r\n");
+    };
+
+    socket.onclose = (event) => {
+      term.writeln("\r\n[CONEXIÓN CERRADA]");
+      setTimeout(() => {
+        term.writeln("\r\nReconectando...");
+        connectSocket();
+      }, 3000);
+    };
+
+    term.onData(data => socket.send(data));
+  }
+
+  term.writeln("Conectando al contenedor…\r\n");
+  connectSocket();
+});
+</script>
+{% endblock %}

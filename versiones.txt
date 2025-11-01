@@ -1,0 +1,5 @@
+Servidor de BD: PosgreSQL:v14,0/+
+Python: v3,9/+
+Django: v3.2.5/+
+html 5
+ccs 3
