@@ -101,7 +101,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
             except ValueError:
                 return DRF_Response({"error": "Puerto inválido."}, status=400)
 
-        # Guardado base (el serializer ya valida subject/permissions y asigna owner/status)
+        # Guardado base (el serializer ya valida subject/permissions)
         service = serializer.save(owner=request.user, status="creating")
 
         # Asociar archivos binarios

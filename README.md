@@ -108,8 +108,7 @@ cd paasify
 
 ```bash
 python -m venv venv
-source venv/bin/activate  # En Windows sin "source": venv\Scripts\activate
-```
+source venv/Scripts/activate  # En Windows sin "source": venv\Scripts\activate
 
 ### 3. Instala las Dependencias
 
