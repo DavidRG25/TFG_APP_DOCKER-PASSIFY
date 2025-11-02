@@ -131,5 +131,5 @@ python3 -m daphne -b 0.0.0.0 -p 8080 app_passify.asgi:application
 ```
 #### Dependiendo de la versión
 ```bash
-python3 -m daphne -b 0.0.0.0 -p 8080 app_passify.asgi:application
+python -m daphne -b 0.0.0.0 -p 8080 app_passify.asgi:application
 ```
