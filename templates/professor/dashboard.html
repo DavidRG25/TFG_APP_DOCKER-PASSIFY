@@ -10,7 +10,7 @@
     {% if user.is_superuser or user.is_staff %}
       <a class="btn btn-outline-secondary" href="/admin/">Ir al admin</a>
     {% endif %}
-    <a class="btn btn-outline-primary" href="{% url 'containers:student_subjects' %}">Ver “Mis asignaturas”</a>
+    <a class="btn btn-outline-primary" href="{% url 'professor_dashboard' %}">Actualizar panel</a>
   </div>
 
   <!-- Mis asignaturas -->
@@ -24,7 +24,7 @@
           {% for s in subjects %}
             <a
               class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-              href="/admin/paasify/sport/{{ s.id }}/change/">
+              href="{% url 'professor_subject_detail' s.id %}">
               <div>
                 <div class="fw-semibold">{{ s.name }}</div>
                 <small class="text-muted">
@@ -76,7 +76,7 @@
                 </td>
                 <td>
                   <a class="btn btn-sm btn-outline-primary"
-                     href="/admin/paasify/game/{{ g.id }}/change/">
+                     href="{% url 'professor_project_detail' g.id %}">
                     Abrir
                   </a>
                 </td>

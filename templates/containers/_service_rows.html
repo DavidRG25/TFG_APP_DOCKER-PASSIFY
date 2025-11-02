@@ -100,7 +100,7 @@
 
     <!-- Terminal -->
     <a
-      href="{% url 'terminal_view' s.id %}"
+      href="{% url 'containers:terminal_view' s.id %}"
       class="btn btn-sm btn-dark {% if not s.container_id or s.status != 'running' %}disabled{% endif %}"
       title="Abrir terminal">
       Terminal
