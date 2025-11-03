@@ -1,15 +1,32 @@
 import pytest
-import docker
+from docker.errors import DockerException
 
-from containers.models import Service, PortReservation
-from containers.services import run_container, stop_container, remove_container
+from containers.docker_client import get_docker_client
+from containers.models import PortReservation, Service
+from containers.services import remove_container, run_container, stop_container
+
+
+def _docker_available() -> bool:
+    client = get_docker_client()
+    if client is None:
+        return False
+    try:
+        client.ping()
+        return True
+    except DockerException:
+        return False
+
+
+DOCKER_AVAILABLE = _docker_available()
 
 
 # ───────────────────────── FIXTURES ──────────────────────────
 @pytest.fixture(scope="session")
 def docker_client():
     """Cliente Docker compartido para todos los tests."""
-    return docker.from_env()
+    if not DOCKER_AVAILABLE:
+        pytest.skip("Docker no está disponible para las pruebas de contenedores.")
+    return get_docker_client()
 
 
 # ───────────────────────── TESTS ─────────────────────────────
@@ -28,6 +45,7 @@ def test_port_reservation_is_unique():
 
 
 @pytest.mark.django_db
+@pytest.mark.skipif(not DOCKER_AVAILABLE, reason="Docker no disponible para pruebas de contenedores")
 def test_container_lifecycle(django_user_model, docker_client):
     """
     run → stop → remove debe reflejarse tanto en Docker
