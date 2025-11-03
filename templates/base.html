@@ -292,22 +292,29 @@
             {% endif %}
 
             {% if user.is_authenticated %}
-                {# Proyectos → panel del alumno (evita redirección extra) #}
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'containers:student_panel' %}">
-                        <i class="fas fa-table"></i><span>Proyectos</span>
-                    </a>
-                </li>
+                {% if nav_is_admin or nav_is_student %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'containers:student_panel' %}">
+                            <i class="fas fa-table"></i><span>Proyectos</span>
+                        </a>
+                    </li>
 
-                {# Mis asignaturas del alumno #}
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'containers:student_subjects' %}">
-                        <i class="fas fa-book"></i><span>Mis asignaturas</span>
-                    </a>
-                </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'containers:student_subjects' %}">
+                            <i class="fas fa-book"></i><span>Mis asignaturas</span>
+                        </a>
+                    </li>
+                {% endif %}
 
-                {# Admin visible solo para staff/superuser #}
-                {% if user.is_superuser or user.is_staff %}
+                {% if nav_is_admin or nav_is_teacher %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'professor_dashboard' %}">
+                            <i class="fas fa-chalkboard-teacher"></i><span>Panel profesor</span>
+                        </a>
+                    </li>
+                {% endif %}
+
+                {% if nav_is_admin %}
                     <li class="nav-item">
                         <a class="nav-link" href="/admin/">
                             <i class="fas fa-cog"></i><span>Admin</span>

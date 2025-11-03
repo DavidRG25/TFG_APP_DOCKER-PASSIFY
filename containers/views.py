@@ -1,26 +1,28 @@
 # containers/views.py
-from django.shortcuts import render, get_object_or_404, redirect
-from django.contrib.auth.decorators import login_required
-from django.template.loader import render_to_string
-from django.http import HttpResponse, Http404
-from django.utils.html import escape
-from django.core.exceptions import FieldError
 import ast
+
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import FieldError
+from django.http import Http404, HttpResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
+from django.utils.html import escape
 
 from rest_framework import viewsets
 from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response as DRF_Response
 
-from .models import Service, AllowedImage
-from .serializers import ServiceSerializer, AllowedImageSerializer
-from .services import run_container, stop_container, remove_container
+from docker.errors import NotFound, DockerException
+
+from paasify.models.ProjectModel import Game
 from paasify.models.SportModel import Sport
 
-import docker
-from docker.errors import NotFound
-
-client = docker.from_env()
+from .docker_client import get_docker_client
+from .models import AllowedImage, Service
+from .serializers import AllowedImageSerializer, ServiceSerializer
+from .services import remove_container, run_container, stop_container
 
 
 # ----------------------------- helpers -----------------------------
@@ -29,11 +31,19 @@ def _sync_service(service: Service):
     """Si el container_id ya no existe en Docker, marcamos el servicio como 'removed'."""
     if not service.container_id:
         return
+
+    docker_client = get_docker_client()
+    if docker_client is None:
+        return
+
     try:
-        client.containers.get(service.container_id)
+        docker_client.containers.get(service.container_id)
     except NotFound:
         service.status = "removed"
         service.save()
+    except DockerException:
+        # Si no podemos verificar el contenedor, conservamos el estado actual.
+        return
 
 
 def in_group(user, *group_names) -> bool:
@@ -45,11 +55,27 @@ def in_group(user, *group_names) -> bool:
     return bool(user_groups & targets)
 
 
+def user_is_student(user) -> bool:
+    return in_group(user, "student", "alumno")
+
+
+def user_is_teacher(user) -> bool:
+    return in_group(user, "teacher", "profesor")
+
+
 # ------------------------------ API --------------------------------
 
 class ServiceViewSet(viewsets.ModelViewSet):
     serializer_class = ServiceSerializer
     permission_classes = [IsAuthenticated]
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        user = request.user
+        if user.is_superuser:
+            return
+        if not user_is_student(user):
+            raise PermissionDenied("Solo los alumnos pueden gestionar contenedores.")
 
     def get_queryset(self):
         qs = Service.objects.filter(owner=self.request.user)
@@ -129,30 +155,47 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
-        run_container(self.get_object())
+        service = self.get_object()
+        try:
+            run_container(service)
+        except Exception as exc:
+            return DRF_Response({"status": "error", "message": str(exc)}, status=500)
         return DRF_Response({"status": "started", "message": "Servicio iniciado."})
 
     @action(detail=True, methods=["post"])
     def stop(self, request, pk=None):
-        stop_container(self.get_object())
+        service = self.get_object()
+        try:
+            stop_container(service)
+        except Exception as exc:
+            return DRF_Response({"status": "error", "message": str(exc)}, status=500)
         return DRF_Response({"status": "stopped", "message": "Servicio detenido."})
 
     @action(detail=True, methods=["post"], url_path="remove")
     def remove(self, request, pk=None):
-        remove_container(self.get_object())
+        service = self.get_object()
+        try:
+            remove_container(service)
+        except Exception as exc:
+            return DRF_Response({"status": "error", "message": str(exc)}, status=500)
         return DRF_Response({"status": "removed", "message": "Servicio eliminado."})
 
     @action(detail=True, methods=["get"])
     def logs(self, request, pk=None):
         service = self.get_object()
         if service.container_id:
-            try:
-                container = client.containers.get(service.container_id)
-                service.logs = container.logs(tail=100).decode(errors="replace")
+            docker_client = get_docker_client()
+            if docker_client is None:
+                service.logs = "(Docker no disponible para leer logs)"
                 service.save()
-            except Exception as e:
-                service.logs = f"(error leyendo logs: {str(e)})"
-                service.save()
+            else:
+                try:
+                    container = docker_client.containers.get(service.container_id)
+                    service.logs = container.logs(tail=100).decode(errors="replace")
+                    service.save()
+                except Exception as e:
+                    service.logs = f"(error leyendo logs: {str(e)})"
+                    service.save()
         return HttpResponse(service.logs or "(sin logs)")
 
     # ---- ver Dockerfile/compose subidos ----
@@ -188,6 +231,13 @@ class AllowedImageViewSet(viewsets.ReadOnlyModelViewSet):
 @login_required
 def student_panel(request):
     """Listado genérico de servicios del alumno (todas sus asignaturas)."""
+    if request.user.is_superuser:
+        pass
+    elif user_is_teacher(request.user):
+        return redirect("professor_dashboard")
+    elif not user_is_student(request.user):
+        return HttpResponse("No tienes permiso para acceder al panel de contenedores.", status=403)
+
     services = Service.objects.filter(owner=request.user).exclude(status="removed")
     images = AllowedImage.objects.all()
     return render(
@@ -203,8 +253,10 @@ def student_subjects(request):
     - Teacher/Profesor: asignaturas donde es profesor (Sport.teacher_user = user)
     - Student: asignaturas donde está matriculado (Sport.students contiene user)
     """
-    if in_group(request.user, "teacher", "profesor"):
-        subjects = Sport.objects.filter(teacher_user=request.user)
+    if request.user.is_superuser:
+        subjects = Sport.objects.all()
+    elif user_is_teacher(request.user):
+        return redirect("professor_dashboard")
     else:
         subjects = Sport.objects.filter(students=request.user).distinct()
     return render(request, "containers/subjects.html", {"subjects": subjects})
@@ -215,7 +267,7 @@ def student_services_in_subject(request, subject_id):
     subject = get_object_or_404(Sport, pk=subject_id)
 
     # Si es profesor y entra aquí, lo mandamos a su dashboard
-    if in_group(request.user, "teacher", "profesor"):
+    if user_is_teacher(request.user) and not request.user.is_superuser:
         return redirect("professor_dashboard")
 
     # Solo alumnos matriculados pueden entrar
@@ -239,6 +291,9 @@ def student_services_in_subject(request, subject_id):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def service_table(request):
+    if not (request.user.is_superuser or user_is_student(request.user)):
+        return HttpResponse("No tienes permiso para consultar servicios.", status=403)
+
     qs = Service.objects.filter(owner=request.user).exclude(status="removed")
     subject_id = request.GET.get("subject")
 
@@ -279,7 +334,7 @@ def post_login(request):
     u = request.user
     if u.is_superuser:
         return redirect("/admin/")
-    if in_group(u, "teacher", "profesor"):
+    if user_is_teacher(u):
         return redirect("professor_dashboard")
     # La vista está dentro del app 'containers' (namespaced)
     return redirect("containers:student_subjects")
@@ -291,17 +346,74 @@ def professor_dashboard(request):
     Dashboard de profesor: solo para usuarios del grupo Teacher/Profesor.
     Muestra sus asignaturas y proyectos asociados.
     """
-    if not in_group(request.user, "teacher", "profesor"):
+    if not (user_is_teacher(request.user) or request.user.is_superuser):
         return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
 
-    from paasify.models.ProjectModel import Game
     subjects = Sport.objects.filter(teacher_user=request.user)
-    projects = Game.objects.filter(sport__teacher_user=request.user).select_related("sport", "student")
+    if request.user.is_superuser:
+        subjects = Sport.objects.all()
+
+    projects = (
+        Game.objects.filter(sport__teacher_user=request.user)
+        if not request.user.is_superuser
+        else Game.objects.all()
+    ).select_related("sport", "student")
 
     return render(
         request,
         "professor/dashboard.html",
         {"subjects": subjects, "projects": projects},
+    )
+
+
+@login_required
+def professor_subject_detail(request, subject_id):
+    if not (user_is_teacher(request.user) or request.user.is_superuser):
+        return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
+
+    base_qs = Sport.objects.all() if request.user.is_superuser else Sport.objects.filter(teacher_user=request.user)
+    subject = get_object_or_404(base_qs.select_related("teacher_user"), pk=subject_id)
+
+    students = subject.students.all().order_by("username")
+    services = (
+        Service.objects.filter(subject=subject)
+        .select_related("owner")
+        .exclude(status="removed")
+        .order_by("owner__username", "name")
+    )
+    projects = subject.projects.select_related("student")
+
+    return render(
+        request,
+        "professor/subject_detail.html",
+        {"subject": subject, "students": students, "services": services, "projects": projects},
+    )
+
+
+@login_required
+def professor_project_detail(request, project_id):
+    if not (user_is_teacher(request.user) or request.user.is_superuser):
+        return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
+
+    base_qs = Game.objects.select_related("sport", "student")
+    if not request.user.is_superuser:
+        base_qs = base_qs.filter(sport__teacher_user=request.user)
+
+    project = get_object_or_404(base_qs, pk=project_id)
+
+    student_user = getattr(project.student, "user", None)
+    related_services = Service.objects.none()
+    if student_user is not None:
+        related_services = (
+            Service.objects.filter(owner=student_user)
+            .exclude(status="removed")
+            .select_related("owner", "subject")
+        )
+
+    return render(
+        request,
+        "professor/project_detail.html",
+        {"project": project, "related_services": related_services},
     )
 
 

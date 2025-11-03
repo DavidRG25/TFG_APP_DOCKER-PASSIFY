@@ -34,6 +34,8 @@ urlpatterns = [
     # Roles (en raíz para compatibilidad con LOGIN_REDIRECT_URL)
     path('post-login/', container_views.post_login, name='post_login'),
     path('professor/',  container_views.professor_dashboard, name='professor_dashboard'),
+    path('professor/subjects/<int:subject_id>/', container_views.professor_subject_detail, name='professor_subject_detail'),
+    path('professor/projects/<int:project_id>/', container_views.professor_project_detail, name='professor_project_detail'),
 
     # Admin
     path('admin/', admin.site.urls),
