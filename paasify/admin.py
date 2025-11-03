@@ -2,17 +2,18 @@
 from django import forms
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 
 from paasify.models.StudentModel import Player
 from paasify.models.SportModel import Sport
 from paasify.models.ProjectModel import Game
+from paasify.roles import (
+    DEFAULT_STUDENT_GROUP,
+    STUDENT_GROUP_NAMES,
+    TEACHER_GROUP_NAMES,
+    ensure_user_group,
+)
 
 User = get_user_model()
-
-# Nombres “canónicos”
-TEACHER_GROUP = "Teacher"
-STUDENT_GROUP = "Student"
 
 admin.site.site_header = "PaaSify · Admin"
 admin.site.index_title = "Panel de administración"
@@ -32,7 +33,7 @@ class GameInlineForSubject(admin.TabularInline):
         if db_field.name == "student":
             kwargs["queryset"] = (
                 Player.objects
-                .filter(user__isnull=False, user__groups__name__iexact=STUDENT_GROUP)
+                .filter(user__isnull=False, user__groups__name__in=STUDENT_GROUP_NAMES)
                 .select_related("user")
                 .distinct()
             )
@@ -63,20 +64,20 @@ class SportAdminForm(forms.ModelForm):
 
         # teacher_user: solo usuarios en grupos profesor/Teacher
         self.fields["teacher_user"].queryset = User.objects.filter(
-            groups__name__in=["profesor", TEACHER_GROUP]
+            groups__name__in=TEACHER_GROUP_NAMES
         ).distinct()
         self.fields["teacher_user"].required = True
 
         # students: solo usuarios del grupo Student (case-insensitive)
         self.fields["students"].queryset = User.objects.filter(
-            groups__name__iexact=STUDENT_GROUP
+            groups__name__in=STUDENT_GROUP_NAMES
         ).distinct()
 
     def clean_teacher_user(self):
         u = self.cleaned_data.get("teacher_user")
         if not u:
             raise forms.ValidationError("Debes asignar un profesor.")
-        if not u.groups.filter(name__in=["profesor", TEACHER_GROUP]).exists():
+        if not any(u.groups.filter(name__iexact=name).exists() for name in TEACHER_GROUP_NAMES):
             raise forms.ValidationError(
                 "El usuario seleccionado no pertenece al grupo Profesor/Teacher."
             )
@@ -86,9 +87,11 @@ class SportAdminForm(forms.ModelForm):
         qs = self.cleaned_data.get("students")
         if not qs:
             return qs
-        bad = qs.exclude(groups__name__iexact=STUDENT_GROUP)
-        if bad.exists():
-            raise forms.ValidationError("Todos los alumnos deben pertenecer al grupo Student.")
+        bad = [user for user in qs if not any(
+            user.groups.filter(name__iexact=name).exists() for name in STUDENT_GROUP_NAMES
+        )]
+        if bad:
+            raise forms.ValidationError("Todos los alumnos deben pertenecer al grupo Student/Alumno.")
         return qs
 
 
@@ -155,6 +158,10 @@ class PlayerAdminForm(forms.ModelForm):
         self.fields["user"].required = False
         self.fields["user"].queryset = base_qs
 
+        # Permitir autocompletado cuando se crea o vincula un usuario
+        self.fields["nombre"].required = False
+        self.fields["year"].required = False
+
     def clean(self):
         cleaned = super().clean()
         create = cleaned.get("create_new_user")
@@ -174,28 +181,40 @@ class PlayerAdminForm(forms.ModelForm):
                 username=cleaned["new_username"]
             ).exists():
                 self.add_error("new_username", "Este usuario ya existe")
+            if not cleaned.get("nombre"):
+                cleaned["nombre"] = cleaned.get("new_username") or cleaned.get("new_email")
+            if not cleaned.get("year"):
+                cleaned["year"] = cleaned.get("new_email") or f"{cleaned.get('new_username') or 'alumno'}@pendiente.local"
         else:
             if not selected_user:
                 raise forms.ValidationError(
                     "Seleccione un usuario existente o marque 'Crear usuario nuevo'."
                 )
+            if selected_user and not cleaned.get("nombre"):
+                cleaned["nombre"] = (
+                    selected_user.get_full_name()
+                    or selected_user.get_username()
+                    or selected_user.email
+                    or f"alumno-{selected_user.pk}"
+                )
+            if selected_user and not cleaned.get("year"):
+                cleaned["year"] = selected_user.email or f"{selected_user.get_username()}@pendiente.local"
         return cleaned
 
     def save(self, commit=True):
         player = super().save(commit=False)
         create = self.cleaned_data.get("create_new_user")
-        student_group, _ = Group.objects.get_or_create(name=STUDENT_GROUP)
-
         if create:
             u = User(username=self.cleaned_data["new_username"], email=self.cleaned_data["new_email"])
+            u._skip_player_autocreate = True
             u.set_password(self.cleaned_data["new_password1"])
             u.save()
-            u.groups.add(student_group)
+            ensure_user_group(u, STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP)
             player.user = u
         else:
             u = self.cleaned_data.get("user") or self.instance.user
             if u:
-                u.groups.add(student_group)
+                ensure_user_group(u, STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP)
                 player.user = u
 
         # Autocompletar nombre/email si faltan
