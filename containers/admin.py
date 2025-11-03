@@ -1,17 +1,25 @@
 from django.contrib import admin, messages
 from django.template.response import TemplateResponse
-from .models import AllowedImage, Service
-import docker
 from docker.errors import APIError
 
-# Cliente global (usado por la acción "solo pull")
-client = docker.from_env()
+from .docker_client import get_docker_client
+from .models import AllowedImage, Service
 
 
 # Acción: Probar imagen (pull & run) y MOSTRAR LOG en una página
 @admin.action(description="Probar imagen (pull & run) y mostrar log")
 def probar_imagen_con_log(modeladmin, request, queryset):
-    local_client = docker.from_env()
+    local_client = get_docker_client()
+    if local_client is None:
+        messages.error(
+            request,
+            "No se pudo conectar con el daemon de Docker. Verifica que el servicio esté activo.",
+        )
+        context = {
+            **modeladmin.admin_site.each_context(request),
+            "results": [],
+        }
+        return TemplateResponse(request, "admin/allowedimage_test_logs.html", context)
     results = []
 
     for img in queryset:
@@ -86,10 +94,19 @@ class AllowedImageAdmin(admin.ModelAdmin):
         """
         Acción original: SOLO pull + mensajes en la parte superior del admin.
         """
+        docker_client = get_docker_client()
+        if docker_client is None:
+            self.message_user(
+                request,
+                "Docker no está disponible. Inicia el daemon antes de ejecutar la acción.",
+                level=messages.ERROR,
+            )
+            return
+
         for img in queryset:
             image_full = f"{img.name}:{img.tag}"
             try:
-                client.images.pull(img.name, tag=img.tag)
+                docker_client.images.pull(img.name, tag=img.tag)
                 messages.success(request, f"Imagen {image_full} cargada correctamente.")
             except APIError as e:
                 messages.error(request, f"Error al cargar {image_full}: {e}")
