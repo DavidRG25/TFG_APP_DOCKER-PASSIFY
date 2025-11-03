@@ -1,14 +1,13 @@
 import threading
-import docker
+
 from channels.generic.websocket import WebsocketConsumer
-from django.shortcuts import get_object_or_404
 from django.http import Http404
+from django.shortcuts import get_object_or_404
 
+from docker.errors import DockerException
+
+from .docker_client import get_docker_client
 from .models import Service
-
-# Cliente de alto nivel y API de bajo nivel
-_docker = docker.from_env()
-_api = _docker.api
 
 
 class TerminalConsumer(WebsocketConsumer):
@@ -38,9 +37,17 @@ class TerminalConsumer(WebsocketConsumer):
 
         self.accept()
 
+        docker_client = get_docker_client()
+        if docker_client is None:
+            self.send("\r\n[ERROR] Docker no está disponible actualmente.\r\n")
+            self.close()
+            return
+
+        api = docker_client.api
+
         try:
             # Creamos exec interactivo con TTY y STDIN
-            exec_obj = _api.exec_create(
+            exec_obj = api.exec_create(
                 container=service.container_id,
                 cmd="/bin/sh",
                 tty=True,
@@ -49,7 +56,7 @@ class TerminalConsumer(WebsocketConsumer):
             self.exec_id = exec_obj.get("Id")
 
             # Abrimos un socket bidireccional (TTY=True => no multiplexado)
-            self.sock = _api.exec_start(
+            self.sock = api.exec_start(
                 self.exec_id,
                 detach=False,
                 tty=True,
@@ -68,7 +75,7 @@ class TerminalConsumer(WebsocketConsumer):
             # Mensaje de bienvenida
             self.send("Conexión establecida. Escribe comandos.\r\n")
 
-        except Exception as e:
+        except (DockerException, Exception) as e:
             self.send(f"\r\n[ERROR al iniciar shell]: {e}\r\n")
             self.close()
 

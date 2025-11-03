@@ -1,20 +1,21 @@
 # containers/services.py
 import os
 import shutil
-import json
 import tempfile
 import subprocess
 import random
 
-import docker
-from docker.errors import NotFound, APIError
+from docker.errors import NotFound, APIError, DockerException
 
+from .docker_client import get_docker_client
 from .models import Service, PortReservation
-
-client = docker.from_env()
 
 PORT_RANGE_START = 40000
 PORT_RANGE_END = 50000
+
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MiB
+COMPOSE_EXTENSIONS = {".yml", ".yaml"}
+CODE_EXTENSIONS = {".zip"}
 
 
 def _compose_cmd() -> list[str]:
@@ -53,14 +54,34 @@ def _release_port(port: int | None):
 
 # ---------- Utilidades de ficheros ----------
 
+def _validate_upload(ff, *, allowed_extensions=None, max_size=MAX_UPLOAD_SIZE):
+    """Valida tamaño y extensión permitida para un ``FieldFile``."""
+    if ff is None:
+        return
+
+    if max_size and getattr(ff, "size", None) and ff.size > max_size:
+        raise ValueError(
+            f"El archivo '{getattr(ff, 'name', 'desconocido')}' supera el tamaño máximo permitido ({max_size // (1024 * 1024)} MiB)."
+        )
+
+    if allowed_extensions is not None:
+        name = getattr(ff, "name", "") or ""
+        extension = os.path.splitext(name)[1].lower()
+        if extension not in allowed_extensions:
+            allowed = ", ".join(sorted(ext or 'sin extensión' for ext in allowed_extensions))
+            raise ValueError(
+                f"El archivo '{name}' debe tener una de las extensiones permitidas: {allowed}."
+            )
+
+
 def _save_filefield_to(tmp_path: str, ff) -> str:
     """
     Guarda el contenido de un FileField en 'tmp_path' y devuelve esa ruta.
     """
     os.makedirs(os.path.dirname(tmp_path), exist_ok=True)
-    with ff.open("rb"):
+    with ff.open("rb") as in_fh:
         with open(tmp_path, "wb") as out:
-            shutil.copyfileobj(ff, out)
+            shutil.copyfileobj(in_fh, out)
     return tmp_path
 
 
@@ -86,26 +107,59 @@ def run_container(service: Service, force_restart: bool = False):
       2) Dockerfile       (si se subió)
       3) Imagen permitida (catálogo)
     """
+    docker_client = get_docker_client()
+    if docker_client is None:
+        service.status = "error"
+        service.logs = "Docker no está disponible. Inicia el daemon y vuelve a intentarlo."
+        service.save()
+        raise RuntimeError("Docker no está disponible en el entorno de ejecución.")
+
+    try:
+        if service.compose:
+            _validate_upload(service.compose, allowed_extensions=COMPOSE_EXTENSIONS)
+        if service.code:
+            _validate_upload(service.code, allowed_extensions=CODE_EXTENSIONS)
+        if service.dockerfile:
+            # Dockerfile admite nombres sin extensión, por lo que solo se valida tamaño.
+            _validate_upload(service.dockerfile, allowed_extensions=None)
+    except ValueError as exc:
+        service.status = "error"
+        service.logs = str(exc)
+        service.save()
+        raise
+
     port = None
     try:
         # Si hay que reiniciar, eliminar contenedor previo y liberar puerto
         if force_restart and service.container_id:
             try:
-                client.containers.get(service.container_id).remove(force=True)
+                docker_client.containers.get(service.container_id).remove(force=True)
             except NotFound:
                 pass
+            except DockerException as exc:
+                service.logs = f"No se pudo eliminar el contenedor previo: {exc}"
+                service.save()
+                raise RuntimeError(service.logs)
             service.container_id = None
             _release_port(service.assigned_port)
             service.assigned_port = None
 
         # Si ya existe y no es reinicio, asegurar que esté en marcha y salir
         if service.container_id and not force_restart:
-            container = client.containers.get(service.container_id)
-            if container.status != "running":
-                container.start()
-                service.status = "running"
+            try:
+                container = docker_client.containers.get(service.container_id)
+                if container.status != "running":
+                    container.start()
+                    service.status = "running"
+                    service.save()
+                return
+            except NotFound:
+                service.container_id = None
+            except DockerException as exc:
+                service.logs = f"Error al consultar el contenedor existente: {exc}"
+                service.status = "error"
                 service.save()
-            return
+                raise RuntimeError(service.logs)
 
         # --------- Reserva de puerto (solo para caso NO compose) ---------
         custom_port = getattr(service, "_custom_port", None)
@@ -149,7 +203,9 @@ def run_container(service: Service, force_restart: bool = False):
 
                 # Buscar contenedor por labels del proyecto compose
                 # Tomamos el primero (suponemos un único servicio en el YAML para este MVP)
-                containers = client.containers.list(all=True, filters={"label": f"com.docker.compose.project={project}"})
+                containers = docker_client.containers.list(
+                    all=True, filters={"label": f"com.docker.compose.project={project}"}
+                )
                 if not containers:
                     service.status = "error"
                     service.logs = "docker-compose: no se detectó ningún contenedor con el proyecto especificado."
@@ -212,7 +268,7 @@ def run_container(service: Service, force_restart: bool = False):
         # Puerto interno configurable (si añadís el campo al modelo); por defecto 80
         internal_port = getattr(service, "internal_port", 80)
 
-        container = client.containers.run(
+        container = docker_client.containers.run(
             image=image_to_run,
             detach=True,
             tty=True,
@@ -232,7 +288,7 @@ def run_container(service: Service, force_restart: bool = False):
             service.logs = (service.logs or "") + "\nImagen construida y contenedor arrancado."
         service.save()
 
-    except (APIError, RuntimeError) as exc:
+    except (APIError, DockerException, RuntimeError, ValueError) as exc:
         _release_port(port)
         service.status = "error"
         service.logs = str(exc)
@@ -246,20 +302,34 @@ def stop_container(service: Service):
     if not service.container_id:
         return
     try:
-        client.containers.get(service.container_id).stop()
+        docker_client = get_docker_client()
+        if docker_client is None:
+            raise RuntimeError("Docker no está disponible para detener el servicio.")
+        docker_client.containers.get(service.container_id).stop()
         service.status = "stopped"
         service.save()
     except NotFound:
         service.status = "removed"
         service.save()
+    except (DockerException, RuntimeError) as exc:
+        service.logs = str(exc)
+        service.save()
+        raise
 
 
 def remove_container(service: Service):
     if service.container_id:
         try:
-            client.containers.get(service.container_id).remove(force=True)
+            docker_client = get_docker_client()
+            if docker_client is None:
+                raise RuntimeError("Docker no está disponible para eliminar el servicio.")
+            docker_client.containers.get(service.container_id).remove(force=True)
         except NotFound:
             pass
+        except (DockerException, RuntimeError) as exc:
+            service.logs = str(exc)
+            service.save()
+            raise
 
     _release_port(service.assigned_port)
 

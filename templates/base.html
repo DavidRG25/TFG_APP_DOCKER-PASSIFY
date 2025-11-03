@@ -292,21 +292,28 @@
             {% endif %}
 
             {% if user.is_authenticated %}
-                {# Proyectos → panel del alumno (evita redirección extra) #}
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'containers:student_panel' %}">
-                        <i class="fas fa-table"></i><span>Proyectos</span>
-                    </a>
-                </li>
+                {% if user.is_superuser or user.groups.filter(name__iexact='student').exists or user.groups.filter(name__iexact='alumno').exists %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'containers:student_panel' %}">
+                            <i class="fas fa-table"></i><span>Proyectos</span>
+                        </a>
+                    </li>
 
-                {# Mis asignaturas del alumno #}
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'containers:student_subjects' %}">
-                        <i class="fas fa-book"></i><span>Mis asignaturas</span>
-                    </a>
-                </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'containers:student_subjects' %}">
+                            <i class="fas fa-book"></i><span>Mis asignaturas</span>
+                        </a>
+                    </li>
+                {% endif %}
 
-                {# Admin visible solo para staff/superuser #}
+                {% if user.is_superuser or user.groups.filter(name__iexact='teacher').exists or user.groups.filter(name__iexact='profesor').exists %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'professor_dashboard' %}">
+                            <i class="fas fa-chalkboard-teacher"></i><span>Panel profesor</span>
+                        </a>
+                    </li>
+                {% endif %}
+
                 {% if user.is_superuser or user.is_staff %}
                     <li class="nav-item">
                         <a class="nav-link" href="/admin/">
