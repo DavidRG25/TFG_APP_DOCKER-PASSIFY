@@ -45,11 +45,11 @@ INSTALLED_APPS = [
 ]
 
 # ---------------------------------------------------------------------
-# Middleware (añadimos WhiteNoise para estáticos en prod)
+# Middleware (WhiteNoise para estáticos)
 # ---------------------------------------------------------------------
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # <— IMPORTANTE
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Requiere paquete 'whitenoise'
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -63,6 +63,13 @@ MIDDLEWARE = [
 # ---------------------------------------------------------------------
 ASGI_APPLICATION = "app_passify.asgi.application"
 WSGI_APPLICATION = 'app_passify.wsgi.application'
+
+# Channels (capa en memoria para dev; en prod usa channels_redis)
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    }
+}
 
 # ---------------------------------------------------------------------
 # URLs / Templates
@@ -108,8 +115,8 @@ AUTH_PASSWORD_VALIDATORS = [
 # ---------------------------------------------------------------------
 # I18N / TZ
 # ---------------------------------------------------------------------
-LANGUAGE_CODE = 'es-ar'
-TIME_ZONE = 'UTC'
+LANGUAGE_CODE = 'es-es'
+TIME_ZONE = 'Europe/Madrid'
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
@@ -128,9 +135,15 @@ STATICFILES_DIRS = [
 # Carpeta a la que colecta en despliegue
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# WhiteNoise: compresión y versionado (recomendado)
+# WhiteNoise: compresión y versionado
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 WHITENOISE_USE_FINDERS = True  # útil en dev para localizar estáticos dentro de apps
+
+# ---------------------------------------------------------------------
+# Archivos de usuario (FileField)
+# ---------------------------------------------------------------------
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 # ---------------------------------------------------------------------
 # Defaults

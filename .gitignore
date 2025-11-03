@@ -30,3 +30,6 @@ venv/
 *.tmp
 staticfiles/
 media/
+
+# === IAS ===
+prompts/

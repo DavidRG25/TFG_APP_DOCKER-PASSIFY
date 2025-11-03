@@ -29,7 +29,7 @@
     <button
       class="btn btn-sm btn-success"
       {% if s.status == "running" %}disabled{% endif %}
-      hx-post="{% url 'service-start' s.id %}"
+      hx-post="/api/containers/{{ s.id }}/start/"
       hx-target="#service-table"
       hx-swap="innerHTML"
       title="Iniciar">
@@ -40,7 +40,7 @@
     <button
       class="btn btn-sm btn-warning"
       {% if s.status != "running" %}disabled{% endif %}
-      hx-post="{% url 'service-stop' s.id %}"
+      hx-post="/api/containers/{{ s.id }}/stop/"
       hx-target="#service-table"
       hx-swap="innerHTML"
       title="Detener">
@@ -50,7 +50,7 @@
     <!-- Remove (via POST) -->
     <button
       class="btn btn-sm btn-danger"
-      hx-post="{% url 'service-remove' s.id %}"
+      hx-post="/api/containers/{{ s.id }}/remove/"
       hx-target="#service-table"
       hx-swap="innerHTML"
       hx-confirm="¿Eliminar definitivamente?"
@@ -61,7 +61,7 @@
     <!-- Logs -->
     <button
       class="btn btn-sm btn-secondary"
-      hx-get="{% url 'service-logs' s.id %}"
+      hx-get="/api/containers/{{ s.id }}/logs/"
       hx-target="#logs-body"
       hx-swap="innerHTML"
       data-bs-toggle="modal"
@@ -74,7 +74,7 @@
     <!-- Dockerfile -->
     <button
       class="btn btn-sm btn-info"
-      hx-get="{% url 'service-dockerfile' s.id %}"
+      hx-get="/api/containers/{{ s.id }}/dockerfile/"
       hx-target="#code-body"
       hx-swap="innerHTML"
       data-bs-toggle="modal"
@@ -88,7 +88,7 @@
     <!-- Compose -->
     <button
       class="btn btn-sm btn-info"
-      hx-get="{% url 'service-compose' s.id %}"
+      hx-get="/api/containers/{{ s.id }}/compose/"
       hx-target="#code-body"
       hx-swap="innerHTML"
       data-bs-toggle="modal"

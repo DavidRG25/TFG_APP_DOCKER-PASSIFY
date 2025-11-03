@@ -122,8 +122,18 @@ pip install -r requirements.txt
 python manage.py makemigrations
 python manage.py migrate
 ```
+### 5. Crea un Superusuario
 
-### 5. Inicia el servidor ASGI con Daphne
+```bash
+python manage.py createsuperuser
+```
+### 6. Recopìla los Archivos Estáticos
+
+```bash
+python manage.py collectstatic --noinput
+```
+
+### 7. Inicia el servidor ASGI con Daphne
 
 ```bash
 python3 -m daphne -b 0.0.0.0 -p 8080 app_passify.asgi:application

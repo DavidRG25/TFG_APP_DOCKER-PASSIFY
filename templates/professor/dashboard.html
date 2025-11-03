@@ -49,8 +49,9 @@
 
   <!-- Proyectos de mis asignaturas -->
   <div class="card">
-    <div class="card-header">
+    <div class="card-header d-flex justify-content-between align-items-center">
       <strong>Proyectos de mis asignaturas</strong>
+      <!-- Tip: aquí podríamos añadir filtros en el futuro -->
     </div>
     <div class="card-body p-0">
       {% if projects %}
@@ -69,7 +70,7 @@
               {% for g in projects %}
               <tr>
                 <td>{{ g.place }}</td>
-                <td>{{ g.student.nombre }}</td>
+                <td>{{ g.student.nombre|default:g.student }}</td>
                 <td>{{ g.sport.name }}</td>
                 <td>
                   {{ g.date|date:"Y-m-d" }} {{ g.time|time:"H:i" }}

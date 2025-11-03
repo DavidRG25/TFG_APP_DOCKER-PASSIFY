@@ -50,6 +50,7 @@
       <form id="newServiceForm"
             method="POST" enctype="multipart/form-data"
             hx-post="/api/containers/"
+            hx-encoding="multipart/form-data"
             hx-target="#service-table"
             hx-swap="afterbegin">
 
@@ -61,7 +62,13 @@
         <div class="modal-body">
           <div class="mb-3">
             <label class="form-label">Nombre</label>
-            <input name="name" class="form-control" required placeholder="p.ej. mi-nginx">
+            <input name="name" class="form-control" required
+                   placeholder="p.ej. mi-nginx"
+                   pattern="[a-z0-9]([a-z0-9\-_.]*[a-z0-9])?"
+                   title="Minúsculas, números, y - _ . (sin espacios; no empezar/terminar con separadores)">
+            <small class="text-muted">
+              Se forzará a minúsculas. Evita espacios y caracteres especiales.
+            </small>
           </div>
 
           <!-- Tipo de despliegue -->
@@ -120,7 +127,7 @@
 
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-success">Crear</button>
+          <button id="createBtn" type="submit" class="btn btn-success">Crear</button>
         </div>
       </form>
 
@@ -176,15 +183,39 @@
     setTimeout(() => el.remove(), 2500);
   }
 
+  // Normaliza nombre a minúsculas y sin espacios (evita tags Docker inválidos)
+  function normalizeServiceName() {
+    const nameInput = document.querySelector('input[name="name"]');
+    if (!nameInput) return;
+    const v = nameInput.value.trim()
+      .toLowerCase()
+      .replace(/\s+/g, '-')          // espacios -> guiones
+      .replace(/[^a-z0-9\-_.]/g, ''); // sólo chars válidos
+    nameInput.value = v;
+  }
+
   // Cierre de modal SOLO cuando el submit del formulario termina OK
+  htmx.on('htmx:beforeRequest', (evt) => {
+    const { elt } = evt.detail || {};
+    if (elt && elt.id === 'newServiceForm') {
+      normalizeServiceName();
+      const btn = document.getElementById('createBtn');
+      if (btn) btn.disabled = true;
+    }
+  });
+
   htmx.on('htmx:afterRequest', (evt) => {
     const { elt, xhr } = evt.detail || {};
-    if (elt && elt.id === 'newServiceForm' && xhr && xhr.status >= 200 && xhr.status < 300) {
-      const modalEl = document.getElementById('newServiceModal');
-      (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).hide();
-      elt.reset();
-      applyMode();             // re-aplica el modo por defecto
-      showToast('Servicio creado');
+    if (elt && elt.id === 'newServiceForm') {
+      const btn = document.getElementById('createBtn');
+      if (btn) btn.disabled = false;
+      if (xhr && xhr.status >= 200 && xhr.status < 300) {
+        const modalEl = document.getElementById('newServiceModal');
+        (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).hide();
+        elt.reset();
+        applyMode();             // re-aplica el modo por defecto
+        showToast('Servicio creado');
+      }
     }
   });
 
@@ -202,6 +233,8 @@
     const status = xhr?.status ?? 0;
     const msg = (xhr && xhr.responseText) ? xhr.responseText : 'Se produjo un error';
     showToast(`Error (${status}): ${msg}`, 'text-bg-danger');
+    const btn = document.getElementById('createBtn');
+    if (btn) btn.disabled = false;
   });
 
   // === Lógica modo default/custom + exclusión Dockerfile/Compose ===

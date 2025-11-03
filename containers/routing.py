@@ -1,6 +1,9 @@
-from django.urls import re_path
+# containers/routing.py
+from django.urls import path
 from .consumers import TerminalConsumer
 
+# Rutas WebSocket de la app "containers"
+# Deben ser incluidas en app_passify/asgi.py dentro de URLRouter(...)
 websocket_urlpatterns = [
-    re_path(r"ws/terminal/(?P<service_id>\d+)/$", TerminalConsumer.as_asgi()),
+    path("ws/terminal/<int:service_id>/", TerminalConsumer.as_asgi()),
 ]

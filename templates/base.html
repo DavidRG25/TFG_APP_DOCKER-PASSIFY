@@ -292,9 +292,9 @@
             {% endif %}
 
             {% if user.is_authenticated %}
-                {# Proyectos → panel del alumno (evita redirección extra) #}
+                {# Proyectos → redirección según rol vía post_login #}
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'containers:student_panel' %}">
+                    <a class="nav-link" href="{% url 'post_login' %}">
                         <i class="fas fa-table"></i><span>Proyectos</span>
                     </a>
                 </li>

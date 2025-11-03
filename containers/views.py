@@ -125,7 +125,10 @@ class ServiceViewSet(viewsets.ModelViewSet):
             {"services": [service]},
             request=request,
         )
-        return DRF_Response(row_html, status=201)
+        # Cabecera para que el modal se cierre desde JS (htmx:afterRequest)
+        resp = DRF_Response(row_html, status=201)
+        resp["HX-Trigger"] = "service-created"
+        return resp
 
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
@@ -252,7 +255,7 @@ def service_table(request):
     for s in qs:
         _sync_service(s)
 
-    html = render_to_string("containers/_service_rows.html", {"services": qs})
+    html = render_to_string("containers/_service_rows.html", {"services": qs}, request=request)
     return HttpResponse(html)
 
 
