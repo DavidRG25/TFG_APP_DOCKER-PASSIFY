@@ -30,3 +30,7 @@ venv/
 *.tmp
 staticfiles/
 media/
+
+# === IA ===
+prompts/
+user_code/
