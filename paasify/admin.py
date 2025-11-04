@@ -162,6 +162,10 @@ class PlayerAdminForm(forms.ModelForm):
         self.fields["nombre"].required = False
         self.fields["year"].required = False
 
+        # Permitir autocompletado cuando se crea o vincula un usuario
+        self.fields["nombre"].required = False
+        self.fields["year"].required = False
+
     def clean(self):
         cleaned = super().clean()
         create = cleaned.get("create_new_user")
