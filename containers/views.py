@@ -71,6 +71,14 @@ def user_is_teacher(user) -> bool:
     return in_group(user, "teacher", "profesor")
 
 
+def user_is_student(user) -> bool:
+    return in_group(user, "student", "alumno")
+
+
+def user_is_teacher(user) -> bool:
+    return in_group(user, "teacher", "profesor")
+
+
 # ------------------------------ API --------------------------------
 
 class ServiceViewSet(viewsets.ModelViewSet):
@@ -371,6 +379,57 @@ def professor_dashboard(request):
         request,
         "professor/dashboard.html",
         {"subjects": subjects, "projects": projects},
+    )
+
+
+@login_required
+def professor_subject_detail(request, subject_id):
+    if not (user_is_teacher(request.user) or request.user.is_superuser):
+        return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
+
+    base_qs = Sport.objects.all() if request.user.is_superuser else Sport.objects.filter(teacher_user=request.user)
+    subject = get_object_or_404(base_qs.select_related("teacher_user"), pk=subject_id)
+
+    students = subject.students.all().order_by("username")
+    services = (
+        Service.objects.filter(subject=subject)
+        .select_related("owner")
+        .exclude(status="removed")
+        .order_by("owner__username", "name")
+    )
+    projects = subject.projects.select_related("student")
+
+    return render(
+        request,
+        "professor/subject_detail.html",
+        {"subject": subject, "students": students, "services": services, "projects": projects},
+    )
+
+
+@login_required
+def professor_project_detail(request, project_id):
+    if not (user_is_teacher(request.user) or request.user.is_superuser):
+        return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
+
+    base_qs = Game.objects.select_related("sport", "student")
+    if not request.user.is_superuser:
+        base_qs = base_qs.filter(sport__teacher_user=request.user)
+
+    project = get_object_or_404(base_qs, pk=project_id)
+
+    student_user = getattr(project.student, "user", None)
+    related_services = Service.objects.none()
+    if student_user is not None:
+        related_services = (
+            Service.objects.filter(owner=student_user)
+            .exclude(status="removed")
+            .select_related("owner", "subject")
+        )
+
+    return render(
+        request,
+        "professor/project_detail.html",
+        {"project": project, "related_services": related_services},
     )
 
 
