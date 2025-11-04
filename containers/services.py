@@ -21,6 +21,10 @@ MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MiB
 COMPOSE_EXTENSIONS = {".yml", ".yaml"}
 CODE_EXTENSIONS = {".zip"}
 
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MiB
+COMPOSE_EXTENSIONS = {".yml", ".yaml"}
+CODE_EXTENSIONS = {".zip"}
+
 
 def _compose_cmd() -> list[str]:
     """
