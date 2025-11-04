@@ -1,5 +1,6 @@
 # containers/views.py
 import ast
+import json
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import FieldError
@@ -16,7 +17,7 @@ from rest_framework.response import Response as DRF_Response
 
 from docker.errors import NotFound, DockerException
 
-from paasify.models.ProjectModel import Game
+from paasify.models.ProjectModel import UserProject
 from paasify.models.SportModel import Sport
 
 from .docker_client import get_docker_client
@@ -85,6 +86,35 @@ class ServiceViewSet(viewsets.ModelViewSet):
     serializer_class = ServiceSerializer
     permission_classes = [IsAuthenticated]
 
+    def _is_htmx(self, request) -> bool:
+        return request.headers.get("HX-Request") == "true"
+
+    def _render_table_fragment(self, request) -> str:
+        services = self.get_queryset()
+        return render_to_string(
+            "containers/_service_rows.html",
+            {"services": services},
+            request=request,
+        )
+
+    def _htmx_response(
+        self,
+        request,
+        *,
+        status=200,
+        message=None,
+        level="text-bg-success",
+        extra_triggers=None,
+    ):
+        html = self._render_table_fragment(request)
+        response = DRF_Response(html, status=status)
+        trigger = dict(extra_triggers or {})
+        if message:
+            trigger["service:toast"] = {"message": message, "variant": level}
+        if trigger:
+            response["HX-Trigger"] = json.dumps(trigger)
+        return response
+
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         user = request.user
@@ -108,45 +138,41 @@ class ServiceViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
-        # --- validación de modo ---
         mode = (request.data.get("mode") or "default").lower()
         if mode not in ("default", "custom"):
             mode = "default"
 
-        has_df   = bool(request.FILES.get("dockerfile"))
+        has_df = bool(request.FILES.get("dockerfile"))
         has_comp = bool(request.FILES.get("compose"))
         has_code = bool(request.FILES.get("code"))
 
         if mode == "default":
             if has_df or has_comp or has_code:
                 return DRF_Response(
-                    {"error": "En modo 'Imagen por defecto' no se permiten Dockerfile/Compose/Código."},
-                    status=400
+                    {"error": "En modo 'Imagen por defecto' no se permiten Dockerfile/Compose/Codigo."},
+                    status=400,
                 )
-        else:  # custom
+        else:
             if has_df and has_comp:
                 return DRF_Response(
                     {"error": "Sube Dockerfile O docker-compose, pero no ambos."},
-                    status=400
+                    status=400,
                 )
             if not (has_df or has_comp):
                 return DRF_Response(
-                    {"error": "En modo 'Configuración personalizada' debes subir Dockerfile o docker-compose."},
-                    status=400
+                    {"error": "En modo 'Configuracion personalizada' debes subir Dockerfile o docker-compose."},
+                    status=400,
                 )
 
-        # Puerto custom (opcional)
         custom_port = request.data.get("custom_port")
         if custom_port:
             try:
                 custom_port = int(custom_port)
             except ValueError:
-                return DRF_Response({"error": "Puerto inválido."}, status=400)
+                return DRF_Response({"error": "Puerto invalido."}, status=400)
 
-        # Guardado base (el serializer ya valida subject/permissions y asigna owner/status)
         service = serializer.save(owner=request.user, status="creating")
 
-        # Asociar archivos binarios
         if has_df:
             service.dockerfile = request.FILES["dockerfile"]
         if has_comp:
@@ -155,19 +181,35 @@ class ServiceViewSet(viewsets.ModelViewSet):
             service.code = request.FILES["code"]
         service.save()
 
-        # Lanzar contenedor
         service._custom_port = custom_port  # usado por run_container
         try:
             run_container(service)
-        except Exception as e:
-            return DRF_Response({"error": str(e)}, status=500)
+        except Exception as exc:
+            service.status = "error"
+            service.logs = str(exc)
+            service.save(update_fields=["status", "logs"])
+            if self._is_htmx(request):
+                return self._htmx_response(
+                    request,
+                    status=500,
+                    message=str(exc),
+                    level="text-bg-danger",
+                )
+            return DRF_Response({"error": str(exc)}, status=500)
 
-        row_html = render_to_string(
-            "containers/_service_rows.html",
-            {"services": [service]},
-            request=request,
-        )
-        return DRF_Response(row_html, status=201)
+        if self._is_htmx(request):
+            triggers = {"service:modal-close": {"modalId": "newServiceModal"}}
+            return self._htmx_response(
+                request,
+                status=201,
+                message="Servicio creado.",
+                level="text-bg-success",
+                extra_triggers=triggers,
+            )
+
+        headers = self.get_success_headers(serializer.data)
+        serialized = ServiceSerializer(service, context={"request": request})
+        return DRF_Response(serialized.data, status=201, headers=headers)
 
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
@@ -175,7 +217,21 @@ class ServiceViewSet(viewsets.ModelViewSet):
         try:
             run_container(service)
         except Exception as exc:
+            if self._is_htmx(request):
+                return self._htmx_response(
+                    request,
+                    status=500,
+                    message=str(exc),
+                    level="text-bg-danger",
+                )
             return DRF_Response({"status": "error", "message": str(exc)}, status=500)
+
+        if self._is_htmx(request):
+            return self._htmx_response(
+                request,
+                message="Servicio iniciado.",
+                level="text-bg-success",
+            )
         return DRF_Response({"status": "started", "message": "Servicio iniciado."})
 
     @action(detail=True, methods=["post"])
@@ -184,7 +240,21 @@ class ServiceViewSet(viewsets.ModelViewSet):
         try:
             stop_container(service)
         except Exception as exc:
+            if self._is_htmx(request):
+                return self._htmx_response(
+                    request,
+                    status=500,
+                    message=str(exc),
+                    level="text-bg-danger",
+                )
             return DRF_Response({"status": "error", "message": str(exc)}, status=500)
+
+        if self._is_htmx(request):
+            return self._htmx_response(
+                request,
+                message="Servicio detenido.",
+                level="text-bg-warning",
+            )
         return DRF_Response({"status": "stopped", "message": "Servicio detenido."})
 
     @action(detail=True, methods=["post"], url_path="remove")
@@ -193,7 +263,21 @@ class ServiceViewSet(viewsets.ModelViewSet):
         try:
             remove_container(service)
         except Exception as exc:
+            if self._is_htmx(request):
+                return self._htmx_response(
+                    request,
+                    status=500,
+                    message=str(exc),
+                    level="text-bg-danger",
+                )
             return DRF_Response({"status": "error", "message": str(exc)}, status=500)
+
+        if self._is_htmx(request):
+            return self._htmx_response(
+                request,
+                message="Servicio eliminado.",
+                level="text-bg-danger",
+            )
         return DRF_Response({"status": "removed", "message": "Servicio eliminado."})
 
     @action(detail=True, methods=["get"])
@@ -370,10 +454,10 @@ def professor_dashboard(request):
         subjects = Sport.objects.all()
 
     projects = (
-        Game.objects.filter(sport__teacher_user=request.user)
+        UserProject.objects.filter(sport__teacher_user=request.user)
         if not request.user.is_superuser
-        else Game.objects.all()
-    ).select_related("sport", "student")
+        else UserProject.objects.all()
+    ).select_related("sport", "user_profile")
 
     return render(
         request,
@@ -397,7 +481,7 @@ def professor_subject_detail(request, subject_id):
         .exclude(status="removed")
         .order_by("owner__username", "name")
     )
-    projects = subject.projects.select_related("student")
+    projects = subject.projects.select_related("user_profile")
 
     return render(
         request,
@@ -411,13 +495,13 @@ def professor_project_detail(request, project_id):
     if not (user_is_teacher(request.user) or request.user.is_superuser):
         return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
 
-    base_qs = Game.objects.select_related("sport", "student")
+    base_qs = UserProject.objects.select_related("sport", "user_profile")
     if not request.user.is_superuser:
         base_qs = base_qs.filter(sport__teacher_user=request.user)
 
     project = get_object_or_404(base_qs, pk=project_id)
 
-    student_user = getattr(project.student, "user", None)
+    student_user = getattr(project.user_profile, "user", None)
     related_services = Service.objects.none()
     if student_user is not None:
         related_services = (
@@ -448,7 +532,7 @@ def professor_subject_detail(request, subject_id):
         .exclude(status="removed")
         .order_by("owner__username", "name")
     )
-    projects = subject.projects.select_related("student")
+    projects = subject.projects.select_related("user_profile")
 
     return render(
         request,
@@ -462,13 +546,13 @@ def professor_project_detail(request, project_id):
     if not (user_is_teacher(request.user) or request.user.is_superuser):
         return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
 
-    base_qs = Game.objects.select_related("sport", "student")
+    base_qs = UserProject.objects.select_related("sport", "user_profile")
     if not request.user.is_superuser:
         base_qs = base_qs.filter(sport__teacher_user=request.user)
 
     project = get_object_or_404(base_qs, pk=project_id)
 
-    student_user = getattr(project.student, "user", None)
+    student_user = getattr(project.user_profile, "user", None)
     related_services = Service.objects.none()
     if student_user is not None:
         related_services = (
@@ -499,7 +583,7 @@ def professor_subject_detail(request, subject_id):
         .exclude(status="removed")
         .order_by("owner__username", "name")
     )
-    projects = subject.projects.select_related("student")
+    projects = subject.projects.select_related("user_profile")
 
     return render(
         request,
@@ -513,13 +597,13 @@ def professor_project_detail(request, project_id):
     if not (user_is_teacher(request.user) or request.user.is_superuser):
         return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
 
-    base_qs = Game.objects.select_related("sport", "student")
+    base_qs = UserProject.objects.select_related("sport", "user_profile")
     if not request.user.is_superuser:
         base_qs = base_qs.filter(sport__teacher_user=request.user)
 
     project = get_object_or_404(base_qs, pk=project_id)
 
-    student_user = getattr(project.student, "user", None)
+    student_user = getattr(project.user_profile, "user", None)
     related_services = Service.objects.none()
     if student_user is not None:
         related_services = (

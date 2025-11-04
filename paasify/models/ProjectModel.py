@@ -3,16 +3,16 @@ from django.utils import timezone
 from datetime import datetime
 
 from paasify.models.SportModel import Sport
-from paasify.models.StudentModel import Player
+from paasify.models.StudentModel import UserProfile
 
 
-class Game(models.Model):
+class UserProject(models.Model):
     place = models.CharField(
         max_length=100,
         verbose_name="Nombre del Proyecto",
     )
-    student = models.ForeignKey(
-        to=Player,
+    user_profile = models.ForeignKey(
+        to=UserProfile,
         on_delete=models.DO_NOTHING,
         verbose_name="Alumno Asignado",
         related_name="projects",
@@ -28,10 +28,10 @@ class Game(models.Model):
 
     class Meta:
         managed = True
-        db_table = "game"
-        verbose_name = "Gestión de Proyecto"
-        verbose_name_plural = "Gestión de Proyectos"
+        db_table = "user_project"
+        verbose_name = "Proyecto asignado"
+        verbose_name_plural = "Proyectos asignados"
         ordering = ("-date", "-time")
 
     def __str__(self):
-        return f"{self.place} · {self.sport} · {self.student}"
+        return f"{self.place} · {self.sport} · {self.user_profile}"

@@ -69,7 +69,7 @@
               {% for g in projects %}
               <tr>
                 <td>{{ g.place }}</td>
-                <td>{{ g.student.nombre }}</td>
+                <td>{{ g.user_profile.nombre }}</td>
                 <td>{{ g.sport.name }}</td>
                 <td>
                   {{ g.date|date:"Y-m-d" }} {{ g.time|time:"H:i" }}
