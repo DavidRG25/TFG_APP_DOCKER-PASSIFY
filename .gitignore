@@ -1,0 +1,35 @@
+# === Django / Python ===
+__pycache__/
+*.py[cod]
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+*.db
+*.sqlite
+db.sqlite3
+
+# === Virtual environment ===
+venv/
+.env/
+.venv/
+
+# === VSCode / Editor ===
+.vscode/
+.idea/
+
+# === Docker ===
+*.pid
+*.seed
+*.bak
+
+# === Caches ===
+*.cache
+*.tmp
+staticfiles/
+media/
+
+# === IA ===
+prompts/
