@@ -129,3 +129,44 @@ python manage.py migrate
 ```bash
 python3 -m daphne -b 0.0.0.0 -p 8080 app_passify.asgi:application
 ```
+
+### 🛠️ Ejecución rápida con el script `start_app.sh`
+
+Si prefieres automatizar los pasos anteriores, puedes usar el script incluido:
+
+```bash
+bash scripts/start_app.sh
+```
+
+El script realiza:
+1. Crea (si es necesario) el entorno virtual en `./venv` usando el Python disponible en tu sistema.
+2. Instala dependencias (`pip install -r requirements.txt`).
+3. Ejecuta `python manage.py makemigrations` y `python manage.py migrate`.
+4. Arranca Daphne en `0.0.0.0:8080`.
+
+Opciones útiles:
+```bash
+bash scripts/start_app.sh --skip-install --skip-migrate       # Reutiliza dependencias y migraciones existentes
+bash scripts/start_app.sh --port 9000                         # Arranca Daphne en otro puerto
+HOST=127.0.0.1 bash scripts/start_app.sh                      # Cambia el host de escucha
+```
+
+> Antes de usar el script, asegúrate de tener Python 3 instalado y accesible desde la terminal (`python --version`).
+
+### 👥 Usuarios de ejemplo
+
+Para generar usuarios base (admin, alumno y profesor) ejecuta el comando:
+
+```bash
+python manage.py create_demo_users
+```
+
+Credenciales creadas:
+
+| Rol        | Usuario    | Contraseña     | Detalles                          |
+|------------|------------|----------------|-----------------------------------|
+| Admin      | `admin`    | `Admin!123`    | Usuario con `is_staff` + `is_superuser`. |
+| Alumno     | `alumno`   | `Alumno!2025`  | Pertenece al grupo `Student`.     |
+| Profesor   | `profesor` | `Profesor!2025`| Pertenece al grupo `Teacher`.     |
+
+El comando es idempotente: si los usuarios ya existen, actualizará permisos, email y contraseñas.

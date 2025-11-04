@@ -56,13 +56,13 @@ def user_is_admin(user) -> bool:
 
 
 @transaction.atomic
-def ensure_player_profile(user) -> "Player":
-    """Crea (si no existe) el perfil Player enlazado al usuario."""
-    from paasify.models.StudentModel import Player
+def ensure_user_profile(user) -> "UserProfile":
+    """Crea (si no existe) el perfil ``UserProfile`` enlazado al usuario."""
+    from paasify.models.StudentModel import UserProfile
 
-    player, created = Player.objects.get_or_create(user=user, defaults={})
+    profile, created = UserProfile.objects.get_or_create(user=user, defaults={})
     if not created:
-        return player
+        return profile
 
     nombre_base = (user.get_full_name() or user.username or user.email or f"alumno-{user.pk}").strip()
     if not nombre_base:
@@ -70,15 +70,15 @@ def ensure_player_profile(user) -> "Player":
 
     unique_name = nombre_base
     suffix = 1
-    while Player.objects.filter(nombre=unique_name).exclude(pk=player.pk).exists():
+    while UserProfile.objects.filter(nombre=unique_name).exclude(pk=profile.pk).exists():
         suffix += 1
         unique_name = f"{nombre_base}-{suffix}"
 
     email = user.email or f"{user.username or 'alumno'}@pendiente.local"
     sexo = "Masculino"
 
-    player.nombre = unique_name
-    player.year = email
-    player.sexo = sexo
-    player.save()
-    return player
+    profile.nombre = unique_name
+    profile.year = email
+    profile.sexo = sexo
+    profile.save()
+    return profile

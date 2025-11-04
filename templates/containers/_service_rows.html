@@ -13,13 +13,13 @@
 
   <td>
     <span
-      class="badge
-        {% if s.status == 'running' %} bg-success
-        {% elif s.status == 'stopped' %} bg-secondary
-        {% elif s.status == 'error' %} bg-danger
+      class="badge text-uppercase fw-semibold px-3 py-2
+        {% if s.status == 'running' %} bg-success text-white
+        {% elif s.status == 'stopped' %} bg-secondary text-white
+        {% elif s.status == 'error' %} bg-danger text-white
         {% else %} bg-warning text-dark
         {% endif %}">
-      {{ s.status|title }}
+      {{ s.status|default:'unknown'|title }}
     </span>
   </td>
 

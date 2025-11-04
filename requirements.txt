@@ -4,6 +4,7 @@ certifi
 channels
 charset-normalizer
 colorama
+daphne
 distlib
 Django
 django-colorfield

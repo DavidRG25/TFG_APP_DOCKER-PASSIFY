@@ -1,12 +1,12 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% load static %}
 
 {% block body %}
 <h2 class="mb-4">
-  {% if current_subject %}{{ current_subject.name }} · Mis servicios{% else %}Mis servicios{% endif %}
+  {% if current_subject %}{{ current_subject.name }} Â· Mis servicios{% else %}Mis servicios{% endif %}
 </h2>
 
-<!-- Botón para abrir el modal de alta -->
+<!-- BotÃ³n para abrir el modal de alta -->
 <button class="btn btn-primary mb-3"
         data-bs-toggle="modal"
         data-bs-target="#newServiceModal">
@@ -51,7 +51,7 @@
             method="POST" enctype="multipart/form-data"
             hx-post="/api/containers/"
             hx-target="#service-table"
-            hx-swap="afterbegin">
+            hx-swap="innerHTML">
 
         {% csrf_token %}
         {% if current_subject %}
@@ -76,7 +76,7 @@
             <div class="form-check">
               <input class="form-check-input" type="radio" name="mode" id="mode_custom" value="custom">
               <label class="form-check-label" for="mode_custom">
-                Configuración personalizada (Dockerfile <strong>o</strong> docker-compose)
+                ConfiguraciÃ³n personalizada (Dockerfile <strong>o</strong> docker-compose)
               </label>
             </div>
           </div>
@@ -87,7 +87,7 @@
             <select name="image" class="form-select" required>
               {% for img in images %}
                 <option value="{{ img.name }}:{{ img.tag }}">
-                  {{ img.name }}:{{ img.tag }} – {{ img.description }}
+                  {{ img.name }}:{{ img.tag }} â€“ {{ img.description }}
                 </option>
               {% endfor %}
             </select>
@@ -100,7 +100,7 @@
             <small class="text-muted">Debe estar entre 40000 y 50000.</small>
           </div>
 
-          <!-- Bloque configuración personalizada -->
+          <!-- Bloque configuraciÃ³n personalizada -->
           <div class="mb-3 custom-block" id="block-dockerfile">
             <label class="form-label">Dockerfile (opcional, exclusivo con compose)</label>
             <input type="file" name="dockerfile" accept=".dockerfile,.Dockerfile,.txt,text/plain" class="form-control">
@@ -112,9 +112,9 @@
           </div>
 
           <div class="mb-3 custom-block" id="block-code">
-            <label class="form-label">Código fuente (.zip opcional)</label>
+            <label class="form-label">CÃ³digo fuente (.zip opcional)</label>
             <input type="file" name="code" accept=".zip,application/zip" class="form-control">
-            <small class="text-muted">Con Dockerfile se usa como contexto de build; con compose se montará en <code>/app</code>.</small>
+            <small class="text-muted">Con Dockerfile se usa como contexto de build; con compose se montarÃ¡ en <code>/app</code>.</small>
           </div>
         </div>
 
@@ -133,16 +133,16 @@
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header"><h5 class="modal-title" id="logsModalLabel">Logs</h5></div>
-      <div class="modal-body"><pre id="logs-body" class="mb-0">(cargando…)</pre></div>
+      <div class="modal-body"><pre id="logs-body" class="mb-0">(cargandoâ€¦)</pre></div>
     </div>
   </div>
 </div>
 
-<!-- Modal: Código fuente -->
+<!-- Modal: CÃ³digo fuente -->
 <div class="modal fade" id="codeModal" tabindex="-1" aria-hidden="true" aria-labelledby="codeModalLabel">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title" id="codeModalLabel">Código fuente</h5></div>
+      <div class="modal-header"><h5 class="modal-title" id="codeModalLabel">CÃ³digo fuente</h5></div>
       <div class="modal-body"><pre id="code-body" class="bg-light p-3 mb-0"></pre></div>
     </div>
   </div>
@@ -176,24 +176,21 @@
     setTimeout(() => el.remove(), 2500);
   }
 
-  // Cierre de modal SOLO cuando el submit del formulario termina OK
-  htmx.on('htmx:afterRequest', (evt) => {
-    const { elt, xhr } = evt.detail || {};
-    if (elt && elt.id === 'newServiceForm' && xhr && xhr.status >= 200 && xhr.status < 300) {
-      const modalEl = document.getElementById('newServiceModal');
-      (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).hide();
-      elt.reset();
-      applyMode();             // re-aplica el modo por defecto
-      showToast('Servicio creado');
+  document.body.addEventListener('service:modal-close', (evt) => {
+    const modalId = evt.detail?.modalId || 'newServiceModal';
+    const modalEl = document.getElementById(modalId);
+    if (!modalEl) return;
+    (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).hide();
+    const form = document.getElementById('newServiceForm');
+    if (form) {
+      form.reset();
+      applyMode();
     }
   });
 
-  // Evitar toast en el refresco periódico del tbody
-  htmx.on('htmx:afterOnLoad', (evt) => {
-    const el = evt.detail.elt;
-    if (el && el.id === 'service-table') return;
-    const xhr = evt.detail.xhr;
-    if (xhr && xhr.status >= 200 && xhr.status < 300) showToast('Operación completada', 'text-bg-success');
+  document.body.addEventListener('service:toast', (evt) => {
+    const detail = evt.detail || {};
+    showToast(detail.message || 'Operacion completada', detail.variant || 'text-bg-success');
   });
 
   // Mostrar errores de HTMX
@@ -204,7 +201,7 @@
     showToast(`Error (${status}): ${msg}`, 'text-bg-danger');
   });
 
-  // === Lógica modo default/custom + exclusión Dockerfile/Compose ===
+  // === LÃ³gica modo default/custom + exclusiÃ³n Dockerfile/Compose ===
   function applyMode() {
     const mode = document.querySelector('input[name="mode"]:checked')?.value || 'default';
     const imgSel = document.querySelector('select[name="image"]');
@@ -228,7 +225,7 @@
   function syncExclusion() {
     const dockerfile = document.querySelector('input[name="dockerfile"]');
     const compose = document.querySelector('input[name="compose"]');
-    // Exclusión: si uno tiene archivo, el otro se bloquea
+    // ExclusiÃ³n: si uno tiene archivo, el otro se bloquea
     if (dockerfile.files && dockerfile.files.length > 0) {
       compose.value = '';
       compose.disabled = true;

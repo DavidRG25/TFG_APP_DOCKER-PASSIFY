@@ -20,13 +20,13 @@
                     </tr>
                     </thead>
                     <tbody>
-                    {% for game in games %}
+                    {% for project in projects %}
                     <tr>
-                        <td>{{ game.place }}</td>  {# Utiliza 'place' para Nombre del Proyecto #}
-                        <td>{{ game.student }}</td>
-                        <td>{{ game.sport.name }}</td>  {# Asignatura Asociada #}
-                        <td>{{ game.date|date:"d/m/Y" }}</td>  {# Formatea la fecha #}
-                        <td>{{ game.time|time:"H:i" }}</td>  {# Formatea la hora #}
+                        <td>{{ project.place }}</td>  {# Utiliza 'place' para Nombre del Proyecto #}
+                        <td>{{ project.user_profile }}</td>
+                        <td>{{ project.sport.name }}</td>  {# Asignatura Asociada #}
+                        <td>{{ project.date|date:"d/m/Y" }}</td>  {# Formatea la fecha #}
+                        <td>{{ project.time|time:"H:i" }}</td>  {# Formatea la hora #}
                     </tr>
                     {% endfor %}
                     </tbody>
