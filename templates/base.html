@@ -292,7 +292,7 @@
             {% endif %}
 
             {% if user.is_authenticated %}
-                {% if user.is_superuser or user.groups.filter(name__iexact='student').exists or user.groups.filter(name__iexact='alumno').exists %}
+                {% if nav_is_admin or nav_is_student %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'containers:student_panel' %}">
                             <i class="fas fa-table"></i><span>Proyectos</span>
@@ -306,7 +306,7 @@
                     </li>
                 {% endif %}
 
-                {% if user.is_superuser or user.groups.filter(name__iexact='teacher').exists or user.groups.filter(name__iexact='profesor').exists %}
+                {% if nav_is_admin or nav_is_teacher %}
                     <li class="nav-item">
                         <a class="nav-link" href="{% url 'professor_dashboard' %}">
                             <i class="fas fa-chalkboard-teacher"></i><span>Panel profesor</span>
@@ -314,7 +314,7 @@
                     </li>
                 {% endif %}
 
-                {% if user.is_superuser or user.is_staff %}
+                {% if nav_is_admin %}
                     <li class="nav-item">
                         <a class="nav-link" href="/admin/">
                             <i class="fas fa-cog"></i><span>Admin</span>
