@@ -17,7 +17,7 @@ from rest_framework.response import Response as DRF_Response
 from docker.errors import DockerException, NotFound
 
 from paasify.models.ProjectModel import UserProject
-from paasify.models.SportModel import Sport
+from paasify.models.SubjectModel import Subject
 from paasify.roles import (
     user_is_admin as roles_user_is_admin,
     user_is_student as roles_user_is_student,
@@ -344,21 +344,21 @@ def student_panel(request):
 @login_required
 def student_subjects(request):
     """
-    - Teacher/Profesor: asignaturas donde es profesor (Sport.teacher_user = user)
-    - Student: asignaturas donde estÃÂ¡ matriculado (Sport.students contiene user)
+    - Teacher/Profesor: asignaturas donde es profesor (Subject.teacher_user = user)
+    - Student: asignaturas donde estÃÂ¡ matriculado (Subject.students contiene user)
     """
     if request.user.is_superuser:
-        subjects = Sport.objects.all()
+        subjects = Subject.objects.all()
     elif user_is_teacher(request.user):
         return redirect("professor_dashboard")
     else:
-        subjects = Sport.objects.filter(students=request.user).distinct()
+        subjects = Subject.objects.filter(students=request.user).distinct()
     return render(request, "containers/subjects.html", {"subjects": subjects})
 
 
 @login_required
 def student_services_in_subject(request, subject_id):
-    subject = get_object_or_404(Sport, pk=subject_id)
+    subject = get_object_or_404(Subject, pk=subject_id)
 
     # Si es profesor y entra aqui, lo mandamos a su dashboard salvo que sea superusuario
     if user_is_teacher(request.user) and not request.user.is_superuser:
@@ -443,15 +443,15 @@ def professor_dashboard(request):
     if not (user_is_teacher(request.user) or request.user.is_superuser):
         return HttpResponse("No tienes permiso para acceder a esta pÃÂ¡gina.", status=403)
 
-    subjects = Sport.objects.filter(teacher_user=request.user)
+    subjects = Subject.objects.filter(teacher_user=request.user)
     if request.user.is_superuser:
-        subjects = Sport.objects.all()
+        subjects = Subject.objects.all()
 
     projects = (
-        UserProject.objects.filter(sport__teacher_user=request.user)
+        UserProject.objects.filter(subject__teacher_user=request.user)
         if not request.user.is_superuser
         else UserProject.objects.all()
-    ).select_related("sport", "user_profile")
+    ).select_related("subject", "user_profile")
 
     return render(
         request,
@@ -465,7 +465,7 @@ def professor_subject_detail(request, subject_id):
     if not (user_is_teacher(request.user) or user_is_admin(request.user)):
         return HttpResponse("No tienes permiso para acceder a esta pagina.", status=403)
 
-    base_qs = Sport.objects.all() if request.user.is_superuser else Sport.objects.filter(teacher_user=request.user)
+    base_qs = Subject.objects.all() if request.user.is_superuser else Subject.objects.filter(teacher_user=request.user)
     subject = get_object_or_404(base_qs.select_related("teacher_user"), pk=subject_id)
 
     students = subject.students.all().order_by("username")
@@ -489,9 +489,9 @@ def professor_project_detail(request, project_id):
     if not (user_is_teacher(request.user) or user_is_admin(request.user)):
         return HttpResponse("No tienes permiso para acceder a esta pagina.", status=403)
 
-    base_qs = UserProject.objects.select_related("sport", "user_profile")
+    base_qs = UserProject.objects.select_related("subject", "user_profile")
     if not request.user.is_superuser:
-        base_qs = base_qs.filter(sport__teacher_user=request.user)
+        base_qs = base_qs.filter(subject__teacher_user=request.user)
 
     project = get_object_or_404(base_qs, pk=project_id)
 
@@ -552,7 +552,7 @@ def edit_service(request, pk):
 @login_required
 def subjects_list(request):
     if user_is_teacher(request.user):
-        subjects = Sport.objects.filter(teacher_user=request.user)
+        subjects = Subject.objects.filter(teacher_user=request.user)
     else:
-        subjects = Sport.objects.filter(students=request.user)
+        subjects = Subject.objects.filter(students=request.user)
     return render(request, "containers/subjects.html", {"subjects": subjects})
