@@ -1,11 +1,11 @@
-{% extends 'base.html' %}
+﻿{% extends 'base.html' %}
 
 {% block body %}
 <div class="container-fluid">
     <h3 class="text-dark mb-4"> Proyectos y Servicios</h3>
     <div class="card shadow">
         <div class="card-header py-3">
-            <p class="text-primary m-0 font-weight-bold">Información de los proyectos</p>
+            <p class="text-primary m-0 font-weight-bold">InformaciÃ³n de los proyectos</p>
         </div>
         <div class="card-body">
             <div class="table-responsive table mt-2" id="dataTable" role="grid" aria-describedby="dataTable_info">
@@ -24,7 +24,7 @@
                     <tr>
                         <td>{{ project.place }}</td>  {# Utiliza 'place' para Nombre del Proyecto #}
                         <td>{{ project.user_profile }}</td>
-                        <td>{{ project.sport.name }}</td>  {# Asignatura Asociada #}
+                        <td>{{ project.subject.name }}</td>  {# Asignatura Asociada #}
                         <td>{{ project.date|date:"d/m/Y" }}</td>  {# Formatea la fecha #}
                         <td>{{ project.time|time:"H:i" }}</td>  {# Formatea la hora #}
                     </tr>
@@ -42,7 +42,7 @@
                             {% if previous %}
                             <li class="page-item">
                                 <a class="page-link" href="{% url 'table' n=previous %}" aria-label="Previous">
-                                    <span aria-hidden="true">«</span>
+                                    <span aria-hidden="true">Â«</span>
                                 </a>
                             </li>
                             {% endif %}
@@ -62,7 +62,7 @@
                             {% if next %}
                             <li class="page-item">
                                 <a class="page-link" href="{% url 'table' n=next %}" aria-label="Next">
-                                    <span aria-hidden="true">»</span>
+                                    <span aria-hidden="true">Â»</span>
                                 </a>
                             </li>
                             {% endif %}
@@ -74,3 +74,4 @@
     </div>
 </div>
 {% endblock %}
+

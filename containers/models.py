@@ -1,4 +1,4 @@
-﻿from django.conf import settings
+from django.conf import settings
 from django.db import models, transaction
 from django.db.utils import IntegrityError
 
@@ -39,7 +39,7 @@ class Service(models.Model):
         verbose_name="Propietario",
     )
     subject = models.ForeignKey(
-        "paasify.Sport",
+        "paasify.Subject",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,

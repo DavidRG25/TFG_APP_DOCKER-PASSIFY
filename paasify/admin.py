@@ -4,7 +4,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 
 from paasify.models.StudentModel import UserProfile
-from paasify.models.SportModel import Sport
+from paasify.models.SubjectModel import Subject
 from paasify.models.ProjectModel import UserProject
 from paasify.roles import (
     DEFAULT_STUDENT_GROUP,
@@ -21,11 +21,11 @@ admin.site.index_title = "Panel de administración"
 admin.site.site_title = "PaaSify"
 
 
-#  Inlines (UserProject dentro de Sport/UserProfile)
+#  Inlines (UserProject dentro de Subject/UserProfile)
 
 class UserProjectInlineForSubject(admin.TabularInline):
     model = UserProject
-    fk_name = "sport"
+    fk_name = "subject"
     extra = 1
     autocomplete_fields = ("user_profile",)
 
@@ -48,14 +48,14 @@ class UserProjectInlineForProfile(admin.TabularInline):
     model = UserProject
     fk_name = "user_profile"
     extra = 1
-    autocomplete_fields = ("sport",)
+    autocomplete_fields = ("subject",)
 
 
-#  Sport (Asignaturas)
+#  Subject (Asignaturas)
 
-class SportAdminForm(forms.ModelForm):
+class SubjectAdminForm(forms.ModelForm):
     class Meta:
-        model = Sport
+        model = Subject
         fields = "__all__"
 
     def __init__(self, *args, **kwargs):
@@ -76,10 +76,6 @@ class SportAdminForm(forms.ModelForm):
         self.fields["students"].queryset = User.objects.filter(
             groups__name__in=[*STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP]
         ).distinct()
-        self.fields["sexo"].required = False
-        sexo_choices = UserProfile._meta.get_field("sexo").choices
-        if sexo_choices:
-            self.fields["sexo"].initial = sexo_choices[0][0]
 
     def clean_teacher_user(self):
         u = self.cleaned_data.get("teacher_user")
@@ -105,9 +101,9 @@ class SportAdminForm(forms.ModelForm):
         return qs
 
 
-@admin.register(Sport)
-class SportAdmin(admin.ModelAdmin):
-    form = SportAdminForm
+@admin.register(Subject)
+class SubjectAdmin(admin.ModelAdmin):
+    form = SubjectAdminForm
     list_display = ("name", "category", "genero", "teacher_user")
     search_fields = ("name", "teacher_user__username", "teacher_user__email")
     list_filter = ("category", "genero")
@@ -133,12 +129,12 @@ class SportAdmin(admin.ModelAdmin):
             obj.save()
 
         if formset.model is UserProject:
-            sport = form.instance
+            subject_instance = form.instance
             for obj in objs:
                 profile = getattr(obj, "user_profile", None)
                 user = getattr(profile, "user", None) if profile else None
                 if user:
-                    sport.students.add(user)
+                    subject_instance.students.add(user)
 
         for obj in formset.deleted_objects:
             obj.delete()
@@ -159,7 +155,7 @@ class UserProfileAdminForm(forms.ModelForm):
 
     class Meta:
         model = UserProfile
-        fields = ["user", "nombre", "year", "sexo"]
+        fields = ["user", "nombre", "year"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -211,9 +207,6 @@ class UserProfileAdminForm(forms.ModelForm):
                 )
             if selected_user and not cleaned.get("year"):
                 cleaned["year"] = selected_user.email or f"{selected_user.get_username()}@pendiente.local"
-        if not cleaned.get("sexo"):
-            sexo_choices = UserProfile._meta.get_field("sexo").choices
-            cleaned["sexo"] = sexo_choices[0][0] if sexo_choices else "Masculino"
 
         return cleaned
 
@@ -249,9 +242,9 @@ class UserProfileAdminForm(forms.ModelForm):
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
     form = UserProfileAdminForm
-    list_display = ("nombre", "year", "sexo", "user", "es_usuario_alumno")
+    list_display = ("nombre", "year", "user", "es_usuario_alumno")
     search_fields = ("nombre", "year", "user__username", "user__email")
-    list_filter = ("sexo",)
+    list_filter = ()
     autocomplete_fields = ("user",)
     inlines = [UserProjectInlineForProfile]
 
@@ -277,10 +270,10 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 @admin.register(UserProject)
 class UserProjectAdmin(admin.ModelAdmin):
-    list_display = ("place", "user_profile", "sport", "date", "time")
-    list_filter = ("sport", "date")
-    search_fields = ("place", "user_profile__nombre", "sport__name")
-    autocomplete_fields = ("user_profile", "sport")
+    list_display = ("place", "user_profile", "subject", "date", "time")
+    list_filter = ("subject", "date")
+    search_fields = ("place", "user_profile__nombre", "subject__name")
+    autocomplete_fields = ("user_profile", "subject")
 
     # Solo UserProfiles cuyo user pertenece al grupo Student
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
@@ -303,7 +296,7 @@ class UserProjectAdmin(admin.ModelAdmin):
         profile = getattr(obj, "user_profile", None)
         user = getattr(profile, "user", None) if profile else None
         if user:
-            obj.sport.students.add(user)
+            obj.subject.students.add(user)
 
 
 

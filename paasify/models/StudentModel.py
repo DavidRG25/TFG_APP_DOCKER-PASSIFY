@@ -23,16 +23,11 @@ class UserProfile(models.Model):
         max_length=100,
         verbose_name="Email",
     )
-    sexo = models.CharField(
-        max_length=100,
-        verbose_name="Sexo",
-        choices=[("Masculino", "M"), ("Femenino", "F")],
-    )
 
     class Meta:
         managed = True
-        verbose_name = "Perfil de usuario"
-        verbose_name_plural = "Perfiles de usuario"
+        verbose_name = "Perfil de alumno"
+        verbose_name_plural = "Perfiles de alumnos"
         db_table = "user_profile"
 
     def __str__(self) -> str:

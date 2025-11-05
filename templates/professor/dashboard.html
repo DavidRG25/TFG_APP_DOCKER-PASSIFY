@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block body %}
 <div class="container py-4">
@@ -70,7 +70,7 @@
               <tr>
                 <td>{{ g.place }}</td>
                 <td>{{ g.user_profile.nombre }}</td>
-                <td>{{ g.sport.name }}</td>
+                <td>{{ g.subject.name }}</td>
                 <td>
                   {{ g.date|date:"Y-m-d" }} {{ g.time|time:"H:i" }}
                 </td>

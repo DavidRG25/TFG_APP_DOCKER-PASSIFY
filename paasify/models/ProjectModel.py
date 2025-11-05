@@ -1,7 +1,7 @@
 ﻿from django.db import models
 from django.utils import timezone
 
-from paasify.models.SportModel import Sport
+from paasify.models.SubjectModel import Subject
 from paasify.models.StudentModel import UserProfile
 
 
@@ -20,8 +20,8 @@ class UserProject(models.Model):
         verbose_name="Alumno Asignado",
         related_name="projects",
     )
-    sport = models.ForeignKey(
-        to=Sport,
+    subject = models.ForeignKey(
+        to=Subject,
         on_delete=models.DO_NOTHING,
         verbose_name="Asignatura Asociada",
         related_name="projects",
@@ -37,4 +37,4 @@ class UserProject(models.Model):
         ordering = ("-date", "-time")
 
     def __str__(self):
-        return f"{self.place} -> {self.sport} -> {self.user_profile}"
+        return f"{self.place} -> {self.subject} -> {self.user_profile}"

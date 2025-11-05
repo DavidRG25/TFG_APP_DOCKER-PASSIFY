@@ -1,2 +1,3 @@
-from .SportModel import Sport
+from .SubjectModel import Subject
 from .ProjectModel import UserProject
+

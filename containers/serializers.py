@@ -3,7 +3,7 @@ from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 
 from .models import Service, AllowedImage
-from paasify.models.SportModel import Sport
+from paasify.models.SubjectModel import Subject
 
 
 class ServiceSerializer(serializers.ModelSerializer):
@@ -30,7 +30,7 @@ class ServiceSerializer(serializers.ModelSerializer):
 
     # Permitir enlazar asignatura
     subject = serializers.PrimaryKeyRelatedField(
-        queryset=Sport.objects.all(),
+        queryset=Subject.objects.all(),
         required=False,
         allow_null=True,
     )
