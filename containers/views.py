@@ -1,5 +1,4 @@
 # containers/views.py
-import ast
 import json
 
 from django.contrib.auth.decorators import login_required
@@ -15,10 +14,15 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response as DRF_Response
 
-from docker.errors import NotFound, DockerException
+from docker.errors import DockerException, NotFound
 
 from paasify.models.ProjectModel import UserProject
 from paasify.models.SportModel import Sport
+from paasify.roles import (
+    user_is_admin as roles_user_is_admin,
+    user_is_student as roles_user_is_student,
+    user_is_teacher as roles_user_is_teacher,
+)
 
 from .docker_client import get_docker_client
 from .models import AllowedImage, Service
@@ -47,37 +51,28 @@ def _sync_service(service: Service):
         return
 
 
-def in_group(user, *group_names) -> bool:
-    """True si el usuario pertenece (case-insensitive) a cualquiera de los grupos dados."""
-    if not (user and user.is_authenticated):
+def user_is_student(user) -> bool:
+    if not getattr(user, "is_authenticated", False):
         return False
-    user_groups = set(n.lower() for n in user.groups.values_list("name", flat=True))
-    targets = set(g.lower() for g in group_names)
-    return bool(user_groups & targets)
-
-
-def user_is_student(user) -> bool:
-    return in_group(user, "student", "alumno")
+    if getattr(user, "is_superuser", False):
+        return True
+    return roles_user_is_student(user)
 
 
 def user_is_teacher(user) -> bool:
-    return in_group(user, "teacher", "profesor")
+    if not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return roles_user_is_teacher(user)
 
 
-def user_is_student(user) -> bool:
-    return in_group(user, "student", "alumno")
-
-
-def user_is_teacher(user) -> bool:
-    return in_group(user, "teacher", "profesor")
-
-
-def user_is_student(user) -> bool:
-    return in_group(user, "student", "alumno")
-
-
-def user_is_teacher(user) -> bool:
-    return in_group(user, "teacher", "profesor")
+def user_is_admin(user) -> bool:
+    if not getattr(user, "is_authenticated", False):
+        return False
+    if getattr(user, "is_superuser", False):
+        return True
+    return roles_user_is_admin(user)
 
 
 # ------------------------------ API --------------------------------
@@ -118,7 +113,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         user = request.user
-        if user.is_superuser:
+        if user.is_superuser or user_is_admin(user):
             return
         if not user_is_student(user):
             raise PermissionDenied("Solo los alumnos pueden gestionar contenedores.")
@@ -181,9 +176,8 @@ class ServiceViewSet(viewsets.ModelViewSet):
             service.code = request.FILES["code"]
         service.save()
 
-        service._custom_port = custom_port  # usado por run_container
         try:
-            run_container(service)
+            run_container(service, custom_port=custom_port)
         except Exception as exc:
             service.status = "error"
             service.logs = str(exc)
@@ -202,7 +196,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
             return self._htmx_response(
                 request,
                 status=201,
-                message="Servicio creado.",
+                message="Servicio encolado para iniciar.",
                 level="text-bg-success",
                 extra_triggers=triggers,
             )
@@ -229,10 +223,10 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if self._is_htmx(request):
             return self._htmx_response(
                 request,
-                message="Servicio iniciado.",
+                message="Servicio encolado para iniciar.",
                 level="text-bg-success",
             )
-        return DRF_Response({"status": "started", "message": "Servicio iniciado."})
+        return DRF_Response({"status": "queued", "message": "Servicio encolado para iniciar."})
 
     @action(detail=True, methods=["post"])
     def stop(self, request, pk=None):
@@ -330,7 +324,7 @@ class AllowedImageViewSet(viewsets.ReadOnlyModelViewSet):
 
 @login_required
 def student_panel(request):
-    """Listado genérico de servicios del alumno (todas sus asignaturas)."""
+    """Listado genÃÂ©rico de servicios del alumno (todas sus asignaturas)."""
     if request.user.is_superuser:
         pass
     elif user_is_teacher(request.user):
@@ -351,7 +345,7 @@ def student_panel(request):
 def student_subjects(request):
     """
     - Teacher/Profesor: asignaturas donde es profesor (Sport.teacher_user = user)
-    - Student: asignaturas donde está matriculado (Sport.students contiene user)
+    - Student: asignaturas donde estÃÂ¡ matriculado (Sport.students contiene user)
     """
     if request.user.is_superuser:
         subjects = Sport.objects.all()
@@ -366,13 +360,13 @@ def student_subjects(request):
 def student_services_in_subject(request, subject_id):
     subject = get_object_or_404(Sport, pk=subject_id)
 
-    # Si es profesor y entra aquí, lo mandamos a su dashboard
+    # Si es profesor y entra aqui, lo mandamos a su dashboard salvo que sea superusuario
     if user_is_teacher(request.user) and not request.user.is_superuser:
         return redirect("professor_dashboard")
 
-    # Solo alumnos matriculados pueden entrar
-    if not subject.students.filter(pk=request.user.pk).exists():
-        return HttpResponse("No estás matriculado en esta asignatura.", status=403)
+    # Solo alumnos matriculados pueden entrar (salvo administradores)
+    if not (user_is_admin(request.user) or subject.students.filter(pk=request.user.pk).exists()):
+        return HttpResponse("No estas matriculado en esta asignatura.", status=403)
 
     # Mostrar SOLO servicios del alumno para esa asignatura
     services = (
@@ -415,18 +409,18 @@ def service_table(request):
 def terminal_view(request, pk):
     """
     Muestra la terminal web para el servicio si el usuario es el propietario
-    y el contenedor está en ejecución (container_id presente).
+    y el contenedor estÃÂ¡ en ejecuciÃÂ³n (container_id presente).
     """
     service = get_object_or_404(Service, pk=pk, owner=request.user)
     if not service.container_id:
-        return HttpResponse("El servicio no está en ejecución o no tiene container_id.", status=400)
+        return HttpResponse("El servicio no estÃÂ¡ en ejecuciÃÂ³n o no tiene container_id.", status=400)
     return render(request, "containers/terminal.html", {"service": service})
 
 
 @login_required
 def post_login(request):
     """
-    Redirección post-login según rol:
+    RedirecciÃÂ³n post-login segÃÂºn rol:
     - superusuario -> /admin/
     - 'teacher'/'profesor' -> dashboard de profesor
     - resto (alumno) -> 'Mis asignaturas'
@@ -436,7 +430,7 @@ def post_login(request):
         return redirect("/admin/")
     if user_is_teacher(u):
         return redirect("professor_dashboard")
-    # La vista está dentro del app 'containers' (namespaced)
+    # La vista estÃÂ¡ dentro del app 'containers' (namespaced)
     return redirect("containers:student_subjects")
 
 
@@ -447,7 +441,7 @@ def professor_dashboard(request):
     Muestra sus asignaturas y proyectos asociados.
     """
     if not (user_is_teacher(request.user) or request.user.is_superuser):
-        return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
+        return HttpResponse("No tienes permiso para acceder a esta pÃÂ¡gina.", status=403)
 
     subjects = Sport.objects.filter(teacher_user=request.user)
     if request.user.is_superuser:
@@ -468,8 +462,8 @@ def professor_dashboard(request):
 
 @login_required
 def professor_subject_detail(request, subject_id):
-    if not (user_is_teacher(request.user) or request.user.is_superuser):
-        return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
+    if not (user_is_teacher(request.user) or user_is_admin(request.user)):
+        return HttpResponse("No tienes permiso para acceder a esta pagina.", status=403)
 
     base_qs = Sport.objects.all() if request.user.is_superuser else Sport.objects.filter(teacher_user=request.user)
     subject = get_object_or_404(base_qs.select_related("teacher_user"), pk=subject_id)
@@ -492,8 +486,8 @@ def professor_subject_detail(request, subject_id):
 
 @login_required
 def professor_project_detail(request, project_id):
-    if not (user_is_teacher(request.user) or request.user.is_superuser):
-        return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
+    if not (user_is_teacher(request.user) or user_is_admin(request.user)):
+        return HttpResponse("No tienes permiso para acceder a esta pagina.", status=403)
 
     base_qs = UserProject.objects.select_related("sport", "user_profile")
     if not request.user.is_superuser:
@@ -517,129 +511,38 @@ def professor_project_detail(request, project_id):
     )
 
 
-@login_required
-def professor_subject_detail(request, subject_id):
-    if not (user_is_teacher(request.user) or request.user.is_superuser):
-        return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
-
-    base_qs = Sport.objects.all() if request.user.is_superuser else Sport.objects.filter(teacher_user=request.user)
-    subject = get_object_or_404(base_qs.select_related("teacher_user"), pk=subject_id)
-
-    students = subject.students.all().order_by("username")
-    services = (
-        Service.objects.filter(subject=subject)
-        .select_related("owner")
-        .exclude(status="removed")
-        .order_by("owner__username", "name")
-    )
-    projects = subject.projects.select_related("user_profile")
-
-    return render(
-        request,
-        "professor/subject_detail.html",
-        {"subject": subject, "students": students, "services": services, "projects": projects},
-    )
-
-
-@login_required
-def professor_project_detail(request, project_id):
-    if not (user_is_teacher(request.user) or request.user.is_superuser):
-        return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
-
-    base_qs = UserProject.objects.select_related("sport", "user_profile")
-    if not request.user.is_superuser:
-        base_qs = base_qs.filter(sport__teacher_user=request.user)
-
-    project = get_object_or_404(base_qs, pk=project_id)
-
-    student_user = getattr(project.user_profile, "user", None)
-    related_services = Service.objects.none()
-    if student_user is not None:
-        related_services = (
-            Service.objects.filter(owner=student_user)
-            .exclude(status="removed")
-            .select_related("owner", "subject")
-        )
-
-    return render(
-        request,
-        "professor/project_detail.html",
-        {"project": project, "related_services": related_services},
-    )
-
-
-@login_required
-def professor_subject_detail(request, subject_id):
-    if not (user_is_teacher(request.user) or request.user.is_superuser):
-        return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
-
-    base_qs = Sport.objects.all() if request.user.is_superuser else Sport.objects.filter(teacher_user=request.user)
-    subject = get_object_or_404(base_qs.select_related("teacher_user"), pk=subject_id)
-
-    students = subject.students.all().order_by("username")
-    services = (
-        Service.objects.filter(subject=subject)
-        .select_related("owner")
-        .exclude(status="removed")
-        .order_by("owner__username", "name")
-    )
-    projects = subject.projects.select_related("user_profile")
-
-    return render(
-        request,
-        "professor/subject_detail.html",
-        {"subject": subject, "students": students, "services": services, "projects": projects},
-    )
-
-
-@login_required
-def professor_project_detail(request, project_id):
-    if not (user_is_teacher(request.user) or request.user.is_superuser):
-        return HttpResponse("No tienes permiso para acceder a esta página.", status=403)
-
-    base_qs = UserProject.objects.select_related("sport", "user_profile")
-    if not request.user.is_superuser:
-        base_qs = base_qs.filter(sport__teacher_user=request.user)
-
-    project = get_object_or_404(base_qs, pk=project_id)
-
-    student_user = getattr(project.user_profile, "user", None)
-    related_services = Service.objects.none()
-    if student_user is not None:
-        related_services = (
-            Service.objects.filter(owner=student_user)
-            .exclude(status="removed")
-            .select_related("owner", "subject")
-        )
-
-    return render(
-        request,
-        "professor/project_detail.html",
-        {"project": project, "related_services": related_services},
-    )
-
-
-# Editar servicio (env/volúmenes) y reiniciar
+# Editar servicio (env/volumenes) y reiniciar
 @login_required
 def edit_service(request, pk):
     service = get_object_or_404(Service, pk=pk, owner=request.user)
 
     if request.method == "POST":
-        env_vars_raw = request.POST.get("env_vars") or "{}"
-        volumes_raw = request.POST.get("volumes") or "{}"
+        def _parse_optional_json(raw_value: str, field_label: str):
+            if not raw_value:
+                return {}
+            try:
+                data = json.loads(raw_value)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"{field_label}: JSON invalido ({exc.msg}).") from exc
+            if not isinstance(data, dict):
+                raise ValueError(f"{field_label}: debe ser un objeto JSON.")
+            return data
 
         try:
-            service.env_vars = ast.literal_eval(env_vars_raw)
-            service.volumes = ast.literal_eval(volumes_raw)
-            service.save()
-        except Exception as e:
-            return HttpResponse(f"Error al guardar: {e}", status=400)
+            env_vars = _parse_optional_json(request.POST.get("env_vars", ""), "Variables de entorno")
+            volumes = _parse_optional_json(request.POST.get("volumes", ""), "Volumenes")
+        except ValueError as exc:
+            return HttpResponse(str(exc), status=400)
+
+        service.env_vars = env_vars or None
+        service.volumes = volumes or None
+        service.save(update_fields=["env_vars", "volumes", "updated_at"])
 
         try:
             remove_container(service)
             run_container(service)
-        except Exception as e:
-            return HttpResponse(f"Error al reiniciar: {e}", status=500)
+        except Exception as exc:
+            return HttpResponse(f"Error al reiniciar: {exc}", status=500)
 
         return redirect("containers:student_panel")
 
@@ -648,8 +551,7 @@ def edit_service(request, pk):
 
 @login_required
 def subjects_list(request):
-    """Alias: mis asignaturas (igual que student_subjects)."""
-    if in_group(request.user, "teacher", "profesor"):
+    if user_is_teacher(request.user):
         subjects = Sport.objects.filter(teacher_user=request.user)
     else:
         subjects = Sport.objects.filter(students=request.user)

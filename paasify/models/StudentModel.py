@@ -1,9 +1,9 @@
-from django.conf import settings  # enlaza con auth.User
+﻿from django.conf import settings  # enlaza con auth.User
 from django.db import models
 
 
 class UserProfile(models.Model):
-    """Perfil académico asociado a un ``auth.User`` (antiguo Player)."""
+    """Perfil academico asociado a un ``auth.User`` (antiguo Player)."""
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -36,7 +36,5 @@ class UserProfile(models.Model):
         db_table = "user_profile"
 
     def __str__(self) -> str:
-        usuario = f" · @{self.user.username}" if self.user else ""
+        usuario = f" -> @{self.user.username}" if self.user else ""
         return f"{self.nombre}{usuario}"
-
-

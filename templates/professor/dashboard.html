@@ -3,9 +3,9 @@
 {% block body %}
 <div class="container py-4">
   <h2 class="mb-3">Panel de Profesor</h2>
-  <p class="text-muted">Aquí puedes ver tus asignaturas y los proyectos asociados.</p>
+  <p class="text-muted">Aqui puedes ver tus asignaturas y los proyectos asociados.</p>
 
-  <!-- Accesos útiles -->
+  <!-- Accesos utiles -->
   <div class="d-flex gap-2 mb-4">
     {% if user.is_superuser or user.is_staff %}
       <a class="btn btn-outline-secondary" href="/admin/">Ir al admin</a>
@@ -29,8 +29,8 @@
                 <div class="fw-semibold">{{ s.name }}</div>
                 <small class="text-muted">
                   {{ s.get_category_display|default:s.category }}
-                  · Curso {{ s.genero }}
-                  · Alumnos: {{ s.students.count }}
+                   Curso {{ s.genero }}
+                   Alumnos: {{ s.students.count }}
                 </small>
               </div>
               <span class="ms-3">&rsaquo;</span>
@@ -40,7 +40,7 @@
       {% else %}
         <div class="p-3">
           <div class="alert alert-info mb-0">
-            Aún no tienes asignaturas asignadas. Pide a un administrador que te asigne como profesor.
+            Aun no tienes asignaturas asignadas. Pide a un administrador que te asigne como profesor.
           </div>
         </div>
       {% endif %}
@@ -88,7 +88,7 @@
       {% else %}
         <div class="p-3">
           <div class="alert alert-secondary mb-0">
-            No hay proyectos creados todavía en tus asignaturas.
+            No hay proyectos creados todavia en tus asignaturas.
           </div>
         </div>
       {% endif %}

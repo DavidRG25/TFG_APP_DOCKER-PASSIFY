@@ -1,4 +1,4 @@
-{% for s in services %}
+﻿{% for s in services %}
 <tr id="service-{{ s.id }}">
   <td>
     <div class="fw-semibold">{{ s.name }}</div>
@@ -9,7 +9,7 @@
 
   <td>{{ s.image }}</td>
 
-  <td>{{ s.assigned_port|default:"—" }}</td>
+  <td>{{ s.assigned_port|default:"-" }}</td>
 
   <td>
     <span
@@ -25,7 +25,6 @@
 
   <td class="d-flex flex-wrap gap-1">
 
-    <!-- Start -->
     <button
       class="btn btn-sm btn-success"
       {% if s.status == "running" %}disabled{% endif %}
@@ -33,10 +32,9 @@
       hx-target="#service-table"
       hx-swap="innerHTML"
       title="Iniciar">
-      ▶️
+      Iniciar
     </button>
 
-    <!-- Stop -->
     <button
       class="btn btn-sm btn-warning"
       {% if s.status != "running" %}disabled{% endif %}
@@ -44,10 +42,9 @@
       hx-target="#service-table"
       hx-swap="innerHTML"
       title="Detener">
-      ⏸️
+      Detener
     </button>
 
-    <!-- Remove (via POST) -->
     <button
       class="btn btn-sm btn-danger"
       hx-post="{% url 'service-remove' s.id %}"
@@ -55,10 +52,9 @@
       hx-swap="innerHTML"
       hx-confirm="¿Eliminar definitivamente?"
       title="Eliminar">
-      🗑️
+      Eliminar
     </button>
 
-    <!-- Logs -->
     <button
       class="btn btn-sm btn-secondary"
       hx-get="{% url 'service-logs' s.id %}"
@@ -71,7 +67,6 @@
     </button>
 
     {% if s.dockerfile %}
-    <!-- Dockerfile -->
     <button
       class="btn btn-sm btn-info"
       hx-get="{% url 'service-dockerfile' s.id %}"
@@ -85,7 +80,6 @@
     {% endif %}
 
     {% if s.compose %}
-    <!-- Compose -->
     <button
       class="btn btn-sm btn-info"
       hx-get="{% url 'service-compose' s.id %}"
@@ -98,7 +92,6 @@
     </button>
     {% endif %}
 
-    <!-- Terminal -->
     <a
       href="{% url 'containers:terminal_view' s.id %}"
       class="btn btn-sm btn-dark {% if not s.container_id or s.status != 'running' %}disabled{% endif %}"
@@ -111,7 +104,7 @@
 {% empty %}
 <tr>
   <td colspan="5" class="text-center text-muted">
-    Aún no tienes servicios.
+    Aun no tienes servicios.
   </td>
 </tr>
 {% endfor %}

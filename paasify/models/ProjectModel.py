@@ -1,9 +1,12 @@
-from django.db import models
+﻿from django.db import models
 from django.utils import timezone
-from datetime import datetime
 
 from paasify.models.SportModel import Sport
 from paasify.models.StudentModel import UserProfile
+
+
+def current_time():
+    return timezone.localtime().time()
 
 
 class UserProject(models.Model):
@@ -24,7 +27,7 @@ class UserProject(models.Model):
         related_name="projects",
     )
     date = models.DateField(default=timezone.now, verbose_name="Fecha")
-    time = models.TimeField(default=datetime.now().time(), verbose_name="Hora")
+    time = models.TimeField(default=current_time, verbose_name="Hora")
 
     class Meta:
         managed = True
@@ -34,4 +37,4 @@ class UserProject(models.Model):
         ordering = ("-date", "-time")
 
     def __str__(self):
-        return f"{self.place} · {self.sport} · {self.user_profile}"
+        return f"{self.place} -> {self.sport} -> {self.user_profile}"

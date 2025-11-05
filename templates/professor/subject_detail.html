@@ -2,12 +2,12 @@
 
 {% block body %}
 <div class="container py-4">
-  <a href="{% url 'professor_dashboard' %}" class="btn btn-link mb-3">« Volver al panel</a>
+  <a href="{% url 'professor_dashboard' %}" class="btn btn-link mb-3"> Volver al panel</a>
 
   <h2 class="mb-2">{{ subject.name }}</h2>
   <p class="text-muted mb-4">
-    {% if subject.teacher_user %}Profesor responsable: {{ subject.teacher_user.get_full_name|default:subject.teacher_user.username }} · {% endif %}
-    Curso {{ subject.genero }} · {{ subject.get_category_display|default:subject.category }}
+    {% if subject.teacher_user %}Profesor responsable: {{ subject.teacher_user.get_full_name|default:subject.teacher_user.username }}  {% endif %}
+    Curso {{ subject.genero }}  {{ subject.get_category_display|default:subject.category }}
   </p>
 
   <div class="row g-4">
@@ -39,7 +39,7 @@
               {% for project in projects %}
                 <li class="list-group-item d-flex justify-content-between align-items-center">
                   <span>
-                    {{ project.place }} · {{ project.user_profile.nombre }}
+                    {{ project.place }}  {{ project.user_profile.nombre }}
                   </span>
                   <a class="btn btn-sm btn-outline-primary" href="{% url 'professor_project_detail' project.id %}">
                     Ver
@@ -48,7 +48,7 @@
               {% endfor %}
             </ul>
           {% else %}
-            <p class="text-muted mb-0">Aún no se han registrado proyectos para esta asignatura.</p>
+            <p class="text-muted mb-0">Aun no se han registrado proyectos para esta asignatura.</p>
           {% endif %}
         </div>
       </div>
@@ -75,7 +75,7 @@
                   <td>{{ svc.name }}</td>
                   <td>{{ svc.owner.get_username }}</td>
                   <td>{{ svc.status|title }}</td>
-                  <td>{{ svc.assigned_port|default:"—" }}</td>
+                  <td>{{ svc.assigned_port|default:"" }}</td>
                 </tr>
               {% endfor %}
             </tbody>

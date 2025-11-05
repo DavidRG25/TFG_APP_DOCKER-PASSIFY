@@ -1,4 +1,4 @@
-import pytest
+﻿import pytest
 from docker.errors import DockerException
 
 from containers.docker_client import get_docker_client
@@ -20,53 +20,43 @@ def _docker_available() -> bool:
 DOCKER_AVAILABLE = _docker_available()
 
 
-# ───────────────────────── FIXTURES ──────────────────────────
 @pytest.fixture(scope="session")
 def docker_client():
     """Cliente Docker compartido para todos los tests."""
     if not DOCKER_AVAILABLE:
-        pytest.skip("Docker no está disponible para las pruebas de contenedores.")
+        pytest.skip("Docker no esta disponible para las pruebas de contenedores.")
     return get_docker_client()
 
 
-# ───────────────────────── TESTS ─────────────────────────────
 @pytest.mark.django_db
 def test_port_reservation_is_unique():
-    """
-    reserve_free_port() nunca debe devolver el mismo puerto
-    mientras la reserva exista en BD.
-    """
+    """Comprueba que dos reservas consecutivas no devuelven el mismo puerto."""
     first = PortReservation.reserve_free_port()
     second = PortReservation.reserve_free_port()
     assert first != second
 
-    # limpieza
     PortReservation.objects.filter(port__in=[first, second]).delete()
 
 
 @pytest.mark.django_db
 @pytest.mark.skipif(not DOCKER_AVAILABLE, reason="Docker no disponible para pruebas de contenedores")
 def test_container_lifecycle(django_user_model, docker_client):
-    """
-    run → stop → remove debe reflejarse tanto en Docker
-    como en los campos del modelo Service.
-    """
+    """Ejecucion completa: run -> stop -> remove y liberacion de puerto."""
     user = django_user_model.objects.create_user("ci_user", "ci@local", "pass")
-    svc  = Service.objects.create(owner=user, name="nginx-ci", image="nginx:latest")
+    svc = Service.objects.create(owner=user, name="nginx-ci", image="nginx:latest")
 
-    # run
-    run_container(svc)
+    run_container(svc, enqueue=False)
+    svc.refresh_from_db()
     assert svc.status == "running"
     assert docker_client.containers.get(svc.container_id).status == "running"
 
-    # stop
     stop_container(svc)
+    svc.refresh_from_db()
     assert svc.status == "stopped"
 
-    # remove
+    assigned_port = svc.assigned_port
     remove_container(svc)
+    svc.refresh_from_db()
     assert svc.status == "removed"
     assert svc.container_id is None
-
-    # Asegúrate de que el puerto se liberó
-    assert not PortReservation.objects.filter(port=svc.assigned_port).exists()
+    assert not PortReservation.objects.filter(port=assigned_port).exists()
