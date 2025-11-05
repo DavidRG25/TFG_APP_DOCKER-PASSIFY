@@ -174,10 +174,19 @@ class ServiceViewSet(viewsets.ModelViewSet):
             service.compose = request.FILES["compose"]
         if has_code:
             service.code = request.FILES["code"]
+        service.enable_ssh = request.data.get("enable_ssh") in ["on", "true"]
         service.save()
 
+        ssh_data = None
         try:
             run_container(service, custom_port=custom_port)
+            if service.enable_ssh and hasattr(service, "ssh_private_key"):
+                ssh_data = {
+                    "private_key": service.ssh_private_key,
+                    "user": "root",  # Assuming root for now
+                    "server_ip": request.get_host().split(":")[0],
+                    "ssh_port": service.ssh_port,
+                }
         except Exception as exc:
             service.status = "error"
             service.logs = str(exc)
@@ -193,6 +202,8 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
         if self._is_htmx(request):
             triggers = {"service:modal-close": {"modalId": "newServiceModal"}}
+            if ssh_data:
+                triggers["service:show-ssh-key"] = ssh_data
             return self._htmx_response(
                 request,
                 status=201,
@@ -202,8 +213,10 @@ class ServiceViewSet(viewsets.ModelViewSet):
             )
 
         headers = self.get_success_headers(serializer.data)
-        serialized = ServiceSerializer(service, context={"request": request})
-        return DRF_Response(serialized.data, status=201, headers=headers)
+        serialized_data = ServiceSerializer(service, context={"request": request}).data
+        if ssh_data:
+            serialized_data["ssh_data"] = ssh_data
+        return DRF_Response(serialized_data, status=201, headers=headers)
 
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
@@ -324,7 +337,7 @@ class AllowedImageViewSet(viewsets.ReadOnlyModelViewSet):
 
 @login_required
 def student_panel(request):
-    """Listado genÃÂ©rico de servicios del alumno (todas sus asignaturas)."""
+    """Listado genÃƒÂ©rico de servicios del alumno (todas sus asignaturas)."""
     if request.user.is_superuser:
         pass
     elif user_is_teacher(request.user):
@@ -337,7 +350,7 @@ def student_panel(request):
     return render(
         request,
         "containers/student_panel.html",
-        {"services": services, "images": images, "current_subject": None},
+        {"services": services, "images": images, "current_subject": None, "title": "PaaSify - Mis servicios"},
     )
 
 
@@ -345,7 +358,7 @@ def student_panel(request):
 def student_subjects(request):
     """
     - Teacher/Profesor: asignaturas donde es profesor (Sport.teacher_user = user)
-    - Student: asignaturas donde estÃÂ¡ matriculado (Sport.students contiene user)
+    - Student: asignaturas donde estÃƒÂ¡ matriculado (Sport.students contiene user)
     """
     if request.user.is_superuser:
         subjects = Sport.objects.all()
@@ -353,7 +366,7 @@ def student_subjects(request):
         return redirect("professor_dashboard")
     else:
         subjects = Sport.objects.filter(students=request.user).distinct()
-    return render(request, "containers/subjects.html", {"subjects": subjects})
+    return render(request, "containers/subjects.html", {"subjects": subjects, "title": "PaaSify - Asignaturas"})
 
 
 @login_required
@@ -409,18 +422,18 @@ def service_table(request):
 def terminal_view(request, pk):
     """
     Muestra la terminal web para el servicio si el usuario es el propietario
-    y el contenedor estÃÂ¡ en ejecuciÃÂ³n (container_id presente).
+    y el contenedor estÃƒÂ¡ en ejecuciÃƒÂ³n (container_id presente).
     """
     service = get_object_or_404(Service, pk=pk, owner=request.user)
     if not service.container_id:
-        return HttpResponse("El servicio no estÃÂ¡ en ejecuciÃÂ³n o no tiene container_id.", status=400)
+        return HttpResponse("El servicio no estÃƒÂ¡ en ejecuciÃƒÂ³n o no tiene container_id.", status=400)
     return render(request, "containers/terminal.html", {"service": service})
 
 
 @login_required
 def post_login(request):
     """
-    RedirecciÃÂ³n post-login segÃÂºn rol:
+    RedirecciÃƒÂ³n post-login segÃƒÂºn rol:
     - superusuario -> /admin/
     - 'teacher'/'profesor' -> dashboard de profesor
     - resto (alumno) -> 'Mis asignaturas'
@@ -430,7 +443,7 @@ def post_login(request):
         return redirect("/admin/")
     if user_is_teacher(u):
         return redirect("professor_dashboard")
-    # La vista estÃÂ¡ dentro del app 'containers' (namespaced)
+    # La vista estÃƒÂ¡ dentro del app 'containers' (namespaced)
     return redirect("containers:student_subjects")
 
 
@@ -441,7 +454,7 @@ def professor_dashboard(request):
     Muestra sus asignaturas y proyectos asociados.
     """
     if not (user_is_teacher(request.user) or request.user.is_superuser):
-        return HttpResponse("No tienes permiso para acceder a esta pÃÂ¡gina.", status=403)
+        return HttpResponse("No tienes permiso para acceder a esta pÃƒÂ¡gina.", status=403)
 
     subjects = Sport.objects.filter(teacher_user=request.user)
     if request.user.is_superuser:

@@ -99,6 +99,28 @@
       Terminal
     </a>
 
+    <button
+      class="btn btn-sm btn-info"
+      data-bs-toggle="modal"
+      data-bs-target="#execModal"
+      data-container-id="{{ s.container_id }}"
+      {% if not s.container_id or s.status != 'running' %}disabled{% endif %}
+      title="Conexión Local">
+      Conexión Local
+    </button>
+
+    {% if s.enable_ssh and s.ssh_port %}
+    <button
+      class="btn btn-sm btn-primary"
+      data-bs-toggle="modal"
+      data-bs-target="#sshKeyModal"
+      data-ssh-port="{{ s.ssh_port }}"
+      data-ssh-user="root"
+      data-ssh-server-ip="{{ request.get_host }}"
+      title="Comando SSH">
+      SSH
+    </button>
+    {% endif %}
   </td>
 </tr>
 {% empty %}
