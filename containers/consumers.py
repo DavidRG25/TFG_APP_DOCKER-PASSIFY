@@ -1,4 +1,5 @@
-﻿import threading
+import logging
+import threading
 
 from channels.generic.websocket import WebsocketConsumer
 from django.http import Http404
@@ -8,6 +9,8 @@ from docker.errors import DockerException
 
 from .docker_client import get_docker_client
 from .models import Service
+
+logger = logging.getLogger(__name__)
 
 
 class TerminalConsumer(WebsocketConsumer):
@@ -77,7 +80,7 @@ class TerminalConsumer(WebsocketConsumer):
             data = bytes_data if bytes_data is not None else (text_data or "")
             if isinstance(data, str):
                 data = data.encode("utf-8", errors="ignore")
-            self.sock.send(data)
+            self.sock._sock.sendall(data)
         except Exception:
             # Evitamos propagar ruidos de red al cliente.
             pass
@@ -86,14 +89,21 @@ class TerminalConsumer(WebsocketConsumer):
         """Transfiere la salida del contenedor hacia el navegador."""
         try:
             while True:
-                chunk = self.sock.recv(4096)
+                # Use ._sock.recv for the raw socket from docker-py
+                chunk = self.sock._sock.recv(4096)
                 if not chunk:
+                    logger.info("Terminal WS: container socket closed.")
                     break
+                logger.debug(f"Terminal WS: recv {chunk!r}")
                 try:
-                    self.send(chunk.decode("utf-8", errors="ignore"))
+                    decoded = chunk.decode("utf-8", errors="ignore")
+                    self.send(decoded)
+                    logger.debug(f"Terminal WS: sent {decoded!r}")
                 except Exception:
                     self.send(str(chunk))
+                    logger.debug(f"Terminal WS: sent raw {chunk!r}")
         except Exception as exc:
+            logger.error(f"Terminal WS: error reading from container: {exc}")
             try:
                 self.send(f"\r\n[ERROR OUTPUT]: {exc}\r\n")
             except Exception:

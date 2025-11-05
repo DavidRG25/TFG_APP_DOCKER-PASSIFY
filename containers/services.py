@@ -2,6 +2,9 @@
 import os
 import shutil
 import subprocess
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
@@ -19,6 +22,21 @@ CODE_EXTENSIONS = {".zip"}
 EXECUTOR = ThreadPoolExecutor(
     max_workers=int(os.environ.get("SERVICE_WORKERS", "2"))
 )
+
+
+def _generate_ssh_keys():
+    """Generates a new SSH key pair."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_key = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    public_key = key.public_key().public_bytes(
+        encoding=serialization.Encoding.OpenSSH,
+        format=serialization.PublicFormat.OpenSSH,
+    )
+    return private_key.decode(), public_key.decode()
 
 
 def _compose_cmd() -> list[str]:
@@ -101,6 +119,7 @@ def _run_container_internal(
     *,
     force_restart: bool = False,
     custom_port: int | None = None,
+    command: list[str] | None = None,
 ):
     """
     Arranca (o rearma) el contenedor asociado a un Service.
@@ -250,6 +269,31 @@ def _run_container_internal(
             # --------- Caso imagen directa del catÃ¡logo ---------
             image_to_run = service.image
 
+        if service.enable_ssh:
+            private_key, public_key = _generate_ssh_keys()
+            service.ssh_private_key = private_key  # Store temporarily
+            with tempfile.TemporaryDirectory() as builddir:
+                dockerfile_content = f"FROM {image_to_run}\n"
+                dockerfile_content += f"RUN mkdir -p /root/.ssh && echo '{public_key}' >> /root/.ssh/authorized_keys\n"
+                with open(os.path.join(builddir, "Dockerfile"), "w") as f:
+                    f.write(dockerfile_content)
+
+                image_tag = f"{service.owner.username}/{service.name}:{port or 'latest'}-ssh"
+                try:
+                    proc = subprocess.run(
+                        ["docker", "build", "-t", image_tag, builddir],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                    build_out = (proc.stdout or "") + "\n" + (proc.stderr or "")
+                except subprocess.CalledProcessError as e:
+                    service.status = "error"
+                    service.logs = (e.stderr or e.stdout or str(e)).strip()
+                    service.save()
+                    raise RuntimeError(f"Error al construir la imagen SSH:\n{service.logs}")
+                image_to_run = image_tag
+
         # --------- Variables y volÃºmenes (para no-compose) ---------
         volumes = {}
         # Montaje de /app si se subiÃ³ un ZIP (nota: en runtime un ZIP no sirve; aquÃ­ solo se expone el archivo)
@@ -268,13 +312,20 @@ def _run_container_internal(
         # Puerto interno configurable (si aÃ±adÃ­s el campo al modelo); por defecto 80
         internal_port = getattr(service, "internal_port", 80)
 
+        ports = {f"{internal_port}/tcp": port} if port else {}
+        if service.enable_ssh:
+            ssh_port = PortReservation.reserve_free_port()
+            ports["22/tcp"] = ssh_port
+            service.ssh_port = ssh_port
+
         container = docker_client.containers.run(
             image=image_to_run,
+            command=command,
             detach=True,
             tty=True,
             stdin_open=True,                 # importante para la terminal
             name=f"{service.owner.username}_{service.name}_{port or 'auto'}",
-            ports={f"{internal_port}/tcp": port} if port else None,
+            ports=ports,
             volumes=volumes or None,
             environment=env_vars or None,
             working_dir="/app" if volumes else None,
@@ -296,31 +347,41 @@ def _run_container_internal(
         raise
 
 
-def _run_container_worker(service_id: int, force_restart: bool, custom_port: int | None) -> None:
+def _run_container_worker(
+    service_id: int, force_restart: bool, custom_port: int | None, command: list[str] | None
+) -> None:
     try:
         service = Service.objects.get(pk=service_id)
     except Service.DoesNotExist:
         return
-    _run_container_internal(service, force_restart=force_restart, custom_port=custom_port)
+    _run_container_internal(
+        service, force_restart=force_restart, custom_port=custom_port, command=command
+    )
 
 
 def run_container(
     service: Service,
     force_restart: bool = False,
     custom_port: int | None = None,
+    command: list[str] | None = None,
     enqueue: bool = True,
 ) -> None:
     """
     Encola la ejecucion del contenedor para no bloquear el hilo que atiende la peticion.
     """
     if not enqueue:
-        _run_container_internal(service, force_restart=force_restart, custom_port=custom_port)
+        _run_container_internal(
+            service,
+            force_restart=force_restart,
+            custom_port=custom_port,
+            command=command,
+        )
         return
 
     service.status = "pending"
     service.logs = (service.logs or "") + "\nEjecucion encolada."
     service.save(update_fields=["status", "logs", "updated_at"])
-    EXECUTOR.submit(_run_container_worker, service.pk, force_restart, custom_port)
+    EXECUTOR.submit(_run_container_worker, service.pk, force_restart, custom_port, command)
 
 
 # ---------- Stop / Remove ----------
