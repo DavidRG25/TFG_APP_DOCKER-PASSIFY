@@ -62,6 +62,14 @@ class Service(models.Model):
     created_at = models.DateTimeField("Creado", auto_now_add=True)
     updated_at = models.DateTimeField("Actualizado", auto_now=True)
 
+    # Opciones
+    enable_ssh = models.BooleanField(default=False)
+    ssh_port = models.PositiveIntegerField("Puerto SSH", null=True, blank=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ssh_private_key = None
+
     class Meta:
         verbose_name = "Servicio"
         verbose_name_plural = "Servicios"

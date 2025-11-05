@@ -102,6 +102,14 @@
             <label class="form-label">Codigo fuente (.zip opcional)</label>
             <input type="file" name="code" accept=".zip" class="form-control">
           </div>
+
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" name="enable_ssh" id="enable_ssh">
+            <label class="form-check-label" for="enable_ssh">
+              Habilitar acceso remoto por SSH
+            </label>
+            <small class="text-muted d-block">La imagen debe tener un servidor SSH instalado.</small>
+          </div>
         </div>
 
         <div class="modal-footer">
@@ -109,6 +117,46 @@
           <button type="submit" class="btn btn-primary">Crear servicio</button>
         </div>
       </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para 'docker exec' -->
+<div class.modal.fade id="execModal" tabindex="-1" aria-labelledby="execModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="execModalLabel">Conexión Local</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p>Copia y pega el siguiente comando en tu terminal local:</p>
+        <div class="input-group">
+          <input type="text" id="execCommand" class="form-control" readonly>
+          <button class="btn btn-outline-secondary" type="button" id="copyExecCommand">Copiar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal para clave SSH -->
+<div class="modal fade" id="sshKeyModal" tabindex="-1" aria-labelledby="sshKeyModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="sshKeyModalLabel">Clave Privada SSH</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <p><strong>Guarda esta clave privada en un lugar seguro.</strong> No se volverá a mostrar.</p>
+        <textarea id="sshPrivateKey" class="form-control" rows="10" readonly></textarea>
+        <p class="mt-3">Comando de conexión:</p>
+        <div class="input-group">
+          <input type="text" id="sshCommand" class="form-control" readonly>
+          <button class="btn btn-outline-secondary" type="button" id="copySshCommand">Copiar</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -214,6 +262,58 @@
     ['dockerfile', 'compose'].forEach((name) => {
       const input = document.querySelector(`input[name="${name}"]`);
       if (input) input.addEventListener('change', syncExclusion);
+    });
+
+    const execModal = document.getElementById('execModal');
+    execModal.addEventListener('show.bs.modal', function (event) {
+      const button = event.relatedTarget;
+      const containerId = button.getAttribute('data-container-id');
+      const command = `docker exec -it ${containerId} /bin/sh`;
+      const commandInput = execModal.querySelector('#execCommand');
+      commandInput.value = command;
+    });
+
+    const copyButton = document.getElementById('copyExecCommand');
+    copyButton.addEventListener('click', function () {
+      const commandInput = document.getElementById('execCommand');
+      commandInput.select();
+      document.execCommand('copy');
+    });
+
+    document.body.addEventListener('service:show-ssh-key', (evt) => {
+      const detail = evt.detail || {};
+      const privateKey = detail.private_key;
+      const user = detail.user;
+      const serverIp = detail.server_ip;
+      const sshPort = detail.ssh_port;
+
+      const command = `ssh -i /path/to/private_key ${user}@${serverIp} -p ${sshPort}`;
+
+      const sshKeyModal = new bootstrap.Modal(document.getElementById('sshKeyModal'));
+      document.getElementById('sshPrivateKey').value = privateKey;
+      document.getElementById('sshCommand').value = command;
+      sshKeyModal.show();
+    });
+
+    const sshKeyModal = document.getElementById('sshKeyModal');
+    sshKeyModal.addEventListener('show.bs.modal', function (event) {
+      const button = event.relatedTarget;
+      const sshPort = button.getAttribute('data-ssh-port');
+      const sshUser = button.getAttribute('data-ssh-user');
+      const sshServerIp = button.getAttribute('data-ssh-server-ip');
+
+      if (sshPort) {
+        const command = `ssh -i /path/to/private_key ${sshUser}@${sshServerIp} -p ${sshPort}`;
+        document.getElementById('sshCommand').value = command;
+        document.getElementById('sshPrivateKey').value = '';
+      }
+    });
+
+    const copySshButton = document.getElementById('copySshCommand');
+    copySshButton.addEventListener('click', function () {
+      const commandInput = document.getElementById('sshCommand');
+      commandInput.select();
+      document.execCommand('copy');
     });
   });
 </script>
