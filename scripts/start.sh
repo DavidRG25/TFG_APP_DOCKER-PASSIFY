@@ -4,6 +4,13 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+if [[ -f "$ROOT_DIR/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "$ROOT_DIR/.env"
+  set +a
+fi
+
 export DJANGO_SETTINGS_MODULE="${DJANGO_SETTINGS_MODULE:-app_passify.settings}"
 export DJANGO_DEBUG="${DJANGO_DEBUG:-false}"
 export DJANGO_ALLOWED_HOSTS="${DJANGO_ALLOWED_HOSTS:-0.0.0.0,localhost,127.0.0.1}"
