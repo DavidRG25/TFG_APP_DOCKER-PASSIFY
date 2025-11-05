@@ -3,22 +3,19 @@
 
 {% block body %}
 <h2 class="mb-4">
-  {% if current_subject %}{{ current_subject.name }} Â· Mis servicios{% else %}Mis servicios{% endif %}
+  {% if current_subject %}{{ current_subject.name }} - Mis servicios{% else %}Mis servicios{% endif %}
 </h2>
 
-<!-- BotÃ³n para abrir el modal de alta -->
 <button class="btn btn-primary mb-3"
         data-bs-toggle="modal"
         data-bs-target="#newServiceModal">
   Nuevo servicio
 </button>
 
-<!-- Toasts visuales para feedback -->
 <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
   <div id="toast-container"></div>
 </div>
 
-<!-- Tabla de servicios -->
 <table class="table table-striped">
   <thead>
     <tr>
@@ -37,11 +34,9 @@
   </tbody>
 </table>
 
-<!-- Modal: Nuevo servicio -->
 <div class="modal fade" id="newServiceModal" tabindex="-1" aria-hidden="true" aria-labelledby="newServiceModalLabel">
   <div class="modal-dialog">
     <div class="modal-content">
-
       <div class="modal-header">
         <h5 class="modal-title" id="newServiceModalLabel">Nuevo servicio</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
@@ -52,7 +47,6 @@
             hx-post="/api/containers/"
             hx-target="#service-table"
             hx-swap="innerHTML">
-
         {% csrf_token %}
         {% if current_subject %}
           <input type="hidden" name="subject" value="{{ current_subject.id }}">
@@ -64,30 +58,24 @@
             <input name="name" class="form-control" required placeholder="p.ej. mi-nginx">
           </div>
 
-          <!-- Tipo de despliegue -->
           <div class="mb-3">
             <label class="form-label">Tipo de despliegue</label>
             <div class="form-check">
               <input class="form-check-input" type="radio" name="mode" id="mode_default" value="default" checked>
-              <label class="form-check-label" for="mode_default">
-                Imagen por defecto (recomendada)
-              </label>
+              <label class="form-check-label" for="mode_default">Imagen por defecto (recomendada)</label>
             </div>
             <div class="form-check">
               <input class="form-check-input" type="radio" name="mode" id="mode_custom" value="custom">
-              <label class="form-check-label" for="mode_custom">
-                ConfiguraciÃ³n personalizada (Dockerfile <strong>o</strong> docker-compose)
-              </label>
+              <label class="form-check-label" for="mode_custom">Configuracion personalizada (Dockerfile o docker-compose)</label>
             </div>
           </div>
 
-          <!-- Selector de imagen por defecto -->
           <div class="mb-3" id="block-default-image">
             <label class="form-label">Imagen</label>
             <select name="image" class="form-select" required>
               {% for img in images %}
                 <option value="{{ img.name }}:{{ img.tag }}">
-                  {{ img.name }}:{{ img.tag }} â€“ {{ img.description }}
+                  {{ img.name }}:{{ img.tag }} - {{ img.description }}
                 </option>
               {% endfor %}
             </select>
@@ -100,7 +88,6 @@
             <small class="text-muted">Debe estar entre 40000 y 50000.</small>
           </div>
 
-          <!-- Bloque configuraciÃ³n personalizada -->
           <div class="mb-3 custom-block" id="block-dockerfile">
             <label class="form-label">Dockerfile (opcional, exclusivo con compose)</label>
             <input type="file" name="dockerfile" accept=".dockerfile,.Dockerfile,.txt,text/plain" class="form-control">
@@ -112,54 +99,32 @@
           </div>
 
           <div class="mb-3 custom-block" id="block-code">
-            <label class="form-label">CÃ³digo fuente (.zip opcional)</label>
-            <input type="file" name="code" accept=".zip,application/zip" class="form-control">
-            <small class="text-muted">Con Dockerfile se usa como contexto de build; con compose se montarÃ¡ en <code>/app</code>.</small>
+            <label class="form-label">Codigo fuente (.zip opcional)</label>
+            <input type="file" name="code" accept=".zip" class="form-control">
           </div>
         </div>
 
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-success">Crear</button>
+          <button type="submit" class="btn btn-primary">Crear servicio</button>
         </div>
       </form>
-
     </div>
   </div>
 </div>
+{% endblock %}
 
-<!-- Modal: Logs -->
-<div class="modal fade" id="logsModal" tabindex="-1" aria-hidden="true" aria-labelledby="logsModalLabel">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title" id="logsModalLabel">Logs</h5></div>
-      <div class="modal-body"><pre id="logs-body" class="mb-0">(cargandoâ€¦)</pre></div>
-    </div>
-  </div>
-</div>
-
-<!-- Modal: CÃ³digo fuente -->
-<div class="modal fade" id="codeModal" tabindex="-1" aria-hidden="true" aria-labelledby="codeModalLabel">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header"><h5 class="modal-title" id="codeModalLabel">CÃ³digo fuente</h5></div>
-      <div class="modal-body"><pre id="code-body" class="bg-light p-3 mb-0"></pre></div>
-    </div>
-  </div>
-</div>
-
-<!-- Scripts -->
+{% block extrascripts %}
 <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-
 <script>
-  // CSRF para peticiones HTMX
   htmx.on('htmx:configRequest', (e) => {
     const token = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
-    if (token) e.detail.headers['X-CSRFToken'] = token;
+    if (token) {
+      e.detail.headers['X-CSRFToken'] = token;
+    }
   });
 
-  // Helper Toast
   function showToast(message, extraClass = 'text-bg-success') {
     const box = document.getElementById('toast-container');
     if (!box) return;
@@ -193,15 +158,13 @@
     showToast(detail.message || 'Operacion completada', detail.variant || 'text-bg-success');
   });
 
-  // Mostrar errores de HTMX
   htmx.on('htmx:responseError', (evt) => {
     const xhr = evt.detail.xhr;
     const status = xhr?.status ?? 0;
-    const msg = (xhr && xhr.responseText) ? xhr.responseText : 'Se produjo un error';
+    const msg = xhr?.responseText || 'Se produjo un error inesperado';
     showToast(`Error (${status}): ${msg}`, 'text-bg-danger');
   });
 
-  // === LÃ³gica modo default/custom + exclusiÃ³n Dockerfile/Compose ===
   function applyMode() {
     const mode = document.querySelector('input[name="mode"]:checked')?.value || 'default';
     const imgSel = document.querySelector('select[name="image"]');
@@ -212,12 +175,17 @@
 
     if (mode === 'default') {
       imgSel.disabled = false;
-      customBlocks.forEach(b => b.classList.add('opacity-50'));
-      [dockerfile, compose, code].forEach(i => { i.disabled = true; i.value = ''; });
+      customBlocks.forEach((b) => b.classList.add('opacity-50'));
+      [dockerfile, compose, code].forEach((input) => {
+        input.disabled = true;
+        input.value = '';
+      });
     } else {
       imgSel.disabled = true;
-      customBlocks.forEach(b => b.classList.remove('opacity-50'));
-      [dockerfile, compose, code].forEach(i => i.disabled = false);
+      customBlocks.forEach((b) => b.classList.remove('opacity-50'));
+      [dockerfile, compose, code].forEach((input) => {
+        input.disabled = false;
+      });
       syncExclusion();
     }
   }
@@ -225,11 +193,11 @@
   function syncExclusion() {
     const dockerfile = document.querySelector('input[name="dockerfile"]');
     const compose = document.querySelector('input[name="compose"]');
-    // ExclusiÃ³n: si uno tiene archivo, el otro se bloquea
-    if (dockerfile.files && dockerfile.files.length > 0) {
+
+    if (dockerfile.files?.length) {
       compose.value = '';
       compose.disabled = true;
-    } else if (compose.files && compose.files.length > 0) {
+    } else if (compose.files?.length) {
       dockerfile.value = '';
       dockerfile.disabled = true;
     } else {
@@ -240,10 +208,13 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     applyMode();
-    document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', applyMode));
-    ['dockerfile','compose'].forEach(n =>
-      document.querySelector(`input[name="${n}"]`).addEventListener('change', syncExclusion)
-    );
+    document.querySelectorAll('input[name="mode"]').forEach((radio) => {
+      radio.addEventListener('change', applyMode);
+    });
+    ['dockerfile', 'compose'].forEach((name) => {
+      const input = document.querySelector(`input[name="${name}"]`);
+      if (input) input.addEventListener('change', syncExclusion);
+    });
   });
 </script>
 {% endblock %}

@@ -34,7 +34,7 @@
             padding: 0 20px;
         }
 
-        /* Contenedor izquierdo (logo + menú) */
+        /* Contenedor izquierdo (logo + menu) */
         .navbar-left-container {
             display: flex;
             align-items: center;
@@ -60,13 +60,13 @@
             font-weight: bold;
         }
 
-        /* Menú principal - ahora completamente a la izquierda */
+        /* Menu principal - ahora completamente a la izquierda */
         .sidebar-nav {
             display: flex;
             list-style: none;
             margin: 0;
             padding: 0;
-            margin-right: auto; /* Empuja todo lo demás a la derecha */
+            margin-right: auto; /* Empuja todo lo demas a la derecha */
         }
 
         .nav-item {
@@ -96,7 +96,7 @@
             font-size: 1rem;
         }
 
-        /* Parte derecha (solo botón de autenticación) */
+        /* Parte derecha (solo boton de autenticacion) */
         .navbar-right {
             display: flex;
             align-items: center;
@@ -176,7 +176,7 @@
         }
 
         /* =============================================== */
-        /* AJUSTES SOLO PARA MÓVIL (RESPONSIVE) */
+        /* AJUSTES SOLO PARA MOVIL (RESPONSIVE) */
         /* =============================================== */
 
         @media (max-width: 768px) {
@@ -267,23 +267,23 @@
 <body>
 <!-- Barra superior unificada -->
 <nav class="top-navbar">
-    <!-- Botón de menú móvil -->
+    <!-- Boton de menu movil -->
     <button class="mobile-menu-btn" id="mobileMenuBtn">
         <i class="fas fa-bars"></i>
     </button>
 
-    <!-- Contenedor izquierdo (logo + menú) -->
+    <!-- Contenedor izquierdo (logo + menu) -->
     <div class="navbar-left-container">
-        <!-- Logo (redirige según rol si ya estás autenticado) -->
+        <!-- Logo (redirige segun rol si ya estas autenticado) -->
         <a class="sidebar-brand"
            href="{% if user.is_authenticated %}{% url 'post_login' %}{% else %}{% url 'index' %}{% endif %}">
             <div class="sidebar-brand-icon"><i class="fas fa-cloud"></i></div>
             <div class="sidebar-brand-text">PaaSify</div>
         </a>
 
-        <!-- Menú principal - ahora a la izquierda del todo -->
+        <!-- Menu principal - ahora a la izquierda del todo -->
         <ul class="sidebar-nav">
-            {# Mostrar "Inicio" SOLO si NO está autenticado (pantalla de login) #}
+            {# Mostrar "Inicio" SOLO si NO esta autenticado (pantalla de login) #}
             {% if not user.is_authenticated %}
                 <li class="nav-item">
                     <a class="nav-link {% if section == 'home' %} active {% endif %}" href="{% url 'index' %}">
@@ -326,7 +326,7 @@
         </ul>
     </div>
 
-    <!-- Parte derecha - Solo botón de autenticación -->
+    <!-- Parte derecha - Solo boton de autenticacion -->
     <div class="navbar-right">
         <div class="auth-container">
             {% if user.is_authenticated %}
@@ -336,7 +336,7 @@
                 <form method="post" action="{% url 'logout' %}" style="display:inline;">
                     {% csrf_token %}
                     <button type="submit" class="auth-button">
-                        Cerrar sesión <span class="user-status-indicator authenticated"></span>
+                        Cerrar sesion <span class="user-status-indicator authenticated"></span>
                     </button>
                 </form>
             {% else %}
@@ -352,14 +352,14 @@
 <div id="content-wrapper">
     <div id="main-content">
         {% block body %}
-        <!-- Contenido específico de cada página -->
+        <!-- Contenido especifico de cada pagina -->
         {% endblock %}
     </div>
 
     <footer class="footer">
         <div class="container">
             <div class="text-center">
-                <span>Copyright © PaaSify 2025</span>
+                <span>Copyright  PaaSify 2025</span>
             </div>
         </div>
     </footer>
@@ -371,12 +371,12 @@
 <script src="{% static 'assets/js/theme.js' %}"></script>
 
 <script>
-    // Toggle del menú móvil
+    // Toggle del menu movil
     document.getElementById('mobileMenuBtn').addEventListener('click', function() {
         document.body.classList.toggle('mobile-menu-visible');
     });
 
-    // Cerrar menú al hacer clic en un enlace (solo móvil)
+    // Cerrar menu al hacer clic en un enlace (solo movil)
     if (window.innerWidth <= 768) {
         document.querySelectorAll('.nav-link').forEach(function(link) {
             link.addEventListener('click', function() {

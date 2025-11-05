@@ -2,13 +2,13 @@
 
 {% block body %}
 <div class="container py-4">
-  <a href="{% url 'professor_dashboard' %}" class="btn btn-link mb-3">« Volver al panel</a>
+  <a href="{% url 'professor_dashboard' %}" class="btn btn-link mb-3"> Volver al panel</a>
 
   <h2 class="mb-2">{{ project.place }}</h2>
   <p class="text-muted">
     Alumno: {{ project.user_profile.nombre }}
     {% if project.user_profile.user %}(@{{ project.user_profile.user.username }}){% endif %}
-    · Asignatura: {{ project.sport.name }}
+     Asignatura: {{ project.sport.name }}
   </p>
   <p class="text-muted">Fecha prevista: {{ project.date|date:"Y-m-d" }} {{ project.time|time:"H:i" }}</p>
 
@@ -30,9 +30,9 @@
               {% for svc in related_services %}
                 <tr>
                   <td>{{ svc.name }}</td>
-                  <td>{{ svc.subject.name|default:"—" }}</td>
+                  <td>{{ svc.subject.name|default:"" }}</td>
                   <td>{{ svc.status|title }}</td>
-                  <td>{{ svc.assigned_port|default:"—" }}</td>
+                  <td>{{ svc.assigned_port|default:"" }}</td>
                 </tr>
               {% endfor %}
             </tbody>
