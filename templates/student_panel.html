@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% load static %}
 
 {% block body %}
@@ -132,7 +132,7 @@
     if (!element) return;
     element.select();
     document.execCommand('copy');
-    showToast('Â¡Copiado!');
+    showToast('¡Copiado!');
   }
 
   htmx.on('htmx:configRequest', (e) => {

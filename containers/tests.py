@@ -3,6 +3,7 @@ import asyncio
 import pytest
 from asgiref.sync import sync_to_async
 from channels.testing import WebsocketCommunicator
+from django.contrib.auth.models import Group
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from docker.errors import DockerException
@@ -30,18 +31,36 @@ DOCKER_AVAILABLE = _docker_available()
 
 @pytest.fixture(scope="session")
 def docker_client():
-    """Cliente Docker compartido para todos los tests."""
     if not DOCKER_AVAILABLE:
-        pytest.skip("Docker no esta disponible para las pruebas de contenedores.")
-    return get_docker_client()
+        pytest.skip("Docker no disponible para las pruebas de contenedores.")
+    client = get_docker_client()
+    if client is None:
+        pytest.skip("Docker no disponible para las pruebas de contenedores.")
+    return client
 
 
 @pytest.fixture(autouse=True)
 def clean_docker(docker_client):
-    """Ensure no test containers are left running before each test."""
+    """Elimina contenedores de prueba que puedan quedar colgados entre tests."""
     for c in docker_client.containers.list(all=True):
-        if "test" in c.name:
+        if "test" in c.name or "ci" in c.name:
             c.remove(force=True)
+
+
+@pytest.fixture
+def student_user(django_user_model):
+    """Usuario con rol de estudiante autenticado."""
+    group, _ = Group.objects.get_or_create(name="Student")
+    user = django_user_model.objects.create_user("student1", "s@test.com", "pass")
+    user.groups.add(group)
+    return user
+
+
+@pytest.fixture
+def api_client(student_user):
+    client = APIClient()
+    client.force_authenticate(user=student_user)
+    return client
 
 
 @pytest.mark.django_db
@@ -55,52 +74,8 @@ def test_port_reservation_is_unique():
 
 
 @pytest.mark.django_db
-@pytest.mark.skipif(not DOCKER_AVAILABLE, reason="Docker no disponible para pruebas de contenedores")
-def test_container_lifecycle(django_user_model, docker_client):
-    """Ejecucion completa: run -> stop -> remove y liberacion de puerto."""
-    user = django_user_model.objects.create_user("ci_user", "ci@local", "pass")
-    svc = Service.objects.create(owner=user, name="nginx-ci", image="nginx:latest")
-
-    run_container(svc, enqueue=False)
-    svc.refresh_from_db()
-    assert svc.status == "running"
-    assert docker_client.containers.get(svc.container_id).status == "running"
-
-    stop_container(svc)
-    svc.refresh_from_db()
-    assert svc.status == "stopped"
-
-    assigned_port = svc.assigned_port
-    remove_container(svc)
-    svc.refresh_from_db()
-    assert svc.status == "removed"
-    assert svc.container_id is None
-    assert not PortReservation.objects.filter(port__in=[assigned_port]).exists()
-
-
-from django.contrib.auth.models import Group
-
-
-@pytest.fixture
-def student_user(django_user_model):
-    """Usuario con rol de 'estudiante' para pruebas de API."""
-    group, _ = Group.objects.get_or_create(name="Student")
-    user = django_user_model.objects.create_user("student1", "s@test.com", "pass")
-    user.groups.add(group)
-    return user
-
-
-@pytest.fixture
-def api_client(student_user):
-    """Cliente de API autenticado como 'student_user'."""
-    client = APIClient()
-    client.force_authenticate(user=student_user)
-    return client
-
-
-@pytest.mark.django_db
 class TestServiceCreation:
-    """Grupo de tests para la creacion de servicios via API."""
+    """Grupo de tests para la creación de servicios vía API."""
 
     def test_create_with_default_image(self, api_client):
         AllowedImage.objects.create(name="nginx", tag="latest")
@@ -128,7 +103,7 @@ class TestServiceCreation:
         response = api_client.post(url, data, format="multipart")
         assert response.status_code == 201
         svc = Service.objects.get(name="test-dockerfile")
-        assert svc.dockerfile is not None
+        assert svc.dockerfile
 
     def test_create_with_compose(self, api_client):
         url = reverse("service-list")
@@ -139,7 +114,7 @@ class TestServiceCreation:
         response = api_client.post(url, data, format="multipart")
         assert response.status_code == 201
         svc = Service.objects.get(name="test-compose")
-        assert svc.compose is not None
+        assert svc.compose
 
     def test_create_fails_with_dockerfile_and_compose(self, api_client):
         url = reverse("service-list")
@@ -162,9 +137,7 @@ class TestServiceCreation:
 
     @pytest.mark.skipif(not DOCKER_AVAILABLE, reason="Docker no disponible")
     def test_get_service_logs(self, api_client, student_user):
-        svc = Service.objects.create(
-            owner=student_user, name="test-logs", image="hello-world"
-        )
+        svc = Service.objects.create(owner=student_user, name="test-logs", image="hello-world")
         try:
             run_container(svc, enqueue=False)
             url = reverse("service-logs", kwargs={"pk": svc.pk})
@@ -175,16 +148,38 @@ class TestServiceCreation:
             remove_container(svc)
 
 
+@pytest.mark.django_db
+@pytest.mark.skipif(not DOCKER_AVAILABLE, reason="Docker no disponible para pruebas de contenedores")
+def test_container_lifecycle(django_user_model, docker_client):
+    user = django_user_model.objects.create_user("ci_user", "ci@local", "pass")
+    svc = Service.objects.create(owner=user, name="nginx-ci", image="nginx:latest")
+
+    run_container(svc, enqueue=False)
+    svc.refresh_from_db()
+    assert svc.status == "running"
+    assert docker_client.containers.get(svc.container_id).status == "running"
+
+    stop_container(svc)
+    svc.refresh_from_db()
+    assert svc.status == "stopped"
+
+    assigned_port = svc.assigned_port
+    remove_container(svc)
+    svc.refresh_from_db()
+    assert svc.status == "removed"
+    assert svc.container_id is None
+    assert not PortReservation.objects.filter(port__in=[assigned_port]).exists()
+
+
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
-@pytest.mark.skipif(not DOCKER_AVAILABLE, reason="Docker not available")
+@pytest.mark.skipif(not DOCKER_AVAILABLE, reason="Docker no disponible")
 async def test_terminal_websocket(student_user):
-    """Tests the interactive terminal via WebSocket."""
+    """Valida la terminal interactiva mediante WebSocket."""
     svc = await sync_to_async(Service.objects.create)(
         owner=student_user, name="test-terminal", image="alpine:latest"
     )
     try:
-        # Keep the container alive for the test
         await sync_to_async(run_container)(svc, command=["sleep", "60"], enqueue=False)
         await sync_to_async(svc.refresh_from_db)()
         assert svc.status == "running"
@@ -198,9 +193,8 @@ async def test_terminal_websocket(student_user):
         connected, _ = await communicator.connect()
         assert connected
 
-        # Send a command and check for its output
         await communicator.send_to(text_data="echo 'hello from terminal'\n")
-        await asyncio.sleep(0.1)  # Give the shell a moment to process
+        await asyncio.sleep(0.1)
         response = ""
         try:
             while True:
