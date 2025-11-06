@@ -22,8 +22,12 @@ class TerminalConsumer(WebsocketConsumer):
         self._reader_thread = None
         self.sock = None
 
+        from .views import user_is_admin, user_is_teacher
         try:
-            service = get_object_or_404(Service, pk=service_id, owner=user)
+            if user_is_admin(user) or user_is_teacher(user):
+                service = get_object_or_404(Service, pk=service_id)
+            else:
+                service = get_object_or_404(Service, pk=service_id, owner=user)
         except Http404:
             self.close(code=4403)
             return

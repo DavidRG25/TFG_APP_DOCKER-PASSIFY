@@ -29,8 +29,8 @@
       class="btn btn-sm btn-success"
       {% if s.status == "running" %}disabled{% endif %}
       hx-post="{% url 'service-start' s.id %}"
-      hx-target="#service-table"
-      hx-swap="innerHTML"
+      hx-target="#service-{{ s.id }}"
+      hx-swap="outerHTML"
       title="Iniciar">
       Iniciar
     </button>
@@ -39,8 +39,8 @@
       class="btn btn-sm btn-warning"
       {% if s.status != "running" %}disabled{% endif %}
       hx-post="{% url 'service-stop' s.id %}"
-      hx-target="#service-table"
-      hx-swap="innerHTML"
+      hx-target="#service-{{ s.id }}"
+      hx-swap="outerHTML"
       title="Detener">
       Detener
     </button>
@@ -48,9 +48,9 @@
     <button
       class="btn btn-sm btn-danger"
       hx-post="{% url 'service-remove' s.id %}"
-      hx-target="#service-table"
-      hx-swap="innerHTML"
-      hx-confirm="¿Eliminar definitivamente?"
+      hx-target="#service-{{ s.id }}"
+      hx-swap="outerHTML"
+      hx-confirm="Â¿Eliminar definitivamente?"
       title="Eliminar">
       Eliminar
     </button>
@@ -58,10 +58,10 @@
     <button
       class="btn btn-sm btn-secondary"
       hx-get="{% url 'service-logs' s.id %}"
-      hx-target="#logs-body"
+      hx-target="#genericModalContent"
       hx-swap="innerHTML"
       data-bs-toggle="modal"
-      data-bs-target="#logsModal"
+      data-bs-target="#genericModal"
       title="Ver logs">
       Logs
     </button>
@@ -94,33 +94,22 @@
 
     <a
       href="{% url 'containers:terminal_view' s.id %}"
-      class="btn btn-sm btn-dark {% if not s.container_id or s.status != 'running' %}disabled{% endif %}"
+      class="btn btn-sm btn-dark {% if s.status != 'running' %}disabled{% endif %}"
       title="Abrir terminal">
       Terminal
     </a>
 
     <button
-      class="btn btn-sm btn-info"
-      data-bs-toggle="modal"
-      data-bs-target="#execModal"
-      data-container-id="{{ s.container_id }}"
-      {% if not s.container_id or s.status != 'running' %}disabled{% endif %}
-      title="Conexión Local">
-      Conexión Local
-    </button>
-
-    {% if s.enable_ssh and s.ssh_port %}
-    <button
       class="btn btn-sm btn-primary"
+      hx-get="{% url 'service-ssh-uri' s.id %}"
+      hx-target="#genericModalContent"
+      hx-swap="innerHTML"
       data-bs-toggle="modal"
-      data-bs-target="#sshKeyModal"
-      data-ssh-port="{{ s.ssh_port }}"
-      data-ssh-user="root"
-      data-ssh-server-ip="{{ request.get_host }}"
+      data-bs-target="#genericModal"
+      {% if s.status != 'running' or not s.ssh_port %}disabled{% endif %}
       title="Comando SSH">
       SSH
     </button>
-    {% endif %}
   </td>
 </tr>
 {% empty %}

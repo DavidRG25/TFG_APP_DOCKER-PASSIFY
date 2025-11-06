@@ -15,8 +15,7 @@ def get_docker_client() -> docker.DockerClient | None:
     """
     try:
         client = docker.from_env()
-        # ``ping`` valida la conexión sin ejecutar operaciones destructivas.
         client.ping()
         return client
-    except DockerException:
+    except (DockerException, OSError):
         return None

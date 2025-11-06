@@ -27,7 +27,7 @@ from paasify.roles import (
 from .docker_client import get_docker_client
 from .models import AllowedImage, Service
 from .serializers import AllowedImageSerializer, ServiceSerializer
-from .services import remove_container, run_container, stop_container
+from .services import SSH_USERNAME, remove_container, run_container, stop_container
 
 
 # ----------------------------- helpers -----------------------------
@@ -119,7 +119,12 @@ class ServiceViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Solo los alumnos pueden gestionar contenedores.")
 
     def get_queryset(self):
-        qs = Service.objects.filter(owner=self.request.user)
+        user = self.request.user
+        if user_is_admin(user) or user_is_teacher(user):
+            qs = Service.objects.all()
+        else:
+            qs = Service.objects.filter(owner=user)
+        
         for s in qs:
             _sync_service(s)
         return qs.exclude(status="removed")
@@ -174,19 +179,10 @@ class ServiceViewSet(viewsets.ModelViewSet):
             service.compose = request.FILES["compose"]
         if has_code:
             service.code = request.FILES["code"]
-        service.enable_ssh = request.data.get("enable_ssh") in ["on", "true"]
         service.save()
 
-        ssh_data = None
         try:
             run_container(service, custom_port=custom_port)
-            if service.enable_ssh and hasattr(service, "ssh_private_key"):
-                ssh_data = {
-                    "private_key": service.ssh_private_key,
-                    "user": "root",  # Assuming root for now
-                    "server_ip": request.get_host().split(":")[0],
-                    "ssh_port": service.ssh_port,
-                }
         except Exception as exc:
             service.status = "error"
             service.logs = str(exc)
@@ -201,22 +197,20 @@ class ServiceViewSet(viewsets.ModelViewSet):
             return DRF_Response({"error": str(exc)}, status=500)
 
         if self._is_htmx(request):
-            triggers = {"service:modal-close": {"modalId": "newServiceModal"}}
-            if ssh_data:
-                triggers["service:show-ssh-key"] = ssh_data
             return self._htmx_response(
                 request,
                 status=201,
                 message="Servicio encolado para iniciar.",
                 level="text-bg-success",
-                extra_triggers=triggers,
+                extra_triggers={"service:modal-close": {"modalId": "newServiceModal"}},
             )
 
         headers = self.get_success_headers(serializer.data)
-        serialized_data = ServiceSerializer(service, context={"request": request}).data
-        if ssh_data:
-            serialized_data["ssh_data"] = ssh_data
-        return DRF_Response(serialized_data, status=201, headers=headers)
+        return DRF_Response(
+            ServiceSerializer(service, context={"request": request}).data,
+            status=201,
+            headers=headers
+        )
 
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
@@ -290,20 +284,29 @@ class ServiceViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def logs(self, request, pk=None):
         service = self.get_object()
+        log_content = "(sin logs)"
         if service.container_id:
             docker_client = get_docker_client()
-            if docker_client is None:
-                service.logs = "(Docker no disponible para leer logs)"
-                service.save()
-            else:
+            if docker_client:
                 try:
                     container = docker_client.containers.get(service.container_id)
-                    service.logs = container.logs(tail=100).decode(errors="replace")
-                    service.save()
+                    log_content = container.logs(tail=200).decode(errors="replace")
                 except Exception as e:
-                    service.logs = f"(error leyendo logs: {str(e)})"
-                    service.save()
-        return HttpResponse(service.logs or "(sin logs)")
+                    log_content = f"(error leyendo logs: {e})"
+        
+        if self._is_htmx(request):
+            html = f"""
+                <div class="modal-header">
+                    <h5 class="modal-title">Logs de {service.name}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <pre><code class="language-plaintext">{escape(log_content)}</code></pre>
+                </div>
+            """
+            return HttpResponse(html)
+        
+        return HttpResponse(log_content, content_type="text/plain")
 
     # ---- ver Dockerfile/compose subidos ----
     CODE_MAX = 256 * 1024
@@ -325,6 +328,47 @@ class ServiceViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def compose(self, request, pk=None):
         return self._serve_code(self.get_object().compose, "yaml")
+
+    @action(detail=True, methods=["get"], url_path="ssh-uri")
+    def ssh_uri(self, request, pk=None):
+        service = self.get_object()
+        if service.status != "running" or not service.ssh_port:
+            return DRF_Response(
+                {"error": "El servicio no está en ejecución o no tiene puerto SSH asignado."},
+                status=400,
+            )
+
+        host = request.get_host().split(":")[0]
+        uri = f"ssh {SSH_USERNAME}@{host} -p {service.ssh_port}"
+        password = service.ssh_password or "No disponible"
+
+        if self._is_htmx(request):
+            safe_uri = escape(uri)
+            safe_password = escape(password)
+            safe_user = escape(SSH_USERNAME)
+            # Si es HTMX, devolvemos un fragmento de HTML para el modal
+            html = f"""
+                <div class="modal-header">
+                    <h5 class="modal-title">Conexión SSH</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Copia y pega el siguiente comando en tu terminal:</p>
+                    <div class="input-group">
+                        <input type="text" id="sshCommand" class="form-control" value="{safe_uri}" readonly>
+                        <button class="btn btn-outline-secondary" onclick="copyToClipboard('#sshCommand')">Copiar</button>
+                    </div>
+                    <p class="mt-3 mb-1">Contraseña:</p>
+                    <div class="input-group">
+                        <input type="text" id="sshPassword" class="form-control" value="{safe_password}" readonly>
+                        <button class="btn btn-outline-secondary" onclick="copyToClipboard('#sshPassword')">Copiar</button>
+                    </div>
+                    <small class="text-muted d-block mt-2">Usuario: {safe_user}</small>
+                </div>
+            """
+            return HttpResponse(html)
+
+        return DRF_Response({"ssh_uri": uri, "password": password, "user": SSH_USERNAME})
 
 
 class AllowedImageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -422,12 +466,23 @@ def service_table(request):
 def terminal_view(request, pk):
     """
     Muestra la terminal web para el servicio si el usuario es el propietario
-    y el contenedor estÃƒÂ¡ en ejecuciÃƒÂ³n (container_id presente).
+    y el contenedor está en ejecución.
     """
-    service = get_object_or_404(Service, pk=pk, owner=request.user)
-    if not service.container_id:
-        return HttpResponse("El servicio no estÃƒÂ¡ en ejecuciÃƒÂ³n o no tiene container_id.", status=400)
-    return render(request, "containers/terminal.html", {"service": service})
+    user = request.user
+    if user_is_admin(user) or user_is_teacher(user):
+        service = get_object_or_404(Service, pk=pk)
+    else:
+        service = get_object_or_404(Service, pk=pk, owner=user)
+
+    if service.status != "running" or not service.container_id:
+        return HttpResponse("El servicio no está en ejecución.", status=400)
+    
+    # El endpoint del WebSocket se construye dinámicamente
+    ws_path = f"/ws/terminal/{service.id}/"
+    return render(request, "containers/terminal.html", {
+        "service": service,
+        "ws_path": ws_path,
+    })
 
 
 @login_required

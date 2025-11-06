@@ -1,6 +1,7 @@
-from django.urls import re_path
-from .consumers import TerminalConsumer
+# containers/routing.py
+from django.urls import path
+from . import consumers
 
 websocket_urlpatterns = [
-    re_path(r"ws/terminal/(?P<service_id>\d+)/$", TerminalConsumer.as_asgi()),
+    path("ws/terminal/<int:service_id>/", consumers.TerminalConsumer.as_asgi()),
 ]
