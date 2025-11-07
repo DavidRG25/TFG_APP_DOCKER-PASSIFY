@@ -108,8 +108,7 @@ cd paasify
 
 ```bash
 python -m venv venv
-source venv/bin/activate  # En Windows sin "source": venv\Scripts\activate
-```
+source venv/Scripts/activate  # En Windows sin "source": venv\Scripts\activate
 
 ### 3. Instala las Dependencias
 
@@ -129,6 +128,7 @@ python manage.py migrate
 ```bash
 python3 -m daphne -b 0.0.0.0 -p 8080 app_passify.asgi:application
 ```
+<<<<<<< HEAD
 
 ### 🛠️ Ejecución rápida con el script `start_app.sh`
 
@@ -170,3 +170,9 @@ Credenciales creadas:
 | Profesor   | `profesor` | `Profesor!2025`| Pertenece al grupo `Teacher`.     |
 
 El comando es idempotente: si los usuarios ya existen, actualizará permisos, email y contraseñas.
+=======
+#### Dependiendo de la versión
+```bash
+python -m daphne -b 0.0.0.0 -p 8080 app_passify.asgi:application
+```
+>>>>>>> main
