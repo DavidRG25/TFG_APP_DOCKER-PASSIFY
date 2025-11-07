@@ -1,17 +1,27 @@
+import requests
 from django.contrib import admin, messages
 from django.template.response import TemplateResponse
-from .models import AllowedImage, Service
-import docker
 from docker.errors import APIError
 
-# Cliente global (usado por la acción "solo pull")
-client = docker.from_env()
+from .docker_client import get_docker_client
+from .forms import AllowedImageForm
+from .models import AllowedImage, Service
 
 
 # Acción: Probar imagen (pull & run) y MOSTRAR LOG en una página
 @admin.action(description="Probar imagen (pull & run) y mostrar log")
 def probar_imagen_con_log(modeladmin, request, queryset):
-    local_client = docker.from_env()
+    local_client = get_docker_client()
+    if local_client is None:
+        messages.error(
+            request,
+            "No se pudo conectar con el daemon de Docker. Verifica que el servicio esté activo.",
+        )
+        context = {
+            **modeladmin.admin_site.each_context(request),
+            "results": [],
+        }
+        return TemplateResponse(request, "admin/allowedimage_test_logs.html", context)
     results = []
 
     for img in queryset:
@@ -34,7 +44,10 @@ def probar_imagen_con_log(modeladmin, request, queryset):
         if status == "ok":
             # Intento A: con sh -lc (para imágenes que tienen shell)
             try:
-                cmd = "echo PASSED"
+                if "mysql" in img.name:
+                    cmd = "mysql --version"
+                else:
+                    cmd = "echo PASSED"
                 log_lines.append(f"$ docker run --rm {full} sh -lc '{cmd}'")
                 out = local_client.containers.run(
                     full, ["sh", "-lc", cmd], remove=True, detach=False
@@ -76,20 +89,55 @@ def probar_imagen_con_log(modeladmin, request, queryset):
 # AllowedImage Admin
 @admin.register(AllowedImage)
 class AllowedImageAdmin(admin.ModelAdmin):
+    form = AllowedImageForm
     list_display = ('name', 'tag', 'description')
     search_fields = ('name', 'tag', 'description')
 
     # Incluimos ambas acciones: la tuya (solo pull) y la nueva (con log)
     actions = [probar_imagen_con_log, 'probar_imagen']
 
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        if obj and obj.name:
+            tags = self._get_docker_hub_tags(obj.name)
+            form.base_fields['suggested_tags'].initial = "\n".join(tags)
+        return form
+
+    def _get_docker_hub_tags(self, name):
+        url = f"https://hub.docker.com/v2/repositories/library/{name}/tags/"
+        response = requests.get(url)
+        if response.status_code != 200:
+            return []
+        results = response.json().get('results', [])
+        return [r['name'] for r in results]
+
+    def save_model(self, request, obj, form, change):
+        name = form.cleaned_data.get('name')
+        tag = form.cleaned_data.get('tag')
+        url = f"https://hub.docker.com/v2/repositories/library/{name}/tags/{tag}"
+        response = requests.get(url)
+        if response.status_code != 200:
+            messages.error(request, f"La imagen '{name}:{tag}' no existe en Docker Hub.")
+            return
+        super().save_model(request, obj, form, change)
+
     def probar_imagen(self, request, queryset):
         """
         Acción original: SOLO pull + mensajes en la parte superior del admin.
         """
+        docker_client = get_docker_client()
+        if docker_client is None:
+            self.message_user(
+                request,
+                "Docker no está disponible. Inicia el daemon antes de ejecutar la acción.",
+                level=messages.ERROR,
+            )
+            return
+
         for img in queryset:
             image_full = f"{img.name}:{img.tag}"
             try:
-                client.images.pull(img.name, tag=img.tag)
+                docker_client.images.pull(img.name, tag=img.tag)
                 messages.success(request, f"Imagen {image_full} cargada correctamente.")
             except APIError as e:
                 messages.error(request, f"Error al cargar {image_full}: {e}")

@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 {% load static %}
 
 {% block extrahead %}
@@ -21,41 +21,61 @@ document.addEventListener("DOMContentLoaded", () => {
     cursorBlink: true,
     scrollback: 1000,
     tabStopWidth: 8,
-    theme: {
-      background: "#000000",
-      foreground: "#ffffff"
-    }
+    theme: { background: "#000000", foreground: "#ffffff" }
   });
   term.open(document.getElementById("terminal-container"));
 
-  function connectSocket() {
-    const scheme = (window.location.protocol === 'https:') ? 'wss' : 'ws';
+  let currentSocket = null;
+  let retryCount = 0;
+  const MAX_RETRIES = 5;
+
+  const connectSocket = () => {
+    const scheme = window.location.protocol === "https:" ? "wss" : "ws";
     const socket = new WebSocket(`${scheme}://${window.location.host}/ws/terminal/{{ service.id }}/`);
+    currentSocket = socket;
 
     socket.onopen = () => {
-      term.writeln("Conexión establecida con el contenedor.");
+      retryCount = 0;
+      term.writeln("Conexion establecida con el contenedor.");
     };
 
-    socket.onmessage = (event) => {
-      term.write(event.data);
-    };
+    socket.onmessage = (event) => term.write(event.data || "");
 
-    socket.onerror = (event) => {
-      term.writeln("\r\n[ERROR DE CONEXIÓN WEBSOCKET]\r\n");
+    socket.onerror = () => {
+      term.writeln("\r\n[ERROR DE CONEXION WEBSOCKET]\r\n");
     };
 
     socket.onclose = (event) => {
-      term.writeln("\r\n[CONEXIÓN CERRADA]");
+      currentSocket = null;
+      term.writeln(`\r\n[CONEXION CERRADA ${event.code}]`);
+
+      if (event.code === 4403) {
+        term.writeln("\r\nAcceso denegado. No se intentara reconectar.");
+        return;
+      }
+
+      if (event.code === 1000 || event.code === 1001 || retryCount >= MAX_RETRIES) {
+        if (retryCount >= MAX_RETRIES) {
+          term.writeln("\r\nSe alcanzo el numero maximo de reintentos.");
+        }
+        return;
+      }
+
+      retryCount += 1;
       setTimeout(() => {
         term.writeln("\r\nReconectando...");
         connectSocket();
       }, 3000);
     };
+  };
 
-    term.onData(data => socket.send(data));
-  }
+  term.onData((data) => {
+    if (currentSocket && currentSocket.readyState === WebSocket.OPEN) {
+      currentSocket.send(data);
+    }
+  });
 
-  term.writeln("Conectando al contenedor…\r\n");
+  term.writeln("Conectando al contenedor...\r\n");
   connectSocket();
 });
 </script>

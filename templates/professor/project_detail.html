@@ -1,0 +1,48 @@
+﻿{% extends "base.html" %}
+
+{% block body %}
+<div class="container py-4">
+  <a href="{% url 'professor_dashboard' %}" class="btn btn-link mb-3"> Volver al panel</a>
+
+  <h2 class="mb-2">{{ project.place }}</h2>
+  <p class="text-muted">
+    Alumno: {{ project.user_profile.nombre }}
+    {% if project.user_profile.user %}(@{{ project.user_profile.user.username }}){% endif %}
+     Asignatura: {{ project.subject.name }}
+  </p>
+  <p class="text-muted">Fecha prevista: {{ project.date|date:"Y-m-d" }} {{ project.time|time:"H:i" }}</p>
+
+  <div class="card mt-4">
+    <div class="card-header"><strong>Servicios del alumno</strong></div>
+    <div class="card-body p-0">
+      {% if related_services %}
+        <div class="table-responsive">
+          <table class="table table-striped mb-0">
+            <thead>
+              <tr>
+                <th>Servicio</th>
+                <th>Asignatura</th>
+                <th>Estado</th>
+                <th>Puerto</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for svc in related_services %}
+                <tr>
+                  <td>{{ svc.name }}</td>
+                  <td>{{ svc.subject.name|default:"" }}</td>
+                  <td>{{ svc.status|title }}</td>
+                  <td>{{ svc.assigned_port|default:"" }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-muted m-3">El alumno no tiene contenedores activos asociados.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+

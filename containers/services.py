@@ -1,20 +1,46 @@
 # containers/services.py
 import os
+import secrets
 import shutil
-import json
-import tempfile
 import subprocess
-import random
 
-import docker
-from docker.errors import NotFound, APIError
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+import tempfile
+from concurrent.futures import ThreadPoolExecutor
 
-from .models import Service, PortReservation
+from django.db import IntegrityError, transaction
 
-client = docker.from_env()
+from docker import DockerClient
+from docker.errors import APIError, DockerException, NotFound
 
-PORT_RANGE_START = 40000
-PORT_RANGE_END = 50000
+from .docker_client import get_docker_client
+from .models import PortReservation, Service
+
+MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MiB
+COMPOSE_EXTENSIONS = {".yml", ".yaml"}
+CODE_EXTENSIONS = {".zip"}
+SSH_IMAGE = os.environ.get("SERVICE_SSH_IMAGE", "linuxserver/openssh-server")
+SSH_USERNAME = os.environ.get("SERVICE_SSH_USER", "student")
+
+EXECUTOR = ThreadPoolExecutor(
+    max_workers=int(os.environ.get("SERVICE_WORKERS", "2"))
+)
+
+
+def _generate_ssh_keys():
+    """Generates a new SSH key pair."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    private_key = key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    public_key = key.public_key().public_bytes(
+        encoding=serialization.Encoding.OpenSSH,
+        format=serialization.PublicFormat.OpenSSH,
+    )
+    return private_key.decode(), public_key.decode()
 
 
 def _compose_cmd() -> list[str]:
@@ -29,21 +55,7 @@ def _compose_cmd() -> list[str]:
             return cmd
         except Exception:
             continue
-    raise RuntimeError("No se encontró 'docker compose' (v2) ni 'docker-compose' (v1).")
-
-
-# ---------- Utilidades de puertos ----------
-
-def _reserve_free_port() -> int:
-    """
-    Reserva un puerto libre dentro del rango configurado.
-    """
-    for _ in range(2000):
-        port = random.randint(PORT_RANGE_START, PORT_RANGE_END)
-        if not PortReservation.objects.filter(port=port).exists():
-            PortReservation.objects.create(port=port)
-            return port
-    raise RuntimeError("No free ports available in defined range")
+    raise RuntimeError("No se encontrÃ³ 'docker compose' (v2) ni 'docker-compose' (v1).")
 
 
 def _release_port(port: int | None):
@@ -51,22 +63,59 @@ def _release_port(port: int | None):
         PortReservation.objects.filter(port=port).delete()
 
 
+def _reserve_specific_port(port: int) -> None:
+    try:
+        with transaction.atomic():
+            PortReservation.objects.create(port=port)
+    except IntegrityError as exc:
+        raise RuntimeError(f"El puerto {port} ya esta en uso.") from exc
+
+
+def _append_log(service: Service, message: str) -> None:
+    """Añade una línea al histórico de logs del servicio."""
+    current = service.logs or ""
+    if current:
+        service.logs = f"{current.rstrip()}\n{message}"
+    else:
+        service.logs = message
+
+
 # ---------- Utilidades de ficheros ----------
+
+def _validate_upload(ff, *, allowed_extensions=None, max_size=MAX_UPLOAD_SIZE):
+    """Valida tamaÃ±o y extensiÃ³n permitida para un ``FieldFile``."""
+    if ff is None:
+        return
+
+    if max_size and getattr(ff, "size", None) and ff.size > max_size:
+        raise ValueError(
+            f"El archivo '{getattr(ff, 'name', 'desconocido')}' supera el tamaÃ±o mÃ¡ximo permitido ({max_size // (1024 * 1024)} MiB)."
+        )
+
+    if allowed_extensions is not None:
+        name = getattr(ff, "name", "") or ""
+        extension = os.path.splitext(name)[1].lower()
+        if extension not in allowed_extensions:
+            allowed = ", ".join(sorted(ext or 'sin extensiÃ³n' for ext in allowed_extensions))
+            raise ValueError(
+                f"El archivo '{name}' debe tener una de las extensiones permitidas: {allowed}."
+            )
+
 
 def _save_filefield_to(tmp_path: str, ff) -> str:
     """
     Guarda el contenido de un FileField en 'tmp_path' y devuelve esa ruta.
     """
     os.makedirs(os.path.dirname(tmp_path), exist_ok=True)
-    with ff.open("rb"):
+    with ff.open("rb") as in_fh:
         with open(tmp_path, "wb") as out:
-            shutil.copyfileobj(ff, out)
+            shutil.copyfileobj(in_fh, out)
     return tmp_path
 
 
 def _unpack_code_zip_to(target_dir: str, ff) -> None:
     """
-    Descomprime un ZIP de código a 'target_dir'.
+    Descomprime un ZIP de cÃ³digo a 'target_dir'.
     """
     os.makedirs(target_dir, exist_ok=True)
     # Guardar ZIP a temp antes de descomprimir
@@ -76,50 +125,87 @@ def _unpack_code_zip_to(target_dir: str, ff) -> None:
     os.remove(zpath)
 
 
-# ---------- Función principal ----------
+# ---------- FunciÃ³n principal ----------
 
-def run_container(service: Service, force_restart: bool = False):
+def _run_container_internal(
+    service: Service,
+    *,
+    force_restart: bool = False,
+    custom_port: int | None = None,
+    command: list[str] | None = None,
+):
     """
     Arranca (o rearma) el contenedor asociado a un Service.
     Prioridad:
-      1) docker-compose (si se subió)
-      2) Dockerfile       (si se subió)
-      3) Imagen permitida (catálogo)
+      1) docker-compose (si se subiÃ³)
+      2) Dockerfile       (si se subiÃ³)
+      3) Imagen permitida (catÃ¡logo)
     """
+    docker_client = get_docker_client()
+    if docker_client is None:
+        service.status = "error"
+        service.logs = "Docker no estÃ¡ disponible. Inicia el daemon y vuelve a intentarlo."
+        service.save()
+        raise RuntimeError("Docker no estÃ¡ disponible en el entorno de ejecuciÃ³n.")
+
+    try:
+        if service.compose:
+            _validate_upload(service.compose, allowed_extensions=COMPOSE_EXTENSIONS)
+        if service.code:
+            _validate_upload(service.code, allowed_extensions=CODE_EXTENSIONS)
+        if service.dockerfile:
+            # Dockerfile admite nombres sin extensiÃ³n, por lo que solo se valida tamaÃ±o.
+            _validate_upload(service.dockerfile, allowed_extensions=None)
+    except ValueError as exc:
+        service.status = "error"
+        service.logs = str(exc)
+        service.save()
+        raise
+
     port = None
     try:
         # Si hay que reiniciar, eliminar contenedor previo y liberar puerto
         if force_restart and service.container_id:
             try:
-                client.containers.get(service.container_id).remove(force=True)
+                docker_client.containers.get(service.container_id).remove(force=True)
             except NotFound:
                 pass
+            except DockerException as exc:
+                service.logs = f"No se pudo eliminar el contenedor previo: {exc}"
+                service.save()
+                raise RuntimeError(service.logs)
             service.container_id = None
             _release_port(service.assigned_port)
             service.assigned_port = None
 
-        # Si ya existe y no es reinicio, asegurar que esté en marcha y salir
+        # Si ya existe y no es reinicio, asegurar que estÃ© en marcha y salir
         if service.container_id and not force_restart:
-            container = client.containers.get(service.container_id)
-            if container.status != "running":
-                container.start()
-                service.status = "running"
+            try:
+                container = docker_client.containers.get(service.container_id)
+                if container.status != "running":
+                    container.start()
+                    service.status = "running"
+                    service.save()
+                return
+            except NotFound:
+                service.container_id = None
+            except DockerException as exc:
+                service.logs = f"Error al consultar el contenedor existente: {exc}"
+                service.status = "error"
                 service.save()
-            return
+                raise RuntimeError(service.logs)
 
         # --------- Reserva de puerto (solo para caso NO compose) ---------
-        custom_port = getattr(service, "_custom_port", None)
+        # custom_port es proporcionado por la vista al encolar la tarea.
         if service.compose:
-            # docker-compose maneja puertos por su YAML; no reservamos aquí
+            # docker-compose maneja puertos por su YAML; no reservamos aqui
             pass
         else:
             if custom_port:
-                if PortReservation.objects.filter(port=custom_port).exists():
-                    raise RuntimeError(f"El puerto {custom_port} ya está en uso.")
+                _reserve_specific_port(custom_port)
                 port = custom_port
-                PortReservation.objects.create(port=port)
             else:
-                port = _reserve_free_port()
+                port = PortReservation.reserve_free_port()
 
         # --------- Caso docker-compose ---------
         if service.compose:
@@ -127,11 +213,11 @@ def run_container(service: Service, force_restart: bool = False):
                 compose_path = os.path.join(tmpdir, "docker-compose.yml")
                 _save_filefield_to(compose_path, service.compose)
 
-                # Si hay código, lo descomprimimos como contexto de trabajo (p.ej. ./app)
+                # Si hay cÃ³digo, lo descomprimimos como contexto de trabajo (p.ej. ./app)
                 if service.code:
                     _unpack_code_zip_to(os.path.join(tmpdir, "app"), service.code)
 
-                # Nombre de proyecto único para poder localizar el contenedor
+                # Nombre de proyecto Ãºnico para poder localizar el contenedor
                 project = f"svc{service.id}"
 
                 try:
@@ -148,11 +234,13 @@ def run_container(service: Service, force_restart: bool = False):
                     raise RuntimeError(f"Error al ejecutar docker compose:\n{service.logs}")
 
                 # Buscar contenedor por labels del proyecto compose
-                # Tomamos el primero (suponemos un único servicio en el YAML para este MVP)
-                containers = client.containers.list(all=True, filters={"label": f"com.docker.compose.project={project}"})
+                # Tomamos el primero (suponemos un Ãºnico servicio en el YAML para este MVP)
+                containers = docker_client.containers.list(
+                    all=True, filters={"label": f"com.docker.compose.project={project}"}
+                )
                 if not containers:
                     service.status = "error"
-                    service.logs = "docker-compose: no se detectó ningún contenedor con el proyecto especificado."
+                    service.logs = "docker-compose: no se detectÃ³ ningÃºn contenedor con el proyecto especificado."
                     service.save()
                     raise RuntimeError(service.logs)
 
@@ -191,12 +279,20 @@ def run_container(service: Service, force_restart: bool = False):
 
                 image_to_run = image_tag
         else:
-            # --------- Caso imagen directa del catálogo ---------
+            # --------- Caso imagen directa del catÃ¡logo ---------
             image_to_run = service.image
 
-        # --------- Variables y volúmenes (para no-compose) ---------
-        volumes = {}
-        # Montaje de /app si se subió un ZIP (nota: en runtime un ZIP no sirve; aquí solo se expone el archivo)
+
+        # --------- Variables y volÃºmenes (para no-compose) ---------
+        volume_name = f"svc_{service.id}"
+        try:
+            docker_client.volumes.create(name=volume_name)
+        except APIError as e:
+            if e.response.status_code != 409:  # 409 es 'conflicto', el volumen ya existe (OK)
+                raise RuntimeError(f"No se pudo crear el volumen '{volume_name}': {e}")
+        service.volume_name = volume_name
+        volumes = {volume_name: {"bind": "/home/user/data", "mode": "rw"}}
+        # Montaje de /app si se subiÃ³ un ZIP (nota: en runtime un ZIP no sirve; aquÃ­ solo se expone el archivo)
         # Para casos reales, se recomienda usar Dockerfile o compose con COPY en build.
         if service.code and hasattr(service.code, "path"):
             volumes[service.code.path] = {"bind": "/app", "mode": "rw"}
@@ -209,16 +305,19 @@ def run_container(service: Service, force_restart: bool = False):
         if not isinstance(env_vars, dict):
             env_vars = {}
 
-        # Puerto interno configurable (si añadís el campo al modelo); por defecto 80
+        # Puerto interno configurable (si aÃ±adÃ­s el campo al modelo); por defecto 80
         internal_port = getattr(service, "internal_port", 80)
 
-        container = client.containers.run(
+        ports = {f"{internal_port}/tcp": port} if port else {}
+
+        container = docker_client.containers.run(
             image=image_to_run,
+            command=command,
             detach=True,
             tty=True,
             stdin_open=True,                 # importante para la terminal
             name=f"{service.owner.username}_{service.name}_{port or 'auto'}",
-            ports={f"{internal_port}/tcp": port} if port else None,
+            ports=ports,
             volumes=volumes or None,
             environment=env_vars or None,
             working_dir="/app" if volumes else None,
@@ -227,17 +326,119 @@ def run_container(service: Service, force_restart: bool = False):
         service.container_id = container.id
         service.assigned_port = port
         service.status = "running"
-        # Guardar build logs si venía de Dockerfile
+        # Guardar build logs si venÃ­a de Dockerfile
         if service.dockerfile:
-            service.logs = (service.logs or "") + "\nImagen construida y contenedor arrancado."
+            _append_log(service, "Imagen construida y contenedor arrancado.")
         service.save()
 
-    except (APIError, RuntimeError) as exc:
+        # Iniciar sidecar SSH
+        _run_ssh_sidecar(service, docker_client)
+
+    except (APIError, DockerException, RuntimeError, ValueError) as exc:
         _release_port(port)
         service.status = "error"
         service.logs = str(exc)
         service.save()
         raise
+
+
+def _run_ssh_sidecar(service: Service, docker_client: "DockerClient") -> None:
+    """Inicia un contenedor auxiliar con servidor SSH y volumen compartido."""
+    if service.volume_name is None:
+        _append_log(service, "[SSH] No hay volumen asociado; se omite sidecar.")
+        service.ssh_port = None
+        service.ssh_password = None
+        service.save(update_fields=["logs", "ssh_port", "ssh_password"])
+        return
+
+    try:
+        ssh_port = PortReservation.reserve_free_port()
+    except RuntimeError as exc:
+        _append_log(service, f"[SSH] No se pudo reservar puerto: {exc}")
+        service.ssh_port = None
+        service.ssh_password = None
+        service.save(update_fields=["logs", "ssh_port", "ssh_password"])
+        return
+
+    password = secrets.token_urlsafe(10)
+    container_name = f"ssh-sidecar_{service.id}"
+    env_vars = {
+        "USER_NAME": SSH_USERNAME,
+        "PASSWORD": password,
+        "USER_PASSWORD": password,
+        "PASSWORD_ACCESS": "true",
+        "SUDO_ACCESS": "false",
+        "TZ": os.environ.get("TZ", "UTC"),
+    }
+    volumes = {
+        service.volume_name: {
+            "bind": f"/home/{SSH_USERNAME}/data",
+            "mode": "rw",
+        }
+    }
+
+    try:
+        try:
+            previous = docker_client.containers.get(container_name)
+            previous.remove(force=True)
+        except NotFound:
+            pass
+
+        docker_client.containers.run(
+            image=SSH_IMAGE,
+            name=container_name,
+            environment=env_vars,
+            ports={"2222/tcp": ssh_port},
+            volumes=volumes,
+            detach=True,
+            restart_policy={"Name": "unless-stopped"},
+        )
+        service.ssh_port = ssh_port
+        service.ssh_password = password
+        service.save(update_fields=["ssh_port", "ssh_password"])
+    except (DockerException, Exception) as exc:
+        _release_port(ssh_port)
+        service.ssh_port = None
+        service.ssh_password = None
+        _append_log(service, f"[SSH] No se pudo iniciar el sidecar: {exc}")
+        service.save(update_fields=["logs", "ssh_port", "ssh_password"])
+
+
+def _run_container_worker(
+    service_id: int, force_restart: bool, custom_port: int | None, command: list[str] | None
+) -> None:
+    try:
+        service = Service.objects.get(pk=service_id)
+    except Service.DoesNotExist:
+        return
+    _run_container_internal(
+        service, force_restart=force_restart, custom_port=custom_port, command=command
+    )
+
+
+def run_container(
+    service: Service,
+    force_restart: bool = False,
+    custom_port: int | None = None,
+    command: list[str] | None = None,
+    enqueue: bool = True,
+) -> None:
+    """
+    Encola la ejecucion del contenedor para no bloquear el hilo que atiende la peticion.
+    """
+    if not enqueue:
+        _run_container_internal(
+            service,
+            force_restart=force_restart,
+            custom_port=custom_port,
+            command=command,
+        )
+        return
+
+    service.status = "pending"
+    _append_log(service, "Ejecucion encolada.")
+    service.save(update_fields=["status", "logs", "updated_at"])
+    EXECUTOR.submit(_run_container_worker, service.pk, force_restart, custom_port, command)
 
 
 # ---------- Stop / Remove ----------
@@ -246,24 +447,67 @@ def stop_container(service: Service):
     if not service.container_id:
         return
     try:
-        client.containers.get(service.container_id).stop()
+        docker_client = get_docker_client()
+        if docker_client is None:
+            raise RuntimeError("Docker no estÃ¡ disponible para detener el servicio.")
+        docker_client.containers.get(service.container_id).stop()
         service.status = "stopped"
         service.save()
     except NotFound:
         service.status = "removed"
         service.save()
+    except (DockerException, RuntimeError) as exc:
+        service.logs = str(exc)
+        service.save()
+        raise
 
 
 def remove_container(service: Service):
+    docker_client = get_docker_client()
+    if docker_client is None:
+        raise RuntimeError("Docker no está disponible para eliminar el servicio.")
+
+    # Eliminar contenedor principal
     if service.container_id:
         try:
-            client.containers.get(service.container_id).remove(force=True)
+            container = docker_client.containers.get(service.container_id)
+            container.remove(force=True)
         except NotFound:
             pass
+        except DockerException as exc:
+            _append_log(service, f"Error al eliminar el contenedor: {exc}")
+            service.save(update_fields=["logs"])
 
+    # Eliminar sidecar SSH
+    sidecar_name = f"ssh-sidecar_{service.id}"
+    try:
+        sidecar_container = docker_client.containers.get(sidecar_name)
+        sidecar_container.remove(force=True)
+    except NotFound:
+        pass
+    except DockerException as exc:
+        _append_log(service, f"Error al eliminar el sidecar SSH: {exc}")
+        service.save(update_fields=["logs"])
+
+    # Liberar puertos
     _release_port(service.assigned_port)
+    _release_port(service.ssh_port)
+
+    # Eliminar volumen
+    if service.volume_name:
+        try:
+            volume = docker_client.volumes.get(service.volume_name)
+            volume.remove(force=True)
+        except NotFound:
+            pass
+        except DockerException as exc:
+            _append_log(service, f"Error al eliminar el volumen: {exc}")
+            service.save(update_fields=["logs"])
 
     service.container_id = None
     service.assigned_port = None
+    service.ssh_port = None
+    service.ssh_password = None
+    service.volume_name = None
     service.status = "removed"
     service.save()

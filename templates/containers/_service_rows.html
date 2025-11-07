@@ -1,4 +1,4 @@
-{% for s in services %}
+﻿{% for s in services %}
 <tr id="service-{{ s.id }}">
   <td>
     <div class="fw-semibold">{{ s.name }}</div>
@@ -9,69 +9,64 @@
 
   <td>{{ s.image }}</td>
 
-  <td>{{ s.assigned_port|default:"—" }}</td>
+  <td>{{ s.assigned_port|default:"-" }}</td>
 
   <td>
     <span
-      class="badge
-        {% if s.status == 'running' %} bg-success
-        {% elif s.status == 'stopped' %} bg-secondary
-        {% elif s.status == 'error' %} bg-danger
+      class="badge text-uppercase fw-semibold px-3 py-2
+        {% if s.status == 'running' %} bg-success text-white
+        {% elif s.status == 'stopped' %} bg-secondary text-white
+        {% elif s.status == 'error' %} bg-danger text-white
         {% else %} bg-warning text-dark
         {% endif %}">
-      {{ s.status|title }}
+      {{ s.status|default:'unknown'|title }}
     </span>
   </td>
 
   <td class="d-flex flex-wrap gap-1">
 
-    <!-- Start -->
     <button
       class="btn btn-sm btn-success"
       {% if s.status == "running" %}disabled{% endif %}
       hx-post="{% url 'service-start' s.id %}"
-      hx-target="#service-table"
-      hx-swap="innerHTML"
+      hx-target="#service-{{ s.id }}"
+      hx-swap="outerHTML"
       title="Iniciar">
-      ▶️
+      Iniciar
     </button>
 
-    <!-- Stop -->
     <button
       class="btn btn-sm btn-warning"
       {% if s.status != "running" %}disabled{% endif %}
       hx-post="{% url 'service-stop' s.id %}"
-      hx-target="#service-table"
-      hx-swap="innerHTML"
+      hx-target="#service-{{ s.id }}"
+      hx-swap="outerHTML"
       title="Detener">
-      ⏸️
+      Detener
     </button>
 
-    <!-- Remove (via POST) -->
     <button
       class="btn btn-sm btn-danger"
       hx-post="{% url 'service-remove' s.id %}"
-      hx-target="#service-table"
-      hx-swap="innerHTML"
-      hx-confirm="¿Eliminar definitivamente?"
+      hx-target="#service-{{ s.id }}"
+      hx-swap="outerHTML"
+      hx-confirm="Â¿Eliminar definitivamente?"
       title="Eliminar">
-      🗑️
+      Eliminar
     </button>
 
-    <!-- Logs -->
     <button
       class="btn btn-sm btn-secondary"
       hx-get="{% url 'service-logs' s.id %}"
-      hx-target="#logs-body"
+      hx-target="#genericModalContent"
       hx-swap="innerHTML"
       data-bs-toggle="modal"
-      data-bs-target="#logsModal"
+      data-bs-target="#genericModal"
       title="Ver logs">
       Logs
     </button>
 
     {% if s.dockerfile %}
-    <!-- Dockerfile -->
     <button
       class="btn btn-sm btn-info"
       hx-get="{% url 'service-dockerfile' s.id %}"
@@ -85,7 +80,6 @@
     {% endif %}
 
     {% if s.compose %}
-    <!-- Compose -->
     <button
       class="btn btn-sm btn-info"
       hx-get="{% url 'service-compose' s.id %}"
@@ -98,20 +92,30 @@
     </button>
     {% endif %}
 
-    <!-- Terminal -->
     <a
-      href="{% if s.container_id and s.status == 'running' %}{% url 'containers:terminal_view' s.id %}{% else %}#{% endif %}"
-      class="btn btn-sm btn-dark {% if not s.container_id or s.status != 'running' %}disabled{% endif %}"
+      href="{% url 'containers:terminal_view' s.id %}"
+      class="btn btn-sm btn-dark {% if s.status != 'running' %}disabled{% endif %}"
       title="Abrir terminal">
       Terminal
     </a>
 
+    <button
+      class="btn btn-sm btn-primary"
+      hx-get="{% url 'service-ssh-uri' s.id %}"
+      hx-target="#genericModalContent"
+      hx-swap="innerHTML"
+      data-bs-toggle="modal"
+      data-bs-target="#genericModal"
+      {% if s.status != 'running' or not s.ssh_port %}disabled{% endif %}
+      title="Comando SSH">
+      SSH
+    </button>
   </td>
 </tr>
 {% empty %}
 <tr>
   <td colspan="5" class="text-center text-muted">
-    Aún no tienes servicios.
+    Aun no tienes servicios.
   </td>
 </tr>
 {% endfor %}
