@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from django.db import IntegrityError, transaction
 
+from docker import DockerClient
 from docker.errors import APIError, DockerException, NotFound
 
 from .docker_client import get_docker_client
