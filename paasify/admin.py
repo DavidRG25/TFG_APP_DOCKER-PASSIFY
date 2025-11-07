@@ -2,55 +2,60 @@
 from django import forms
 from django.contrib import admin
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 
-from paasify.models.StudentModel import Player
-from paasify.models.SportModel import Sport
-from paasify.models.ProjectModel import Game
+from paasify.models.StudentModel import UserProfile
+from paasify.models.SubjectModel import Subject
+from paasify.models.ProjectModel import UserProject
+from paasify.roles import (
+    DEFAULT_STUDENT_GROUP,
+    DEFAULT_TEACHER_GROUP,
+    STUDENT_GROUP_NAMES,
+    TEACHER_GROUP_NAMES,
+    ensure_user_group,
+)
 
 User = get_user_model()
-
-# Nombres “canónicos”
-TEACHER_GROUP = "Teacher"
-STUDENT_GROUP = "Student"
 
 admin.site.site_header = "PaaSify · Admin"
 admin.site.index_title = "Panel de administración"
 admin.site.site_title = "PaaSify"
 
 
-#  Inlines (Game dentro de Sport/Player)
+#  Inlines (UserProject dentro de Subject/UserProfile)
 
-class GameInlineForSubject(admin.TabularInline):
-    model = Game
-    fk_name = "sport"
+class UserProjectInlineForSubject(admin.TabularInline):
+    model = UserProject
+    fk_name = "subject"
     extra = 1
-    autocomplete_fields = ("student",)
+    autocomplete_fields = ("user_profile",)
 
-    # Solo Players cuyo user ∈ grupo Student
+    # Solo perfiles cuyo usuario pertenece al grupo Student
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "student":
+        if db_field.name == "user_profile":
             kwargs["queryset"] = (
-                Player.objects
-                .filter(user__isnull=False, user__groups__name__iexact=STUDENT_GROUP)
+                UserProfile.objects
+                .filter(
+                    user__isnull=False,
+                    user__groups__name__in=[DEFAULT_STUDENT_GROUP, *STUDENT_GROUP_NAMES],
+                )
                 .select_related("user")
                 .distinct()
             )
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
-class GameInlineForPlayer(admin.TabularInline):
-    model = Game
-    fk_name = "student"
+class UserProjectInlineForProfile(admin.TabularInline):
+    model = UserProject
+    fk_name = "user_profile"
     extra = 1
-    autocomplete_fields = ("sport",)
+    autocomplete_fields = ("subject",)
 
 
-#  Sport (Asignaturas)
+#  Subject (Asignaturas)
 
-class SportAdminForm(forms.ModelForm):
+class SubjectAdminForm(forms.ModelForm):
     class Meta:
-        model = Sport
+        model = Subject
         fields = "__all__"
 
     def __init__(self, *args, **kwargs):
@@ -63,20 +68,20 @@ class SportAdminForm(forms.ModelForm):
 
         # teacher_user: solo usuarios en grupos profesor/Teacher
         self.fields["teacher_user"].queryset = User.objects.filter(
-            groups__name__in=["profesor", TEACHER_GROUP]
+            groups__name__in=[*TEACHER_GROUP_NAMES, DEFAULT_TEACHER_GROUP]
         ).distinct()
         self.fields["teacher_user"].required = True
 
         # students: solo usuarios del grupo Student (case-insensitive)
         self.fields["students"].queryset = User.objects.filter(
-            groups__name__iexact=STUDENT_GROUP
+            groups__name__in=[*STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP]
         ).distinct()
 
     def clean_teacher_user(self):
         u = self.cleaned_data.get("teacher_user")
         if not u:
             raise forms.ValidationError("Debes asignar un profesor.")
-        if not u.groups.filter(name__in=["profesor", TEACHER_GROUP]).exists():
+        if not any(u.groups.filter(name__iexact=name).exists() for name in TEACHER_GROUP_NAMES):
             raise forms.ValidationError(
                 "El usuario seleccionado no pertenece al grupo Profesor/Teacher."
             )
@@ -86,32 +91,36 @@ class SportAdminForm(forms.ModelForm):
         qs = self.cleaned_data.get("students")
         if not qs:
             return qs
-        bad = qs.exclude(groups__name__iexact=STUDENT_GROUP)
-        if bad.exists():
-            raise forms.ValidationError("Todos los alumnos deben pertenecer al grupo Student.")
+        allowed = list(STUDENT_GROUP_NAMES) + [DEFAULT_STUDENT_GROUP]
+        bad = [
+            user for user in qs
+            if not any(user.groups.filter(name__iexact=name).exists() for name in allowed)
+        ]
+        if bad:
+            raise forms.ValidationError("Todos los alumnos deben pertenecer al grupo Student/Alumno.")
         return qs
 
 
-@admin.register(Sport)
-class SportAdmin(admin.ModelAdmin):
-    form = SportAdminForm
+@admin.register(Subject)
+class SubjectAdmin(admin.ModelAdmin):
+    form = SubjectAdminForm
     list_display = ("name", "category", "genero", "teacher_user")
     search_fields = ("name", "teacher_user__username", "teacher_user__email")
     list_filter = ("category", "genero")
     autocomplete_fields = ("teacher_user",)
     filter_horizontal = ("students",)
-    inlines = [GameInlineForSubject]
+    inlines = [UserProjectInlineForSubject]
     exclude = ("players",)  # oculta campo legacy
 
     # Defensa extra si se cambia el form
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         if db_field.name == "teacher_user":
             kwargs["queryset"] = User.objects.filter(
-                groups__name__in=["profesor", TEACHER_GROUP]
+                groups__name__in=[*TEACHER_GROUP_NAMES, DEFAULT_TEACHER_GROUP]
             ).distinct()
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
-    # Auto-matricular: si en el inline se añade un Game, matriculamos al user del alumno
+    # Auto-matricular: si en el inline se añade un UserProject, matriculamos al user del alumno
     def save_formset(self, request, form, formset, change):
         objs = formset.save(commit=False)
         formset.save_m2m()
@@ -119,21 +128,23 @@ class SportAdmin(admin.ModelAdmin):
         for obj in objs:
             obj.save()
 
-        if formset.model is Game:
-            sport = form.instance
+        if formset.model is UserProject:
+            subject_instance = form.instance
             for obj in objs:
-                if getattr(obj, "student", None) and getattr(obj.student, "user", None):
-                    sport.students.add(obj.student.user)
+                profile = getattr(obj, "user_profile", None)
+                user = getattr(profile, "user", None) if profile else None
+                if user:
+                    subject_instance.students.add(user)
 
         for obj in formset.deleted_objects:
             obj.delete()
 
 
-#  Player (Alumnos)
+#  UserProfile (Alumnos)
 
-class PlayerAdminForm(forms.ModelForm):
+class UserProfileAdminForm(forms.ModelForm):
     """
-    - Elegir usuario existente (sin Player) o crear uno nuevo → añade a grupo Student.
+    - Elegir usuario existente (sin UserProfile) o crear uno nuevo → añade a grupo Student.
     - Al editar, si ya tiene user, no obliga a elegir uno.
     """
     create_new_user = forms.BooleanField(required=False, label="Crear usuario nuevo")
@@ -143,17 +154,21 @@ class PlayerAdminForm(forms.ModelForm):
     new_password2 = forms.CharField(required=False, widget=forms.PasswordInput, label="Confirmar contraseña")
 
     class Meta:
-        model = Player
-        fields = ["user", "nombre", "year", "sexo"]
+        model = UserProfile
+        fields = ["user", "nombre", "year"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Users sin Player; si estamos editando, incluir también el user actual
-        base_qs = User.objects.filter(student_profile__isnull=True)
+        # Users sin UserProfile; si estamos editando, incluir también el user actual
+        base_qs = User.objects.filter(user_profile__isnull=True)
         if self.instance and self.instance.pk and self.instance.user_id:
             base_qs = (base_qs | User.objects.filter(pk=self.instance.user_id)).distinct()
         self.fields["user"].required = False
         self.fields["user"].queryset = base_qs
+
+        # Permitir autocompletado cuando se crea o vincula un usuario
+        self.fields["nombre"].required = False
+        self.fields["year"].required = False
 
     def clean(self):
         cleaned = super().clean()
@@ -174,88 +189,119 @@ class PlayerAdminForm(forms.ModelForm):
                 username=cleaned["new_username"]
             ).exists():
                 self.add_error("new_username", "Este usuario ya existe")
+            if not cleaned.get("nombre"):
+                cleaned["nombre"] = cleaned.get("new_username") or cleaned.get("new_email")
+            if not cleaned.get("year"):
+                cleaned["year"] = cleaned.get("new_email") or f"{cleaned.get('new_username') or 'alumno'}@pendiente.local"
         else:
             if not selected_user:
                 raise forms.ValidationError(
                     "Seleccione un usuario existente o marque 'Crear usuario nuevo'."
                 )
+            if selected_user and not cleaned.get("nombre"):
+                cleaned["nombre"] = (
+                    selected_user.get_full_name()
+                    or selected_user.get_username()
+                    or selected_user.email
+                    or f"alumno-{selected_user.pk}"
+                )
+            if selected_user and not cleaned.get("year"):
+                cleaned["year"] = selected_user.email or f"{selected_user.get_username()}@pendiente.local"
+
         return cleaned
 
     def save(self, commit=True):
-        player = super().save(commit=False)
+        profile = super().save(commit=False)
         create = self.cleaned_data.get("create_new_user")
-        student_group, _ = Group.objects.get_or_create(name=STUDENT_GROUP)
-
         if create:
             u = User(username=self.cleaned_data["new_username"], email=self.cleaned_data["new_email"])
+            u._skip_user_profile_autocreate = True
             u.set_password(self.cleaned_data["new_password1"])
             u.save()
-            u.groups.add(student_group)
-            player.user = u
+            ensure_user_group(u, STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP)
+            profile.user = u
         else:
             u = self.cleaned_data.get("user") or self.instance.user
             if u:
-                u.groups.add(student_group)
-                player.user = u
+                ensure_user_group(u, STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP)
+                profile.user = u
 
         # Autocompletar nombre/email si faltan
-        if player.user:
-            if not player.nombre:
-                player.nombre = player.user.get_username()
-            if not player.year:
-                player.year = player.user.email
+        if profile.user:
+            if not profile.nombre:
+                profile.nombre = profile.user.get_username()
+            if not profile.year:
+                profile.year = profile.user.email
 
         if commit:
-            player.save()
+            profile.save()
             self.save_m2m()
-        return player
+        return profile
 
 
-@admin.register(Player)
-class PlayerAdmin(admin.ModelAdmin):
-    form = PlayerAdminForm
-    list_display = ("nombre", "year", "sexo", "user", "es_usuario_alumno")
+@admin.register(UserProfile)
+class UserProfileAdmin(admin.ModelAdmin):
+    form = UserProfileAdminForm
+    list_display = ("nombre", "year", "user", "es_usuario_alumno")
     search_fields = ("nombre", "year", "user__username", "user__email")
-    list_filter = ("sexo",)
+    list_filter = ()
     autocomplete_fields = ("user",)
-    inlines = [GameInlineForPlayer]
+    inlines = [UserProjectInlineForProfile]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.filter(
             user__isnull=False,
-            user__groups__name__iexact=STUDENT_GROUP
+            user__groups__name__in=[DEFAULT_STUDENT_GROUP, *STUDENT_GROUP_NAMES],
         ).distinct()
 
     def es_usuario_alumno(self, obj):
-        return bool(obj.user and obj.user.groups.filter(name__iexact=STUDENT_GROUP).exists())
+        return bool(
+            obj.user
+            and obj.user.groups.filter(
+                name__in=[DEFAULT_STUDENT_GROUP, *STUDENT_GROUP_NAMES]
+            ).exists()
+        )
     es_usuario_alumno.boolean = True
     es_usuario_alumno.short_description = "Es alumno"
 
 
-# Game (Proyectos)
+# UserProject (Proyectos)
 
-@admin.register(Game)
-class GameAdmin(admin.ModelAdmin):
-    list_display = ("place", "student", "sport", "date", "time")
-    list_filter = ("sport", "date")
-    search_fields = ("place", "student__nombre", "sport__name")
-    autocomplete_fields = ("student", "sport")
+@admin.register(UserProject)
+class UserProjectAdmin(admin.ModelAdmin):
+    list_display = ("place", "user_profile", "subject", "date", "time")
+    list_filter = ("subject", "date")
+    search_fields = ("place", "user_profile__nombre", "subject__name")
+    autocomplete_fields = ("user_profile", "subject")
 
-    # Solo Players cuyo user pertenece al grupo Student
+    # Solo UserProfiles cuyo user pertenece al grupo Student
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "student":
+        if db_field.name == "user_profile":
             qs = (
-                Player.objects
-                .filter(user__isnull=False, user__groups__name__iexact=STUDENT_GROUP)
+                UserProfile.objects
+                .filter(
+                    user__isnull=False,
+                    user__groups__name__in=[DEFAULT_STUDENT_GROUP, *STUDENT_GROUP_NAMES],
+                )
                 .select_related("user")
                 .distinct()
             )
             kwargs["queryset"] = qs
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
-    # Al guardar un Game, matricula automáticamente al user del alumno en la asignatura
+    # Al guardar un UserProject, matricula automáticamente al user del alumno en la asignatura
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
-        if getattr(obj, "student", None) and getattr(obj.student, "user", None):
-            obj.sport.students.add(obj.student.user)
+        profile = getattr(obj, "user_profile", None)
+        user = getattr(profile, "user", None) if profile else None
+        if user:
+            obj.subject.students.add(user)
+
+
+
+
+
+
+
+

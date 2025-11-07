@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extrastyles %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
+{% endblock %}
+
+{% block body %}
+<h2 class="mb-4">Terminal para {{ service.name }}</h2>
+<div id="terminal"></div>
+{% endblock %}
+
+{% block extrascripts %}
+<script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const term = new Terminal();
+    term.open(document.getElementById('terminal'));
+
+    const wsProtocol = window.location.protocol === 'https' ? 'wss' : 'ws';
+    const wsUrl = `${wsProtocol}://${window.location.host}{{ ws_path }}`;
+    const socket = new WebSocket(wsUrl);
+
+    socket.onopen = () => {
+      term.writeln('Conectado al servicio.');
+    };
+
+    socket.onmessage = (event) => {
+      term.write(event.data);
+    };
+
+    socket.onclose = () => {
+      term.writeln('Desconectado del servicio.');
+    };
+
+    term.onData((data) => {
+      socket.send(data);
+    });
+  });
+</script>
+{% endblock %}

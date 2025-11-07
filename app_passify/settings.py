@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 # ---------------------------------------------------------------------
@@ -8,15 +9,33 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ---------------------------------------------------------------------
 # Seguridad / Debug
 # ---------------------------------------------------------------------
-SECRET_KEY = 'django-insecure-&c&&3g=3$4wr)a18dsfj)i*8(xz71v@dn%65w&_(2d6s+mz8$b'
-DEBUG = True
-ALLOWED_HOSTS = ["*"]
+def _get_bool(name: str, default: str = "false") -> bool:
+    return os.environ.get(name, default).strip().lower() in {"1", "true", "yes", "on"}
+
+
+SECRET_KEY = os.environ.get(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-placeholder-secret-key-change-me",
+)
+
+DEBUG = _get_bool("DJANGO_DEBUG", "false")
+
+if not DEBUG and SECRET_KEY == "django-insecure-placeholder-secret-key-change-me":
+    raise RuntimeError("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is false.")
+
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if host.strip()
+]
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://127.0.0.1",
-    "http://127.0.0.1:8000",
-    "http://localhost",
-    "http://localhost:8000",
+    origin.strip()
+    for origin in os.environ.get(
+        "DJANGO_CSRF_TRUSTED_ORIGINS",
+        "http://127.0.0.1,http://127.0.0.1:8000,http://localhost,http://localhost:8000",
+    ).split(",")
+    if origin.strip()
 ]
 
 # ---------------------------------------------------------------------
@@ -80,6 +99,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'paasify.context_processors.role_flags',
             ],
         },
     },

@@ -1,6 +1,6 @@
 import django.core.paginator
 from django.shortcuts import render
-from paasify.models.ProjectModel import Game
+from paasify.models.ProjectModel import UserProject
 from django.core.paginator import Paginator
 
 def index(request):
@@ -11,12 +11,12 @@ def index(request):
     return render(request, "index.html", context)
 
 def table(request, n):
-    games_list = Game.objects.all().order_by("-date", "id")
-    paginator = Paginator(games_list, 10)
+    projects_list = UserProject.objects.all().order_by("-date", "id")
+    paginator = Paginator(projects_list, 10)
 
     next_page = None
     previous_page = None
-    games = []
+    projects = []
 
     try:
         current_page = paginator.page(n)
@@ -26,15 +26,15 @@ def table(request, n):
         if current_page.has_previous():
             previous_page = current_page.previous_page_number()
 
-        games = current_page.object_list
+        projects = current_page.object_list
 
     except django.core.paginator.EmptyPage:
-        games = []
+        projects = []
     except django.core.paginator.PageNotAnInteger:
-        games = []
+        projects = []
 
     data = {
-        "games": games,
+        "projects": projects,
         "notifications": get_notifications(),
         "n_len": len(get_notifications()),
         "total": paginator.count,
@@ -62,3 +62,4 @@ def config(request):
             "message": "Error de autenticación",
             "description": "Debes estar autenticado para realizar esta acción"
         })
+
