@@ -10,6 +10,7 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
 from django.db import IntegrityError, transaction
+from django.utils.text import slugify
 
 from docker import DockerClient
 from docker.errors import APIError, DockerException, NotFound
@@ -78,6 +79,13 @@ def _append_log(service: Service, message: str) -> None:
         service.logs = f"{current.rstrip()}\n{message}"
     else:
         service.logs = message
+
+
+def _sidecar_name(service: Service) -> str:
+    """Genera un nombre de contenedor único y compatible con Docker."""
+    username_slug = slugify(service.owner.username or "", allow_unicode=False) or f"user{service.owner_id}"
+    name = f"ssh-sidecar_{username_slug}_{service.id}"
+    return name[:63]
 
 
 # ---------- Utilidades de ficheros ----------
@@ -361,7 +369,7 @@ def _run_ssh_sidecar(service: Service, docker_client: "DockerClient") -> None:
         return
 
     password = secrets.token_urlsafe(10)
-    container_name = f"ssh-sidecar_{service.id}"
+    container_name = _sidecar_name(service)
     env_vars = {
         "USER_NAME": SSH_USERNAME,
         "PASSWORD": password,
@@ -479,7 +487,7 @@ def remove_container(service: Service):
             service.save(update_fields=["logs"])
 
     # Eliminar sidecar SSH
-    sidecar_name = f"ssh-sidecar_{service.id}"
+    sidecar_name = _sidecar_name(service)
     try:
         sidecar_container = docker_client.containers.get(sidecar_name)
         sidecar_container.remove(force=True)

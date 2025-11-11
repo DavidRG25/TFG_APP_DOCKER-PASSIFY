@@ -101,9 +101,12 @@ class ServiceViewSet(viewsets.ModelViewSet):
         level="text-bg-success",
         extra_triggers=None,
     ):
-        html = self._render_table_fragment(request)
+        html = ""
+        if not self._is_htmx(request):
+            html = self._render_table_fragment(request)
         response = DRF_Response(html, status=status)
         trigger = dict(extra_triggers or {})
+        trigger.setdefault("service:table-refresh", {})
         if message:
             trigger["service:toast"] = {"message": message, "variant": level}
         if trigger:
@@ -381,21 +384,30 @@ class AllowedImageViewSet(viewsets.ReadOnlyModelViewSet):
 
 @login_required
 def student_panel(request):
-    """Listado genÃƒÂ©rico de servicios del alumno (todas sus asignaturas)."""
+    """Listado genérico de servicios del alumno (todas sus asignaturas)."""
     if request.user.is_superuser:
-        pass
+        available_subjects = Subject.objects.all()
     elif user_is_teacher(request.user):
         return redirect("professor_dashboard")
     elif not user_is_student(request.user):
         return HttpResponse("No tienes permiso para acceder al panel de contenedores.", status=403)
+    else:
+        available_subjects = Subject.objects.filter(students=request.user).distinct()
 
     services = Service.objects.filter(owner=request.user).exclude(status="removed")
     images = AllowedImage.objects.all()
     return render(
         request,
         "containers/student_panel.html",
-        {"services": services, "images": images, "current_subject": None, "title": "PaaSify - Mis servicios"},
+        {
+            "services": services,
+            "images": images,
+            "current_subject": None,
+            "available_subjects": available_subjects,
+            "title": "PaaSify - Mis servicios",
+        },
     )
+
 
 
 @login_required

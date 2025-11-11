@@ -30,7 +30,7 @@
       {% if s.status == "running" %}disabled{% endif %}
       hx-post="{% url 'service-start' s.id %}"
       hx-target="#service-{{ s.id }}"
-      hx-swap="outerHTML"
+      hx-swap="none"
       title="Iniciar">
       Iniciar
     </button>
@@ -40,7 +40,7 @@
       {% if s.status != "running" %}disabled{% endif %}
       hx-post="{% url 'service-stop' s.id %}"
       hx-target="#service-{{ s.id }}"
-      hx-swap="outerHTML"
+      hx-swap="none"
       title="Detener">
       Detener
     </button>
@@ -49,7 +49,7 @@
       class="btn btn-sm btn-danger"
       hx-post="{% url 'service-remove' s.id %}"
       hx-target="#service-{{ s.id }}"
-      hx-swap="outerHTML"
+      hx-swap="none"
       hx-confirm="Â¿Eliminar definitivamente?"
       title="Eliminar">
       Eliminar
