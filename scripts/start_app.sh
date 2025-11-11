@@ -9,6 +9,13 @@ SKIP_INSTALL="false"
 SKIP_MIGRATE="false"
 PORT_OVERRIDE=""
 
+if [[ -f "${ROOT_DIR}/.env" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "${ROOT_DIR}/.env"
+  set +a
+fi
+
 usage() {
   cat <<'EOF'
 Usage: scripts/start_app.sh [options]
