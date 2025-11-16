@@ -88,6 +88,34 @@ def _sidecar_name(service: Service) -> str:
     return name[:63]
 
 
+def _ensure_container_running(service: Service, container, reserved_port: int | None):
+    """Verifica que Docker haya iniciado el contenedor.
+
+    Si el contenedor termina inmediatamente (estado exited/dead) registramos los logs,
+    liberamos el puerto reservado y lanzamos una excepción para notificar al usuario.
+    """
+    try:
+        container.reload()
+        status = (container.status or "").lower()
+    except DockerException:
+        return
+
+    if status not in {"running"}:
+        try:
+            log_tail = container.logs(tail=200).decode(errors="replace")
+        except Exception:
+            log_tail = "(logs no disponibles)"
+        service.status = "error"
+        _append_log(service, f"[Docker] {log_tail}".strip())
+        service.save(update_fields=["status", "logs"])
+        try:
+            container.remove(force=True)
+        except DockerException:
+            pass
+        _release_port(reserved_port)
+        raise RuntimeError("El contenedor finalizó inmediatamente. Revisa los logs para más detalles.")
+
+
 # ---------- Utilidades de ficheros ----------
 
 def _validate_upload(ff, *, allowed_extensions=None, max_size=MAX_UPLOAD_SIZE):
@@ -330,6 +358,7 @@ def _run_container_internal(
             environment=env_vars or None,
             working_dir="/app" if volumes else None,
         )
+        _ensure_container_running(service, container, port)
 
         service.container_id = container.id
         service.assigned_port = port
