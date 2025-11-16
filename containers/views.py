@@ -42,7 +42,17 @@ def _sync_service(service: Service):
         return
 
     try:
-        docker_client.containers.get(service.container_id)
+        container = docker_client.containers.get(service.container_id)
+        container.reload()
+        docker_status = (container.status or "").lower()
+        if docker_status not in {"running"} and service.status in {"running", "pending"}:
+            try:
+                log_tail = container.logs(tail=200).decode(errors="replace")
+            except Exception:
+                log_tail = "(logs no disponibles)"
+            service.status = "error"
+            service.logs = (service.logs or "") + f"\n[Docker] {log_tail}".strip()
+            service.save(update_fields=["status", "logs"])
     except NotFound:
         service.status = "removed"
         service.save()
