@@ -13,6 +13,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response as DRF_Response
+from rest_framework.exceptions import ValidationError
 
 from docker.errors import DockerException, NotFound
 
@@ -42,7 +43,17 @@ def _sync_service(service: Service):
         return
 
     try:
-        docker_client.containers.get(service.container_id)
+        container = docker_client.containers.get(service.container_id)
+        container.reload()
+        docker_status = (container.status or "").lower()
+        if docker_status not in {"running"} and service.status in {"running", "pending"}:
+            try:
+                log_tail = container.logs(tail=200).decode(errors="replace")
+            except Exception:
+                log_tail = "(logs no disponibles)"
+            service.status = "error"
+            service.logs = (service.logs or "") + f"\n[Docker] {log_tail}".strip()
+            service.save(update_fields=["status", "logs"])
     except NotFound:
         service.status = "removed"
         service.save()
@@ -101,9 +112,12 @@ class ServiceViewSet(viewsets.ModelViewSet):
         level="text-bg-success",
         extra_triggers=None,
     ):
-        html = self._render_table_fragment(request)
+        html = ""
+        if not self._is_htmx(request):
+            html = self._render_table_fragment(request)
         response = DRF_Response(html, status=status)
         trigger = dict(extra_triggers or {})
+        trigger.setdefault("service:table-refresh", {})
         if message:
             trigger["service:toast"] = {"message": message, "variant": level}
         if trigger:
@@ -136,33 +150,16 @@ class ServiceViewSet(viewsets.ModelViewSet):
         - mode=custom   -> obligatorio Dockerfile XOR Compose; 'image' se ignora si llega.
         """
         serializer = self.get_serializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as exc:
+            if self._is_htmx(request):
+                return self._validation_error_response(exc)
+            raise
 
         mode = (request.data.get("mode") or "default").lower()
         if mode not in ("default", "custom"):
             mode = "default"
-
-        has_df = bool(request.FILES.get("dockerfile"))
-        has_comp = bool(request.FILES.get("compose"))
-        has_code = bool(request.FILES.get("code"))
-
-        if mode == "default":
-            if has_df or has_comp or has_code:
-                return DRF_Response(
-                    {"error": "En modo 'Imagen por defecto' no se permiten Dockerfile/Compose/Codigo."},
-                    status=400,
-                )
-        else:
-            if has_df and has_comp:
-                return DRF_Response(
-                    {"error": "Sube Dockerfile O docker-compose, pero no ambos."},
-                    status=400,
-                )
-            if not (has_df or has_comp):
-                return DRF_Response(
-                    {"error": "En modo 'Configuracion personalizada' debes subir Dockerfile o docker-compose."},
-                    status=400,
-                )
 
         custom_port = request.data.get("custom_port")
         if custom_port:
@@ -173,13 +170,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
         service = serializer.save(owner=request.user, status="creating")
 
-        if has_df:
-            service.dockerfile = request.FILES["dockerfile"]
-        if has_comp:
-            service.compose = request.FILES["compose"]
-        if has_code:
-            service.code = request.FILES["code"]
-        service.save()
+        self._attach_uploaded_files(service, request)
 
         try:
             run_container(service, custom_port=custom_port)
@@ -211,6 +202,32 @@ class ServiceViewSet(viewsets.ModelViewSet):
             status=201,
             headers=headers
         )
+
+    def _validation_error_response(self, exc: ValidationError):
+        """Devuelve un fragmento HTML con errores de validación para HTMX."""
+        if isinstance(exc.detail, dict):
+            items = []
+            for field, messages in exc.detail.items():
+                text = ", ".join(messages) if isinstance(messages, (list, tuple)) else str(messages)
+                items.append(f"<li><strong>{field}:</strong> {text}</li>")
+            html = "<div class='alert alert-danger'><ul class='mb-0'>" + "".join(items) + "</ul></div>"
+        else:
+            html = f"<div class='alert alert-danger'>{exc.detail}</div>"
+        response = DRF_Response(html, status=400)
+        response["HX-Retarget"] = "#form-errors"
+        response["HX-Reswap"] = "innerHTML"
+        return response
+
+    def _attach_uploaded_files(self, service: Service, request):
+        updated_fields = []
+        for field in ("dockerfile", "compose", "code"):
+            uploaded = request.FILES.get(field)
+            if uploaded:
+                filename = uploaded.name or f"{field}_{service.pk}"
+                getattr(service, field).save(filename, uploaded, save=False)
+                updated_fields.append(field)
+        if updated_fields:
+            service.save(update_fields=updated_fields)
 
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
@@ -284,7 +301,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["get"])
     def logs(self, request, pk=None):
         service = self.get_object()
-        log_content = "(sin logs)"
+        log_content = service.logs or "(sin logs)"
         if service.container_id:
             docker_client = get_docker_client()
             if docker_client:
@@ -313,7 +330,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
     def _serve_code(self, filefield, language):
         if not filefield:
-            raise Http404
+            return HttpResponse("(archivo no disponible)", status=404)
         if filefield.size > self.CODE_MAX:
             return HttpResponse("(archivo demasiado grande)", status=413)
         with filefield.open("rb"):
@@ -381,21 +398,30 @@ class AllowedImageViewSet(viewsets.ReadOnlyModelViewSet):
 
 @login_required
 def student_panel(request):
-    """Listado genÃƒÂ©rico de servicios del alumno (todas sus asignaturas)."""
+    """Listado genérico de servicios del alumno (todas sus asignaturas)."""
     if request.user.is_superuser:
-        pass
+        available_subjects = Subject.objects.all()
     elif user_is_teacher(request.user):
         return redirect("professor_dashboard")
     elif not user_is_student(request.user):
         return HttpResponse("No tienes permiso para acceder al panel de contenedores.", status=403)
+    else:
+        available_subjects = Subject.objects.filter(students=request.user).distinct()
 
     services = Service.objects.filter(owner=request.user).exclude(status="removed")
     images = AllowedImage.objects.all()
     return render(
         request,
         "containers/student_panel.html",
-        {"services": services, "images": images, "current_subject": None, "title": "PaaSify - Mis servicios"},
+        {
+            "services": services,
+            "images": images,
+            "current_subject": None,
+            "available_subjects": available_subjects,
+            "title": "PaaSify - Mis servicios",
+        },
     )
+
 
 
 @login_required
@@ -466,7 +492,7 @@ def service_table(request):
 def terminal_view(request, pk):
     """
     Muestra la terminal web para el servicio si el usuario es el propietario
-    y el contenedor está en ejecución.
+    y el contenedor esta en ejecucion.
     """
     user = request.user
     if user_is_admin(user) or user_is_teacher(user):
@@ -475,9 +501,20 @@ def terminal_view(request, pk):
         service = get_object_or_404(Service, pk=pk, owner=user)
 
     if service.status != "running" or not service.container_id:
-        return HttpResponse("El servicio no está en ejecución.", status=400)
-    
-    # El endpoint del WebSocket se construye dinámicamente
+        return HttpResponse("El servicio no esta en ejecucion.", status=400)
+    docker_client = get_docker_client()
+    if docker_client is None:
+        return HttpResponse("Docker no esta disponible actualmente.", status=400)
+    try:
+        container = docker_client.containers.get(service.container_id)
+        container.reload()
+        if (container.status or "").lower() != "running":
+            return HttpResponse("El contenedor no esta en ejecucion.", status=400)
+    except NotFound:
+        return HttpResponse("El contenedor no existe.", status=404)
+    except DockerException as exc:
+        return HttpResponse(f"No se pudo acceder al contenedor: {exc}", status=400)
+
     ws_path = f"/ws/terminal/{service.id}/"
     return render(request, "containers/terminal.html", {
         "service": service,

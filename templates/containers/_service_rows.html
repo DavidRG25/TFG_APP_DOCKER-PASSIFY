@@ -30,7 +30,7 @@
       {% if s.status == "running" %}disabled{% endif %}
       hx-post="{% url 'service-start' s.id %}"
       hx-target="#service-{{ s.id }}"
-      hx-swap="outerHTML"
+      hx-swap="none"
       title="Iniciar">
       Iniciar
     </button>
@@ -40,7 +40,7 @@
       {% if s.status != "running" %}disabled{% endif %}
       hx-post="{% url 'service-stop' s.id %}"
       hx-target="#service-{{ s.id }}"
-      hx-swap="outerHTML"
+      hx-swap="none"
       title="Detener">
       Detener
     </button>
@@ -49,8 +49,8 @@
       class="btn btn-sm btn-danger"
       hx-post="{% url 'service-remove' s.id %}"
       hx-target="#service-{{ s.id }}"
-      hx-swap="outerHTML"
-      hx-confirm="Â¿Eliminar definitivamente?"
+      hx-swap="none"
+      hx-confirm="Eliminar definitivamente?"
       title="Eliminar">
       Eliminar
     </button>
@@ -92,12 +92,21 @@
     </button>
     {% endif %}
 
+    {% if s.container_id and s.status == 'running' %}
     <a
       href="{% url 'containers:terminal_view' s.id %}"
-      class="btn btn-sm btn-dark {% if s.status != 'running' %}disabled{% endif %}"
-      title="Abrir terminal">
+      class="btn btn-sm btn-dark"
+      title="Abrir terminal interactiva">
       Terminal
     </a>
+    {% else %}
+    <button
+      class="btn btn-sm btn-dark"
+      disabled
+      title="Terminal disponible solo cuando el servicio esta en ejecucion">
+      Terminal
+    </button>
+    {% endif %}
 
     <button
       class="btn btn-sm btn-primary"

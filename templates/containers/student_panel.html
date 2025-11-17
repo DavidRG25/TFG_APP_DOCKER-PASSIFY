@@ -28,6 +28,7 @@
   </thead>
   <tbody id="service-table"
          hx-get="{% url 'containers:service_table' %}{% if current_subject %}?subject={{ current_subject.id }}{% endif %}"
+         hx-trigger="load, every 5s, service:table-refresh from:body"
          hx-swap="innerHTML">
     {% include "containers/_service_rows.html" %}
   </tbody>
@@ -45,10 +46,30 @@
             method="POST" enctype="multipart/form-data"
             hx-post="/api/containers/"
             hx-target="#service-table"
-            hx-swap="innerHTML">
+            hx-swap="none">
         {% csrf_token %}
+        <div id="form-errors"></div>
         {% if current_subject %}
           <input type="hidden" name="subject" value="{{ current_subject.id }}">
+        {% else %}
+          <div class="mb-3">
+            <label class="form-label">Asignatura</label>
+            {% if available_subjects %}
+              <select name="subject" class="form-select" required>
+                <option value="">Selecciona una asignatura</option>
+                {% for subject in available_subjects %}
+                  <option value="{{ subject.id }}">{{ subject.name }}</option>
+                {% endfor %}
+              </select>
+              <small class="text-muted d-block mt-1">
+                Selecciona la asignatura para asociar el servicio.
+              </small>
+            {% else %}
+              <div class="alert alert-warning mb-0">
+                No tienes asignaturas disponibles todavía.
+              </div>
+            {% endif %}
+          </div>
         {% endif %}
 
         <div class="modal-body">
@@ -88,17 +109,53 @@
           </div>
 
           <div class="mb-3 custom-block" id="block-dockerfile">
-            <label class="form-label">Dockerfile (opcional, exclusivo con compose)</label>
-            <input type="file" name="dockerfile" accept=".dockerfile,.Dockerfile,.txt,text/plain" class="form-control">
+            <label class="form-label">
+              Dockerfile (opcional, exclusivo con compose)
+              <button type="button"
+                      class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
+                      aria-label="Instrucciones Dockerfile"
+                      data-bs-toggle="popover"
+                      data-bs-trigger="focus"
+                      data-bs-html="true"
+                      data-bs-title="Instrucciones Dockerfile"
+                      data-bs-content="Crea un archivo llamado Dockerfile con FROM base, copia el codigo (COPY . /app) y define CMD/ENTRYPOINT para arrancar la app.">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+              </button>
+            </label>
+            <input type="file" name="dockerfile" accept=".dockerfile,.Dockerfile,.txt,text/plain,*/*" class="form-control">
           </div>
 
           <div class="mb-3 custom-block" id="block-compose">
-            <label class="form-label">docker-compose.yml (opcional, exclusivo con Dockerfile)</label>
+            <label class="form-label">
+              docker-compose.yml (opcional, exclusivo con Dockerfile)
+              <button type="button"
+                      class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
+                      aria-label="Instrucciones docker-compose"
+                      data-bs-toggle="popover"
+                      data-bs-trigger="focus"
+                      data-bs-html="true"
+                      data-bs-title="Instrucciones compose"
+                      data-bs-content="Usa version 3 o superior. Define un servicio principal que exponga puertos y variables. El ZIP se monta como contexto de build o en /app.">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+              </button>
+            </label>
             <input type="file" name="compose" accept=".yml,.yaml" class="form-control">
           </div>
 
           <div class="mb-3 custom-block" id="block-code">
-            <label class="form-label">Codigo fuente (.zip opcional)</label>
+            <label class="form-label">
+              Codigo fuente (.zip obligatorio en modo personalizado)
+              <button type="button"
+                      class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
+                      aria-label="Instrucciones ZIP"
+                      data-bs-toggle="popover"
+                      data-bs-trigger="focus"
+                      data-bs-html="true"
+                      data-bs-title="Contenido del ZIP"
+                      data-bs-content="Sube un ZIP con el codigo y dependencias minimas. Evita carpetas venv. Puedes incluir Dockerfile o compose dentro del ZIP si lo prefieres.">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+              </button>
+            </label>
             <input type="file" name="code" accept=".zip" class="form-control">
           </div>
 
@@ -121,6 +178,7 @@
     </div>
   </div>
 </div>
+
 {% endblock %}
 
 {% block extrascripts %}
@@ -232,6 +290,8 @@
       const input = document.querySelector(`input[name="${name}"]`);
       if (input) input.addEventListener('change', syncExclusion);
     });
+    const popoverTriggerList = Array.from(document.querySelectorAll('[data-bs-toggle="popover"]'));
+    popoverTriggerList.forEach((el) => new bootstrap.Popover(el));
   });
 </script>
 {% endblock %}
