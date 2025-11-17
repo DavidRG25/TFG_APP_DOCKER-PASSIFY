@@ -95,6 +95,7 @@ class ServiceSerializer(serializers.ModelSerializer):
         has_image = bool(image)
         has_dockerfile = bool(dockerfile)
         has_compose = bool(compose)
+        has_code = bool(attrs.get("code"))
 
         # ---- Reglas de modo ----
         # Custom: exactamente uno entre dockerfile / compose
@@ -107,6 +108,10 @@ class ServiceSerializer(serializers.ModelSerializer):
             if has_dockerfile and has_compose:
                 raise serializers.ValidationError(
                     {"compose": _("Use Dockerfile o docker-compose, pero no ambos a la vez.")}
+                )
+            if not has_code:
+                raise serializers.ValidationError(
+                    {"code": _("Debes adjuntar el código fuente (.zip) cuando usas Dockerfile o docker-compose.")}
                 )
         else:
             # Catálogo: requiere image

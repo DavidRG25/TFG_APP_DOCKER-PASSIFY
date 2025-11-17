@@ -10,6 +10,7 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
 from django.db import IntegrityError, transaction
+from django.utils.text import slugify
 
 from docker import DockerClient
 from docker.errors import APIError, DockerException, NotFound
@@ -78,6 +79,41 @@ def _append_log(service: Service, message: str) -> None:
         service.logs = f"{current.rstrip()}\n{message}"
     else:
         service.logs = message
+
+
+def _sidecar_name(service: Service) -> str:
+    """Genera un nombre de contenedor único y compatible con Docker."""
+    username_slug = slugify(service.owner.username or "", allow_unicode=False) or f"user{service.owner_id}"
+    name = f"ssh-sidecar_{username_slug}_{service.id}"
+    return name[:63]
+
+
+def _ensure_container_running(service: Service, container, reserved_port: int | None):
+    """Verifica que Docker haya iniciado el contenedor.
+
+    Si el contenedor termina inmediatamente (estado exited/dead) registramos los logs,
+    liberamos el puerto reservado y lanzamos una excepción para notificar al usuario.
+    """
+    try:
+        container.reload()
+        status = (container.status or "").lower()
+    except DockerException:
+        return
+
+    if status not in {"running"}:
+        try:
+            log_tail = container.logs(tail=200).decode(errors="replace")
+        except Exception:
+            log_tail = "(logs no disponibles)"
+        service.status = "error"
+        _append_log(service, f"[Docker] {log_tail}".strip())
+        service.save(update_fields=["status", "logs"])
+        try:
+            container.remove(force=True)
+        except DockerException:
+            pass
+        _release_port(reserved_port)
+        raise RuntimeError("El contenedor finalizó inmediatamente. Revisa los logs para más detalles.")
 
 
 # ---------- Utilidades de ficheros ----------
@@ -272,12 +308,15 @@ def _run_container_internal(
                     )
                     build_out = (proc.stdout or "") + "\n" + (proc.stderr or "")
                 except subprocess.CalledProcessError as e:
+                    build_out = (e.stdout or "") + "\n" + (e.stderr or "")
                     service.status = "error"
-                    service.logs = (e.stderr or e.stdout or str(e)).strip()
-                    service.save()
+                    service.logs = build_out.strip() or str(e)
+                    service.save(update_fields=["status", "logs"])
                     raise RuntimeError(f"Error al construir la imagen:\n{service.logs}")
 
                 image_to_run = image_tag
+                service.logs = ("docker build completado.\n" + build_out).strip()
+                service.save(update_fields=["logs"])
         else:
             # --------- Caso imagen directa del catÃ¡logo ---------
             image_to_run = service.image
@@ -322,6 +361,7 @@ def _run_container_internal(
             environment=env_vars or None,
             working_dir="/app" if volumes else None,
         )
+        _ensure_container_running(service, container, port)
 
         service.container_id = container.id
         service.assigned_port = port
@@ -361,7 +401,7 @@ def _run_ssh_sidecar(service: Service, docker_client: "DockerClient") -> None:
         return
 
     password = secrets.token_urlsafe(10)
-    container_name = f"ssh-sidecar_{service.id}"
+    container_name = _sidecar_name(service)
     env_vars = {
         "USER_NAME": SSH_USERNAME,
         "PASSWORD": password,
@@ -479,7 +519,7 @@ def remove_container(service: Service):
             service.save(update_fields=["logs"])
 
     # Eliminar sidecar SSH
-    sidecar_name = f"ssh-sidecar_{service.id}"
+    sidecar_name = _sidecar_name(service)
     try:
         sidecar_container = docker_client.containers.get(sidecar_name)
         sidecar_container.remove(force=True)
