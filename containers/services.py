@@ -308,12 +308,15 @@ def _run_container_internal(
                     )
                     build_out = (proc.stdout or "") + "\n" + (proc.stderr or "")
                 except subprocess.CalledProcessError as e:
+                    build_out = (e.stdout or "") + "\n" + (e.stderr or "")
                     service.status = "error"
-                    service.logs = (e.stderr or e.stdout or str(e)).strip()
-                    service.save()
+                    service.logs = build_out.strip() or str(e)
+                    service.save(update_fields=["status", "logs"])
                     raise RuntimeError(f"Error al construir la imagen:\n{service.logs}")
 
                 image_to_run = image_tag
+                service.logs = ("docker build completado.\n" + build_out).strip()
+                service.save(update_fields=["logs"])
         else:
             # --------- Caso imagen directa del catÃ¡logo ---------
             image_to_run = service.image
