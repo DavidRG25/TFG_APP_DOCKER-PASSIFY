@@ -1,5 +1,7 @@
 # containers/services.py
 import os
+import random
+import re
 import secrets
 import shutil
 import subprocess
@@ -10,17 +12,22 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor
 
 from django.db import IntegrityError, transaction
-from django.utils.text import slugify
 
 from docker import DockerClient
 from docker.errors import APIError, DockerException, NotFound
 
 from .docker_client import get_docker_client
-from .models import PortReservation, Service
+from .models import PORT_RANGE_END, PORT_RANGE_START, PortReservation, Service
+
+UNRAR_TOOL = os.environ.get("UNRAR_TOOL_PATH")
+if not UNRAR_TOOL:
+    print("[warning] UNRAR_TOOL_PATH is not set; RAR extraction may fail.")
+elif not os.path.exists(UNRAR_TOOL):
+    print("[warning] UNRAR_TOOL_PATH points to a missing path; RAR extraction may fail.")
 
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MiB
 COMPOSE_EXTENSIONS = {".yml", ".yaml"}
-CODE_EXTENSIONS = {".zip"}
+CODE_EXTENSIONS = {".zip", ".rar"}
 SSH_IMAGE = os.environ.get("SERVICE_SSH_IMAGE", "linuxserver/openssh-server")
 SSH_USERNAME = os.environ.get("SERVICE_SSH_USER", "student")
 
@@ -72,6 +79,23 @@ def _reserve_specific_port(port: int) -> None:
         raise RuntimeError(f"El puerto {port} ya esta en uso.") from exc
 
 
+def generate_random_port() -> int:
+    return random.randint(PORT_RANGE_START, PORT_RANGE_END)
+
+
+def _reserve_random_port() -> int:
+    """Reserva un puerto aleatorio dentro del rango definido."""
+    for _ in range(50):
+        candidate = generate_random_port()
+        try:
+            with transaction.atomic():
+                PortReservation.objects.create(port=candidate)
+            return candidate
+        except IntegrityError:
+            continue
+    return PortReservation.reserve_free_port()
+
+
 def _append_log(service: Service, message: str) -> None:
     """Añade una línea al histórico de logs del servicio."""
     current = service.logs or ""
@@ -82,10 +106,18 @@ def _append_log(service: Service, message: str) -> None:
 
 
 def _sidecar_name(service: Service) -> str:
-    """Genera un nombre de contenedor único y compatible con Docker."""
-    username_slug = slugify(service.owner.username or "", allow_unicode=False) or f"user{service.owner_id}"
-    name = f"ssh-sidecar_{username_slug}_{service.id}"
+    slug = _service_slug(service)
+    name = f"ssh_{service.id}_{slug}"
     return name[:63]
+
+
+def _service_slug(service: Service) -> str:
+    base = (service.name or "").lower()
+    base = re.sub(r"[^a-z0-9-_]+", "-", base)
+    base = re.sub(r"-{2,}", "-", base).strip("-")
+    if not base:
+        base = f"svc{service.id}"
+    return base
 
 
 def _ensure_container_running(service: Service, container, reserved_port: int | None):
@@ -149,16 +181,57 @@ def _save_filefield_to(tmp_path: str, ff) -> str:
     return tmp_path
 
 
-def _unpack_code_zip_to(target_dir: str, ff) -> None:
+def _unpack_code_archive_to(target_dir: str, ff) -> None:
     """
-    Descomprime un ZIP de cÃ³digo a 'target_dir'.
+    Descomprime un archivo de codigo (zip o rar) a 'target_dir'.
     """
     os.makedirs(target_dir, exist_ok=True)
-    # Guardar ZIP a temp antes de descomprimir
-    zpath = os.path.join(target_dir, "_code.zip")
-    _save_filefield_to(zpath, ff)
-    shutil.unpack_archive(zpath, target_dir)
-    os.remove(zpath)
+    name = getattr(ff, "name", "") or ""
+    extension = os.path.splitext(name)[1].lower()
+    tmp_path = os.path.join(target_dir, f"_code{extension or '.tmp'}")
+    _save_filefield_to(tmp_path, ff)
+
+    if extension == ".rar":
+        try:
+            _extract_rar_with_tool(tmp_path, target_dir)
+        finally:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+        return
+
+    try:
+        shutil.unpack_archive(tmp_path, target_dir)
+    except Exception as exc:
+        raise RuntimeError(f"No se pudo descomprimir el archivo: {exc}") from exc
+    finally:
+        os.remove(tmp_path)
+
+
+def _extract_rar_with_tool(tmp_path: str, target_dir: str) -> None:
+    """
+    Usa la herramienta externa definida en UNRAR_TOOL_PATH para probar y extraer el RAR.
+    """
+    if not UNRAR_TOOL:
+        raise RuntimeError("UNRAR_TOOL_PATH no esta definido; instala 7z/unrar y configura la variable de entorno.")
+    if not os.path.exists(UNRAR_TOOL):
+        raise RuntimeError(f"UNRAR_TOOL_PATH apunta a una ruta inexistente: {UNRAR_TOOL}")
+
+    os.makedirs(target_dir, exist_ok=True)
+
+    test_cmd = [UNRAR_TOOL, "t", tmp_path]
+    extract_cmd = [UNRAR_TOOL, "x", tmp_path, f"-o{target_dir}", "-y"]
+
+    try:
+        proc_test = subprocess.run(test_cmd, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError("El archivo RAR esta incompleto o dañado. Intentalo de nuevo.") from exc
+    if proc_test.stdout:
+        _ = proc_test.stdout  # silencio lint
+
+    try:
+        subprocess.run(extract_cmd, capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError("El archivo RAR esta incompleto o dañado. Intentalo de nuevo.") from exc
 
 
 # ---------- FunciÃ³n principal ----------
@@ -241,7 +314,9 @@ def _run_container_internal(
                 _reserve_specific_port(custom_port)
                 port = custom_port
             else:
-                port = PortReservation.reserve_free_port()
+                port = _reserve_random_port()
+            service.assigned_port = port
+            service.save(update_fields=["assigned_port"])
 
         # --------- Caso docker-compose ---------
         if service.compose:
@@ -251,7 +326,7 @@ def _run_container_internal(
 
                 # Si hay cÃ³digo, lo descomprimimos como contexto de trabajo (p.ej. ./app)
                 if service.code:
-                    _unpack_code_zip_to(os.path.join(tmpdir, "app"), service.code)
+                    _unpack_code_archive_to(os.path.join(tmpdir, "app"), service.code)
 
                 # Nombre de proyecto Ãºnico para poder localizar el contenedor
                 project = f"svc{service.id}"
@@ -290,15 +365,17 @@ def _run_container_internal(
                 return
 
         # --------- Caso Dockerfile ---------
+        slug = _service_slug(service)
+
         if service.dockerfile:
             with tempfile.TemporaryDirectory() as builddir:
                 dockerfile_path = os.path.join(builddir, "Dockerfile")
                 _save_filefield_to(dockerfile_path, service.dockerfile)
 
                 if service.code:
-                    _unpack_code_zip_to(builddir, service.code)
+                    _unpack_code_archive_to(builddir, service.code)
 
-                image_tag = f"{service.owner.username}/{service.name}:{port or 'latest'}"
+                image_tag = f"svc_{service.id}_{slug}_image"
                 try:
                     proc = subprocess.run(
                         ["docker", "build", "-t", image_tag, builddir],
@@ -323,18 +400,14 @@ def _run_container_internal(
 
 
         # --------- Variables y volÃºmenes (para no-compose) ---------
-        volume_name = f"svc_{service.id}"
+        volume_name = service.volume_name or f"svc_{service.id}_{slug}_data"
         try:
             docker_client.volumes.create(name=volume_name)
         except APIError as e:
             if e.response.status_code != 409:  # 409 es 'conflicto', el volumen ya existe (OK)
                 raise RuntimeError(f"No se pudo crear el volumen '{volume_name}': {e}")
         service.volume_name = volume_name
-        volumes = {volume_name: {"bind": "/home/user/data", "mode": "rw"}}
-        # Montaje de /app si se subiÃ³ un ZIP (nota: en runtime un ZIP no sirve; aquÃ­ solo se expone el archivo)
-        # Para casos reales, se recomienda usar Dockerfile o compose con COPY en build.
-        if service.code and hasattr(service.code, "path"):
-            volumes[service.code.path] = {"bind": "/app", "mode": "rw"}
+        volumes = {volume_name: {"bind": "/data", "mode": "rw"}}
 
         user_vols = service.volumes or {}
         if isinstance(user_vols, dict):
@@ -347,19 +420,25 @@ def _run_container_internal(
         # Puerto interno configurable (si aÃ±adÃ­s el campo al modelo); por defecto 80
         internal_port = getattr(service, "internal_port", 80)
 
+        internal_port = service.internal_port or 80
+        if service.internal_port is None:
+            service.internal_port = internal_port
+            service.save(update_fields=["internal_port"])
+
         ports = {f"{internal_port}/tcp": port} if port else {}
+
+        container_name = f"svc_{service.id}_{slug}_ctr"
 
         container = docker_client.containers.run(
             image=image_to_run,
             command=command,
             detach=True,
-            tty=True,
-            stdin_open=True,                 # importante para la terminal
-            name=f"{service.owner.username}_{service.name}_{port or 'auto'}",
+            tty=True,                 # importante para la terminal
+            stdin_open=True,
+            name=container_name,
             ports=ports,
             volumes=volumes or None,
             environment=env_vars or None,
-            working_dir="/app" if volumes else None,
         )
         _ensure_container_running(service, container, port)
 
@@ -410,12 +489,7 @@ def _run_ssh_sidecar(service: Service, docker_client: "DockerClient") -> None:
         "SUDO_ACCESS": "false",
         "TZ": os.environ.get("TZ", "UTC"),
     }
-    volumes = {
-        service.volume_name: {
-            "bind": f"/home/{SSH_USERNAME}/data",
-            "mode": "rw",
-        }
-    }
+    volumes = {service.volume_name: {"bind": "/data", "mode": "rw"}}
 
     try:
         try:

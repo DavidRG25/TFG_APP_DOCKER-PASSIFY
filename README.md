@@ -56,6 +56,8 @@ Asegúrate de tener instalado:
 - **Docker Compose**
 - **Pip** (gestor de paquetes de Python)
 - **Daphne** (para entorno de producción con WebSocket)
+- **Extractor RAR** (7-Zip, unrar, bsdtar o unar en el PATH) cuando se usen archivos .rar
+- **UNRAR_TOOL_PATH** apuntando al ejecutable de 7-Zip/unrar, por ejemplo `C:\Program Files\7-Zip\7z.exe`, para descomprimir RAR
 
 ---
 
@@ -64,6 +66,12 @@ Asegúrate de tener instalado:
 ### **Pre-requisitos**
 
 - 📦 **Docker Desktop** debe estar instalado y ejecutándose.  
+- 🗜️ **Extractor RAR** (solo si usaras archivos .rar): instala y deja en PATH uno de estos binarios:
+  - Windows (Chocolatey): `choco install 7zip -y` o `choco install unrar -y`
+  - Ubuntu/WSL: `sudo apt-get install p7zip-full` (o `sudo apt-get install unrar`)
+  - Si ya tienes 7-Zip, agrega su ruta (p. ej. `C:\Program Files\7-Zip`) al PATH y define `UNRAR_TOOL_PATH` apuntando al ejecutable.
+
+> Nota RAR: define `UNRAR_TOOL_PATH` en tu entorno o `.env` con la ruta al binario de 7-Zip/unrar. El sistema testea y extrae RAR mediante ese comando; si falta, la extraccion fallara con mensaje indicando la ausencia o ruta invalida.
 - **Si trabajas en Windows**, para evitar errores con named-pipe y `docker.from_env()`:
   1. Instala y habilita WSL 2 en tu máquina:  
      ```powershell
@@ -109,26 +117,47 @@ cd paasify
 ```bash
 python -m venv venv
 source venv/Scripts/activate  # En Windows sin "source": venv\Scripts\activate
-
-### 3. Instala las Dependencias
-
-```bash
 pip install -r requirements.txt
 ```
 
-### 4. Ejecuta las Migraciones
+### 3. Ejecuta las Migraciones
 
 ```bash
 python manage.py makemigrations
 python manage.py migrate
 ```
 
-### 5. Inicia el servidor ASGI con Daphne
+### 4. Arranca la app
 
 ```bash
-python3 -m daphne -b 0.0.0.0 -p 8080 app_passify.asgi:application
+# Desarrollo
+python manage.py runserver 0.0.0.0:8000
+
+# Produccion ASGI
+python -m daphne -b 0.0.0.0 -p 8080 app_passify.asgi:application
 ```
-<<<<<<< HEAD
+
+### 5. Variables de entorno (ejemplo .env)
+
+```
+DJANGO_SECRET_KEY=pon_aqui_una_clave_segura
+DJANGO_DEBUG=True
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+```
+
+### 6. Crear un servicio (resumen)
+- Modo imagen por defecto: selecciona una imagen del catalogo, puerto opcional entre 40000-50000 (o dejalo vacio para auto-asignar).
+- Modo custom:
+  - Dockerfile o docker-compose (exclusivos).
+  - Codigo fuente obligatorio en .zip o .rar. Para .rar necesitas la herramienta externa (ver requisitos).
+
+### 7. Pruebas rapidas
+
+```bash
+python manage.py test
+# o con pytest
+pytest
+```
 
 ### 🛠️ Ejecución rápida con el script `start_app.sh`
 
@@ -170,9 +199,3 @@ Credenciales creadas:
 | Profesor   | `profesor` | `Profesor!2025`| Pertenece al grupo `Teacher`.     |
 
 El comando es idempotente: si los usuarios ya existen, actualizará permisos, email y contraseñas.
-=======
-#### Dependiendo de la versión
-```bash
-python -m daphne -b 0.0.0.0 -p 8080 app_passify.asgi:application
-```
->>>>>>> main
