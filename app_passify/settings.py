@@ -23,6 +23,9 @@ DEBUG = _get_bool("DJANGO_DEBUG", "false")
 if not DEBUG and SECRET_KEY == "django-insecure-placeholder-secret-key-change-me":
     raise RuntimeError("DJANGO_SECRET_KEY must be set when DJANGO_DEBUG is false.")
 
+DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
+
 ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
