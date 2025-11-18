@@ -27,6 +27,7 @@ class ServiceSerializer(serializers.ModelSerializer):
     custom_port = serializers.IntegerField(required=False, write_only=True)
     env_vars = serializers.JSONField(required=False)
     volumes = serializers.JSONField(required=False)
+    internal_port = serializers.IntegerField(required=False, allow_null=True)
 
     # Permitir enlazar asignatura
     subject = serializers.PrimaryKeyRelatedField(
@@ -51,6 +52,7 @@ class ServiceSerializer(serializers.ModelSerializer):
             "env_vars",
             "volumes",
             "subject",
+            "internal_port",
         )
         read_only_fields = ("id", "assigned_port", "status", "logs")
 
@@ -91,6 +93,8 @@ class ServiceSerializer(serializers.ModelSerializer):
         dockerfile = attrs.get("dockerfile")
         compose = attrs.get("compose")
         subject = attrs.get("subject")
+        name = attrs.get("name") or getattr(self.instance, "name", None)
+        internal_port = attrs.get("internal_port", None)
 
         has_image = bool(image)
         has_dockerfile = bool(dockerfile)
@@ -111,7 +115,7 @@ class ServiceSerializer(serializers.ModelSerializer):
                 )
             if not has_code:
                 raise serializers.ValidationError(
-                    {"code": _("Debes adjuntar el código fuente (.zip) cuando usas Dockerfile o docker-compose.")}
+                    {"code": "Debes adjuntar un archivo .zip o .rar con el codigo fuente."}
                 )
         else:
             # Catálogo: requiere image
@@ -136,6 +140,28 @@ class ServiceSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"subject": _("No tienes permisos sobre esta asignatura.")}
                 )
+
+        # ---- Nombre unico por alumno (excluyendo servicios eliminados) ----
+        if name and user and user.is_authenticated:
+            qs = Service.objects.filter(owner=user, name=name).exclude(status="removed")
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise serializers.ValidationError(
+                    {"name": "Ya existe un servicio tuyo con este nombre."}
+                )
+
+        # ---- Puerto interno opcional ----
+        if internal_port is None:
+            attrs["internal_port"] = 80
+        else:
+            try:
+                ip = int(internal_port)
+            except (TypeError, ValueError):
+                raise serializers.ValidationError({"internal_port": "Debe ser un numero entre 1 y 65535."})
+            if not (1 <= ip <= 65535):
+                raise serializers.ValidationError({"internal_port": "Debe estar entre 1 y 65535."})
+            attrs["internal_port"] = ip
 
         return attrs
 

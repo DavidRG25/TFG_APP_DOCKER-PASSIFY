@@ -9,7 +9,10 @@
 
   <td>{{ s.image }}</td>
 
-  <td>{{ s.assigned_port|default:"-" }}</td>
+  <td>
+    <div>{{ s.assigned_port|default:"-" }}</div>
+    <small class="text-muted d-block">Interno: {{ s.internal_port|default:80 }}</small>
+  </td>
 
   <td>
     <span
