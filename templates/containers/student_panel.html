@@ -102,15 +102,45 @@
             <small class="text-muted d-block mt-1">En modo personalizado este selector queda deshabilitado.</small>
           </div>
 
-          <div class="mb-3">
-            <label class="form-label">Puerto personalizado (opcional)</label>
-            <input name="custom_port" class="form-control" type="number" min="40000" max="50000" placeholder="Ej: 49123">
-            <small class="text-muted">Debe estar entre 40000 y 50000.</small>
-          </div>
+  <div class="mb-3">
+    <label class="form-label">
+      Puerto personalizado (opcional)
+      <button type="button"
+              class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
+                      aria-label="Instrucciones puerto"
+                      data-bs-toggle="popover"
+                      data-bs-trigger="focus"
+                      data-bs-html="true"
+                      data-bs-title="Puerto personalizado"
+                      data-bs-content="Debe estar entre 40000 y 50000. Si no lo indicas se asigna uno libre.">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+              </button>
+            </label>
+    <input name="custom_port" class="form-control" type="number" min="40000" max="50000" placeholder="Ej: 49123">
+    <small class="text-muted">Debe estar entre 40000 y 50000.</small>
+  </div>
 
-          <div class="mb-3 custom-block" id="block-dockerfile">
-            <label class="form-label">
-              Dockerfile (opcional, exclusivo con compose)
+  <div class="mb-3 custom-block" id="block-internal-port">
+    <label class="form-label">
+      Puerto interno del contenedor (opcional)
+      <button type="button"
+              class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
+              aria-label="Instrucciones puerto interno"
+              data-bs-toggle="popover"
+              data-bs-trigger="focus"
+              data-bs-html="true"
+              data-bs-title="Puerto interno"
+              data-bs-content="Puerto dentro del contenedor que escucha tu aplicacion. Ejemplos: Flask 5000, Django 8000, Node.js 3000. Si no lo indicas se usa 80 por defecto.">
+        <i class="bi bi-info-circle" aria-hidden="true"></i>
+      </button>
+    </label>
+    <input name="internal_port" class="form-control" type="number" min="1" max="65535" placeholder="Ej: 5000">
+    <small class="text-muted">Ejemplos: Flask 5000, Django 8000, Node 3000. Por defecto 80.</small>
+  </div>
+
+  <div class="mb-3 custom-block" id="block-dockerfile">
+    <label class="form-label">
+      Dockerfile (opcional, exclusivo con compose)
               <button type="button"
                       class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
                       aria-label="Instrucciones Dockerfile"
@@ -122,7 +152,7 @@
                 <i class="bi bi-info-circle" aria-hidden="true"></i>
               </button>
             </label>
-            <input type="file" name="dockerfile" accept=".dockerfile,.Dockerfile,.txt,text/plain,*/*" class="form-control">
+            <input type="file" name="dockerfile" accept="*/*" class="form-control">
           </div>
 
           <div class="mb-3 custom-block" id="block-compose">
@@ -156,7 +186,7 @@
                 <i class="bi bi-info-circle" aria-hidden="true"></i>
               </button>
             </label>
-            <input type="file" name="code" accept=".zip" class="form-control">
+            <input type="file" name="code" accept=".zip,.rar" class="form-control">
           </div>
 
         </div>
@@ -216,21 +246,57 @@
     setTimeout(() => el.remove(), 2500);
   }
 
+  function resetNewServiceForm() {
+    const form = document.getElementById('newServiceForm');
+    if (!form) return;
+    form.reset();
+    const errors = document.getElementById('form-errors');
+    if (errors) errors.innerHTML = '';
+    ['dockerfile', 'compose', 'code'].forEach((name) => {
+      const input = document.querySelector(`input[name=\"${name}\"]`);
+      if (input) {
+        input.value = '';
+        input.disabled = false;
+      }
+    });
+    applyMode();
+    syncExclusion();
+    document.querySelectorAll('[data-bs-toggle=\"popover\"]').forEach((el) => {
+      const inst = bootstrap.Popover.getInstance(el);
+      if (inst) inst.hide();
+    });
+  }
+
   document.body.addEventListener('service:modal-close', (evt) => {
     const modalId = evt.detail?.modalId || 'newServiceModal';
     const modalEl = document.getElementById(modalId);
     if (!modalEl) return;
     (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).hide();
-    const form = document.getElementById('newServiceForm');
-    if (form) {
-      form.reset();
-      applyMode();
-    }
+    resetNewServiceForm();
   });
 
   document.body.addEventListener('service:toast', (evt) => {
     const detail = evt.detail || {};
     showToast(detail.message || 'Operacion completada', detail.variant || 'text-bg-success');
+  });
+
+  const newServiceModal = document.getElementById('newServiceModal');
+  if (newServiceModal) {
+    newServiceModal.addEventListener('hidden.bs.modal', () => {
+      resetNewServiceForm();
+    });
+  }
+
+  htmx.on('htmx:afterRequest', (evt) => {
+    if (evt.detail?.requestConfig?.elt?.id === 'newServiceForm') {
+      const status = evt.detail.xhr?.status || 0;
+      if (status < 400) {
+        resetNewServiceForm();
+        if (newServiceModal) {
+          (bootstrap.Modal.getInstance(newServiceModal) || new bootstrap.Modal(newServiceModal)).hide();
+        }
+      }
+    }
   });
 
   htmx.on('htmx:responseError', (evt) => {
@@ -246,6 +312,7 @@
     const dockerfile = document.querySelector('input[name="dockerfile"]');
     const compose = document.querySelector('input[name="compose"]');
     const code = document.querySelector('input[name="code"]');
+    const internalPort = document.querySelector('input[name="internal_port"]');
     const customBlocks = document.querySelectorAll('.custom-block');
 
     if (mode === 'default') {
@@ -258,7 +325,7 @@
     } else {
       imgSel.disabled = true;
       customBlocks.forEach((b) => b.classList.remove('opacity-50'));
-      [dockerfile, compose, code].forEach((input) => {
+      [dockerfile, compose, code, internalPort].forEach((input) => {
         input.disabled = false;
       });
       syncExclusion();

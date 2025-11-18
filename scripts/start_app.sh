@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="${ROOT_DIR}/venv"
 HOST_DEFAULT="${HOST:-0.0.0.0}"
-PORT_DEFAULT="${PORT:-8080}"
+PORT_DEFAULT="${PORT:-8000}"
 SKIP_INSTALL="false"
 SKIP_MIGRATE="false"
 PORT_OVERRIDE=""
