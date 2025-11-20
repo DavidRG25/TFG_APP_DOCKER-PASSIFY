@@ -23,17 +23,6 @@ fi
 
 HOST="${DJANGO_HOST:-0.0.0.0}"
 PORT="${DJANGO_PORT:-8000}"
-SSH_IMAGE="${SERVICE_SSH_IMAGE:-linuxserver/openssh-server}"
-
-if command -v docker >/dev/null 2>&1; then
-  echo "[*] Verificando imagen SSH requerida (${SSH_IMAGE})"
-  if ! docker image inspect "$SSH_IMAGE" >/dev/null 2>&1; then
-    echo "[*] Descargando imagen SSH ${SSH_IMAGE}"
-    docker pull "$SSH_IMAGE"
-  fi
-else
-  echo "[!] Docker no esta disponible; no se puede preparar la imagen SSH (${SSH_IMAGE})." >&2
-fi
 
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput

@@ -36,10 +36,20 @@ document.addEventListener("DOMContentLoaded", () => {
 
     socket.onopen = () => {
       retryCount = 0;
-      term.writeln("Conexion establecida con el contenedor.");
     };
 
-    socket.onmessage = (event) => term.write(event.data || "");
+    socket.onmessage = (event) => {
+      if (typeof event.data === "string") {
+        term.write(event.data);
+        return;
+      }
+      if (event.data instanceof Blob) {
+        event.data.arrayBuffer().then((buffer) => {
+          const decoder = new TextDecoder("utf-8");
+          term.write(decoder.decode(new Uint8Array(buffer)));
+        }).catch(() => term.writeln("\r\n[ERROR DECODIFICANDO DATOS]\r\n"));
+      }
+    };
 
     socket.onerror = () => {
       term.writeln("\r\n[ERROR DE CONEXION WEBSOCKET]\r\n");
