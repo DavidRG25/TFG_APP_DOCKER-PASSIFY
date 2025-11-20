@@ -24,7 +24,7 @@
 - Los modales solo muestran texto estetico.
 
 ## Pruebas
-- [ ] Crear servicio con Dockerfile + ZIP -> pasa validacion y se lanza contenedor.
+- [ok] Crear servicio con Dockerfile + ZIP -> pasa validacion y se lanza contenedor.
 - [ok] Intentar Dockerfile sin ZIP -> modal muestra error "Debes adjuntar el codigo fuente".
 - [ok] Adjuntar ZIP sin Dockerfile/compose -> error controlado.
 - [ok] Verificar iconos de ayuda y contenedor de errores en la UI.

@@ -63,13 +63,7 @@ class Service(models.Model):
     updated_at = models.DateTimeField("Actualizado", auto_now=True)
 
     # Opciones
-    ssh_port = models.PositiveIntegerField("Puerto SSH", null=True, blank=True)
     volume_name = models.CharField("Nombre del volumen", max_length=255, blank=True, null=True)
-    ssh_password = models.CharField("Clave SSH", max_length=128, blank=True, null=True)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.ssh_private_key = None
 
     class Meta:
         verbose_name = "Servicio"

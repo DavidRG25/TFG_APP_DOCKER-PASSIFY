@@ -96,6 +96,16 @@
     {% endif %}
 
     {% if s.container_id and s.status == 'running' %}
+    {% if host %}
+    <a
+      href="http://{{ host }}:{{ s.assigned_port }}"
+      class="btn btn-sm btn-outline-primary"
+      target="_blank"
+      rel="noopener"
+      title="Abrir en navegador">
+      Acceder
+    </a>
+    {% endif %}
     <a
       href="{% url 'containers:terminal_view' s.id %}"
       class="btn btn-sm btn-dark"
@@ -111,17 +121,6 @@
     </button>
     {% endif %}
 
-    <button
-      class="btn btn-sm btn-primary"
-      hx-get="{% url 'service-ssh-uri' s.id %}"
-      hx-target="#genericModalContent"
-      hx-swap="innerHTML"
-      data-bs-toggle="modal"
-      data-bs-target="#genericModal"
-      {% if s.status != 'running' or not s.ssh_port %}disabled{% endif %}
-      title="Comando SSH">
-      SSH
-    </button>
   </td>
 </tr>
 {% empty %}
