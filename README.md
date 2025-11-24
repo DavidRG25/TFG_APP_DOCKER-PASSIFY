@@ -199,3 +199,51 @@ Credenciales creadas:
 | Profesor   | `profesor` | `Profesor!2025`| Pertenece al grupo `Teacher`.     |
 
 El comando es idempotente: si los usuarios ya existen, actualizará permisos, email y contraseñas.
+
+---
+
+## **Uso de la API con Tokens JWT**
+
+PaaSify incluye autenticación mediante tokens JWT para acceder a la API de forma programática.
+
+### **Generar un Token**
+
+1. Inicia sesión en la plataforma
+2. Ve a **Mi Perfil** desde el menú de navegación
+3. En la sección **Bearer Token API**, haz clic en **"Generar Token"**
+4. Copia el token completo que aparece en el modal (solo se muestra una vez)
+
+### **Usar el Token en Peticiones API**
+
+Incluye el token en el header `Authorization` con el prefijo `Bearer`:
+
+```bash
+curl -X GET http://localhost:8000/api/containers/ \
+  -H "Authorization: Bearer TU_TOKEN_AQUI"
+```
+
+### **Ejemplo: Crear un Contenedor**
+
+```bash
+curl -X POST http://localhost:8000/api/containers/ \
+  -H "Authorization: Bearer TU_TOKEN_AQUI" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "mi-nginx",
+    "mode": "default",
+    "image": "nginx:latest",
+    "port": 8080
+  }'
+```
+
+### **Refrescar Token**
+
+Los tokens tienen una validez de 365 días. Para refrescar un token:
+
+1. Ve a **Mi Perfil**
+2. Haz clic en **"Refrescar Token"** (esto invalidará el token anterior)
+3. Copia el nuevo token
+
+**Nota:** Los administradores pueden refrescar tokens de usuarios desde el panel de administración Django.
+
+---
