@@ -28,7 +28,7 @@ from paasify.roles import (
 from .docker_client import get_docker_client
 from .models import AllowedImage, Service
 from .serializers import AllowedImageSerializer, ServiceSerializer
-from .services import SSH_USERNAME, remove_container, run_container, stop_container
+from .services import remove_container, run_container, stop_container
 
 
 # ----------------------------- helpers -----------------------------
@@ -97,9 +97,10 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
     def _render_table_fragment(self, request) -> str:
         services = self.get_queryset()
+        host = request.get_host().split(":")[0]
         return render_to_string(
             "containers/_service_rows.html",
-            {"services": services},
+            {"services": services, "host": host},
             request=request,
         )
 
@@ -149,7 +150,8 @@ class ServiceViewSet(viewsets.ModelViewSet):
         - mode=default  -> solo 'image' (+ puerto opcional). NO dockerfile/compose/code.
         - mode=custom   -> obligatorio Dockerfile XOR Compose; 'image' se ignora si llega.
         """
-        serializer = self.get_serializer(data=request.data, context={"request": request})
+        data = request.data.copy()
+        serializer = self.get_serializer(data=data, context={"request": request})
         try:
             serializer.is_valid(raise_exception=True)
         except ValidationError as exc:
@@ -170,7 +172,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
         service = serializer.save(owner=request.user, status="creating")
 
-        self._attach_uploaded_files(service, request)
+        self._attach_uploaded_files(service, request, mode)
 
         try:
             run_container(service, custom_port=custom_port)
@@ -218,7 +220,9 @@ class ServiceViewSet(viewsets.ModelViewSet):
         response["HX-Reswap"] = "innerHTML"
         return response
 
-    def _attach_uploaded_files(self, service: Service, request):
+    def _attach_uploaded_files(self, service: Service, request, mode: str):
+        if mode == "default":
+            return
         updated_fields = []
         for field in ("dockerfile", "compose", "code"):
             uploaded = request.FILES.get(field)
@@ -278,6 +282,8 @@ class ServiceViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="remove")
     def remove(self, request, pk=None):
         service = self.get_object()
+        service.status = "deleting"
+        service.save(update_fields=["status", "updated_at"])
         try:
             remove_container(service)
         except Exception as exc:
@@ -346,47 +352,6 @@ class ServiceViewSet(viewsets.ModelViewSet):
     def compose(self, request, pk=None):
         return self._serve_code(self.get_object().compose, "yaml")
 
-    @action(detail=True, methods=["get"], url_path="ssh-uri")
-    def ssh_uri(self, request, pk=None):
-        service = self.get_object()
-        if service.status != "running" or not service.ssh_port:
-            return DRF_Response(
-                {"error": "El servicio no está en ejecución o no tiene puerto SSH asignado."},
-                status=400,
-            )
-
-        host = request.get_host().split(":")[0]
-        uri = f"ssh {SSH_USERNAME}@{host} -p {service.ssh_port}"
-        password = service.ssh_password or "No disponible"
-
-        if self._is_htmx(request):
-            safe_uri = escape(uri)
-            safe_password = escape(password)
-            safe_user = escape(SSH_USERNAME)
-            # Si es HTMX, devolvemos un fragmento de HTML para el modal
-            html = f"""
-                <div class="modal-header">
-                    <h5 class="modal-title">Conexión SSH</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-                </div>
-                <div class="modal-body">
-                    <p>Copia y pega el siguiente comando en tu terminal:</p>
-                    <div class="input-group">
-                        <input type="text" id="sshCommand" class="form-control" value="{safe_uri}" readonly>
-                        <button class="btn btn-outline-secondary" onclick="copyToClipboard('#sshCommand')">Copiar</button>
-                    </div>
-                    <p class="mt-3 mb-1">Contraseña:</p>
-                    <div class="input-group">
-                        <input type="text" id="sshPassword" class="form-control" value="{safe_password}" readonly>
-                        <button class="btn btn-outline-secondary" onclick="copyToClipboard('#sshPassword')">Copiar</button>
-                    </div>
-                    <small class="text-muted d-block mt-2">Usuario: {safe_user}</small>
-                </div>
-            """
-            return HttpResponse(html)
-
-        return DRF_Response({"ssh_uri": uri, "password": password, "user": SSH_USERNAME})
-
 
 class AllowedImageViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AllowedImage.objects.all()
@@ -410,6 +375,7 @@ def student_panel(request):
 
     services = Service.objects.filter(owner=request.user).exclude(status="removed")
     images = AllowedImage.objects.all()
+    host = request.get_host().split(":")[0]
     return render(
         request,
         "containers/student_panel.html",
@@ -418,6 +384,7 @@ def student_panel(request):
             "images": images,
             "current_subject": None,
             "available_subjects": available_subjects,
+            "host": host,
             "title": "PaaSify - Mis servicios",
         },
     )
@@ -458,10 +425,11 @@ def student_services_in_subject(request, subject_id):
         .exclude(status="removed")
     )
     images = AllowedImage.objects.all()
+    host = request.get_host().split(":")[0]
     return render(
         request,
         "containers/student_panel.html",
-        {"services": services, "images": images, "current_subject": subject},
+        {"services": services, "images": images, "current_subject": subject, "host": host},
     )
 
 
@@ -484,7 +452,8 @@ def service_table(request):
     for s in qs:
         _sync_service(s)
 
-    html = render_to_string("containers/_service_rows.html", {"services": qs})
+    host = request.get_host().split(":")[0]
+    html = render_to_string("containers/_service_rows.html", {"services": qs, "host": host})
     return HttpResponse(html)
 
 

@@ -71,20 +71,28 @@ class TerminalConsumer(WebsocketConsumer):
             )
             self._reader_thread.start()
 
-            self.send("Conexion establecida. Escribe comandos.\r\n")
+            self.send("Conexión establecida con el contenedor.\r\n")
         except (DockerException, Exception) as exc:  # pragma: no cover - dependencias externas
             self.send(f"\r\n[ERROR al iniciar shell]: {exc}\r\n")
             self.close()
 
+    def _get_raw_socket(self):
+        if not self.sock:
+            return None
+        return getattr(self.sock, "_sock", self.sock)
+
     def receive(self, text_data=None, bytes_data=None):
         """Datos que llegan desde el navegador hacia el contenedor."""
         try:
-            if not self.sock:
+            sock = self._get_raw_socket()
+            if not sock:
                 return
             data = bytes_data if bytes_data is not None else (text_data or "")
             if isinstance(data, str):
                 data = data.encode("utf-8", errors="ignore")
-            self.sock._sock.sendall(data)
+            send_fn = getattr(sock, "sendall", None) or getattr(sock, "send", None)
+            if send_fn:
+                send_fn(data)
         except Exception:
             # Evitamos propagar ruidos de red al cliente.
             pass
@@ -92,24 +100,27 @@ class TerminalConsumer(WebsocketConsumer):
     def _read_from_container(self):
         """Transfiere la salida del contenedor hacia el navegador."""
         try:
+            sock = self._get_raw_socket()
+            if not sock:
+                return
             while True:
-                # Use ._sock.recv for the raw socket from docker-py
-                chunk = self.sock._sock.recv(4096)
+                chunk = sock.recv(4096)
                 if not chunk:
                     logger.info("Terminal WS: container socket closed.")
+                    self.send("\r\n[CONEXION CERRADA] El contenedor finalizó la sesión.\r\n")
                     break
                 logger.debug(f"Terminal WS: recv {chunk!r}")
                 try:
-                    decoded = chunk.decode("utf-8", errors="ignore")
-                    self.send(decoded)
+                    decoded = chunk.decode("utf-8")
+                    self.send(text_data=decoded)
                     logger.debug(f"Terminal WS: sent {decoded!r}")
-                except Exception:
-                    self.send(str(chunk))
-                    logger.debug(f"Terminal WS: sent raw {chunk!r}")
+                except UnicodeDecodeError:
+                    self.send(bytes_data=chunk)
+                    logger.debug(f"Terminal WS: sent raw bytes")
         except Exception as exc:
             logger.error(f"Terminal WS: error reading from container: {exc}")
             try:
-                self.send(f"\r\n[ERROR OUTPUT]: {exc}\r\n")
+                self.send(text_data=f"\r\n[ERROR OUTPUT]: {exc}\r\n")
             except Exception:
                 pass
         finally:
@@ -121,13 +132,14 @@ class TerminalConsumer(WebsocketConsumer):
     def disconnect(self, close_code):
         """Limpieza de recursos al cerrar la sesion WebSocket."""
         try:
-            if self.sock is not None:
+            sock = self._get_raw_socket()
+            if sock is not None:
                 try:
-                    self.sock.shutdown(2)
+                    sock.shutdown(2)
                 except Exception:
                     pass
                 try:
-                    self.sock.close()
+                    sock.close()
                 except Exception:
                     pass
         finally:

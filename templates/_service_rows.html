@@ -9,7 +9,10 @@
 
   <td>{{ s.image }}</td>
 
-  <td>{{ s.assigned_port|default:"-" }}</td>
+  <td>
+    <div>{{ s.assigned_port|default:"-" }}</div>
+    <small class="text-muted d-block">Interno: {{ s.internal_port|default:80 }}</small>
+  </td>
 
   <td>
     <span
@@ -92,6 +95,26 @@
     </button>
     {% endif %}
 
+    {% if host %}
+      {% if s.status == 'running' %}
+      <a
+        href="http://{{ host }}:{{ s.assigned_port }}"
+        class="btn btn-sm btn-outline-primary"
+        target="_blank"
+        rel="noopener"
+        title="Abrir en navegador">
+        Acceder
+      </a>
+      {% else %}
+      <button
+        class="btn btn-sm btn-outline-primary"
+        disabled
+        title="Disponible solo cuando el servicio esta en ejecucion">
+        Acceder
+      </button>
+      {% endif %}
+    {% endif %}
+
     <a
       href="{% url 'containers:terminal_view' s.id %}"
       class="btn btn-sm btn-dark {% if s.status != 'running' %}disabled{% endif %}"
@@ -99,17 +122,6 @@
       Terminal
     </a>
 
-    <button
-      class="btn btn-sm btn-primary"
-      hx-get="{% url 'service-ssh-uri' s.id %}"
-      hx-target="#genericModalContent"
-      hx-swap="innerHTML"
-      data-bs-toggle="modal"
-      data-bs-target="#genericModal"
-      {% if s.status != 'running' or not s.ssh_port %}disabled{% endif %}
-      title="Comando SSH">
-      SSH
-    </button>
   </td>
 </tr>
 {% empty %}

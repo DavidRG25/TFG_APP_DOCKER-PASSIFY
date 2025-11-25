@@ -2,15 +2,14 @@
 import os
 import random
 import re
-import secrets
 import shutil
 import subprocess
 
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
+from django.conf import settings
 from django.db import IntegrityError, transaction
 
 from docker import DockerClient
@@ -28,28 +27,10 @@ elif not os.path.exists(UNRAR_TOOL):
 MAX_UPLOAD_SIZE = 10 * 1024 * 1024  # 10 MiB
 COMPOSE_EXTENSIONS = {".yml", ".yaml"}
 CODE_EXTENSIONS = {".zip", ".rar"}
-SSH_IMAGE = os.environ.get("SERVICE_SSH_IMAGE", "linuxserver/openssh-server")
-SSH_USERNAME = os.environ.get("SERVICE_SSH_USER", "student")
 
 EXECUTOR = ThreadPoolExecutor(
     max_workers=int(os.environ.get("SERVICE_WORKERS", "2"))
 )
-
-
-def _generate_ssh_keys():
-    """Generates a new SSH key pair."""
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    private_key = key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-    public_key = key.public_key().public_bytes(
-        encoding=serialization.Encoding.OpenSSH,
-        format=serialization.PublicFormat.OpenSSH,
-    )
-    return private_key.decode(), public_key.decode()
-
 
 def _compose_cmd() -> list[str]:
     """
@@ -103,12 +84,6 @@ def _append_log(service: Service, message: str) -> None:
         service.logs = f"{current.rstrip()}\n{message}"
     else:
         service.logs = message
-
-
-def _sidecar_name(service: Service) -> str:
-    slug = _service_slug(service)
-    name = f"ssh_{service.id}_{slug}"
-    return name[:63]
 
 
 def _service_slug(service: Service) -> str:
@@ -367,6 +342,8 @@ def _run_container_internal(
         # --------- Caso Dockerfile ---------
         slug = _service_slug(service)
 
+        image_cmd = None
+
         if service.dockerfile:
             with tempfile.TemporaryDirectory() as builddir:
                 dockerfile_path = os.path.join(builddir, "Dockerfile")
@@ -398,6 +375,11 @@ def _run_container_internal(
             # --------- Caso imagen directa del catÃ¡logo ---------
             image_to_run = service.image
 
+        try:
+            image_attrs = docker_client.images.get(image_to_run).attrs
+            image_cmd = image_attrs.get("Config", {}).get("Cmd") or None
+        except DockerException:
+            image_cmd = None
 
         # --------- Variables y volÃºmenes (para no-compose) ---------
         volume_name = service.volume_name or f"svc_{service.id}_{slug}_data"
@@ -413,25 +395,41 @@ def _run_container_internal(
         if isinstance(user_vols, dict):
             volumes.update(user_vols)
 
-        env_vars = service.env_vars or {}
-        if not isinstance(env_vars, dict):
-            env_vars = {}
+        env_vars_raw = service.env_vars or {}
+        if not isinstance(env_vars_raw, dict):
+            env_vars_raw = {}
+        env_vars = dict(env_vars_raw)
 
-        # Puerto interno configurable (si aÃ±adÃ­s el campo al modelo); por defecto 80
-        internal_port = getattr(service, "internal_port", 80)
-
-        internal_port = service.internal_port or 80
+        # Puerto interno configurable; por defecto 80
+        internal_port = getattr(service, "internal_port", 80) or 80
         if service.internal_port is None:
             service.internal_port = internal_port
             service.save(update_fields=["internal_port"])
 
-        ports = {f"{internal_port}/tcp": port} if port else {}
-
+        ports = {}
+        if port:
+            ports[f"{internal_port}/tcp"] = port
         container_name = f"svc_{service.id}_{slug}_ctr"
+
+        normalized_command = command
+        if isinstance(normalized_command, (list, tuple)):
+            if not any((str(part).strip() if isinstance(part, str) else part) for part in normalized_command):
+                normalized_command = None
+        elif isinstance(normalized_command, str) and not normalized_command.strip():
+            normalized_command = None
+
+        normalized_image_cmd = image_cmd
+        if isinstance(normalized_image_cmd, (list, tuple)):
+            if not any((str(part).strip() if isinstance(part, str) else part) for part in normalized_image_cmd):
+                normalized_image_cmd = None
+        elif isinstance(normalized_image_cmd, str) and not normalized_image_cmd.strip():
+            normalized_image_cmd = None
+
+        run_command = normalized_command if normalized_command is not None else normalized_image_cmd
 
         container = docker_client.containers.run(
             image=image_to_run,
-            command=command,
+            command=run_command,
             detach=True,
             tty=True,                 # importante para la terminal
             stdin_open=True,
@@ -450,72 +448,12 @@ def _run_container_internal(
             _append_log(service, "Imagen construida y contenedor arrancado.")
         service.save()
 
-        # Iniciar sidecar SSH
-        _run_ssh_sidecar(service, docker_client)
-
     except (APIError, DockerException, RuntimeError, ValueError) as exc:
         _release_port(port)
         service.status = "error"
         service.logs = str(exc)
         service.save()
         raise
-
-
-def _run_ssh_sidecar(service: Service, docker_client: "DockerClient") -> None:
-    """Inicia un contenedor auxiliar con servidor SSH y volumen compartido."""
-    if service.volume_name is None:
-        _append_log(service, "[SSH] No hay volumen asociado; se omite sidecar.")
-        service.ssh_port = None
-        service.ssh_password = None
-        service.save(update_fields=["logs", "ssh_port", "ssh_password"])
-        return
-
-    try:
-        ssh_port = PortReservation.reserve_free_port()
-    except RuntimeError as exc:
-        _append_log(service, f"[SSH] No se pudo reservar puerto: {exc}")
-        service.ssh_port = None
-        service.ssh_password = None
-        service.save(update_fields=["logs", "ssh_port", "ssh_password"])
-        return
-
-    password = secrets.token_urlsafe(10)
-    container_name = _sidecar_name(service)
-    env_vars = {
-        "USER_NAME": SSH_USERNAME,
-        "PASSWORD": password,
-        "USER_PASSWORD": password,
-        "PASSWORD_ACCESS": "true",
-        "SUDO_ACCESS": "false",
-        "TZ": os.environ.get("TZ", "UTC"),
-    }
-    volumes = {service.volume_name: {"bind": "/data", "mode": "rw"}}
-
-    try:
-        try:
-            previous = docker_client.containers.get(container_name)
-            previous.remove(force=True)
-        except NotFound:
-            pass
-
-        docker_client.containers.run(
-            image=SSH_IMAGE,
-            name=container_name,
-            environment=env_vars,
-            ports={"2222/tcp": ssh_port},
-            volumes=volumes,
-            detach=True,
-            restart_policy={"Name": "unless-stopped"},
-        )
-        service.ssh_port = ssh_port
-        service.ssh_password = password
-        service.save(update_fields=["ssh_port", "ssh_password"])
-    except (DockerException, Exception) as exc:
-        _release_port(ssh_port)
-        service.ssh_port = None
-        service.ssh_password = None
-        _append_log(service, f"[SSH] No se pudo iniciar el sidecar: {exc}")
-        service.save(update_fields=["logs", "ssh_port", "ssh_password"])
 
 
 def _run_container_worker(
@@ -592,20 +530,8 @@ def remove_container(service: Service):
             _append_log(service, f"Error al eliminar el contenedor: {exc}")
             service.save(update_fields=["logs"])
 
-    # Eliminar sidecar SSH
-    sidecar_name = _sidecar_name(service)
-    try:
-        sidecar_container = docker_client.containers.get(sidecar_name)
-        sidecar_container.remove(force=True)
-    except NotFound:
-        pass
-    except DockerException as exc:
-        _append_log(service, f"Error al eliminar el sidecar SSH: {exc}")
-        service.save(update_fields=["logs"])
-
     # Liberar puertos
     _release_port(service.assigned_port)
-    _release_port(service.ssh_port)
 
     # Eliminar volumen
     if service.volume_name:
@@ -620,8 +546,6 @@ def remove_container(service: Service):
 
     service.container_id = None
     service.assigned_port = None
-    service.ssh_port = None
-    service.ssh_password = None
     service.volume_name = None
     service.status = "removed"
     service.save()
