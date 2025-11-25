@@ -376,6 +376,13 @@ def student_panel(request):
     services = Service.objects.filter(owner=request.user).exclude(status="removed")
     images = AllowedImage.objects.all()
     host = request.get_host().split(":")[0]
+
+    running_count = services.filter(status="running").count()
+    stopped_count = services.filter(status="stopped").count()
+    error_count = services.filter(status="error").count()
+    total_services = services.count()
+    subjects_count = available_subjects.count() if hasattr(available_subjects, "count") else 0
+
     return render(
         request,
         "containers/student_panel.html",
@@ -386,6 +393,13 @@ def student_panel(request):
             "available_subjects": available_subjects,
             "host": host,
             "title": "PaaSify - Mis servicios",
+            "stats": {
+                "total": total_services,
+                "running": running_count,
+                "stopped": stopped_count,
+                "error": error_count,
+                "subjects": subjects_count,
+            },
         },
     )
 

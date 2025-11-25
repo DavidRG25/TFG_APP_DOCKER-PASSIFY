@@ -20,5 +20,5 @@ HOST="${DJANGO_RUNSERVER_HOST:-127.0.0.1}"
 PORT="${DJANGO_RUNSERVER_PORT:-8000}"
 
 python manage.py migrate --noinput
-python manage.py collectstatic --noinput
+python manage.py collectstatic --noinput --verbosity 0
 python manage.py runserver "${HOST}:${PORT}"
