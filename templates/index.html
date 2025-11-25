@@ -6,133 +6,149 @@
 {% endblock %}
 
 {% block body %}
-<!-- Hero Section -->
 <section class="hero-section">
-    <!-- Formas de fondo animadas -->
-    <div class="hero-shape shape-1"></div>
-    <div class="hero-shape shape-2"></div>
-    <div class="hero-shape shape-3"></div>
+  <div class="hero-shape shape-1"></div>
+  <div class="hero-shape shape-2"></div>
+  <div class="hero-shape shape-3"></div>
 
-    <div class="hero-content">
-        <img src="{% static 'assets/img/logo.png' %}" alt="PaaSify Logo" class="hero-logo">
-        <h1 class="hero-title">Bienvenido a PaaSify</h1>
-        <p class="hero-subtitle">
-            La plataforma educativa definitiva para aprender despliegue de aplicaciones con Docker.
-            Simple, potente y diseñada para estudiantes y profesores.
-        </p>
-
+  <div class="container hero-grid">
+    <div class="hero-left">
+      <div class="eyebrow">Aprende despliegue con Docker en menos pasos</div>
+      <h1 class="hero-title">Plataforma educativa para lanzar contenedores sin fricción</h1>
+      <p class="hero-subtitle">Sube tu código, define puertos y despliega en segundos. Ideal para prácticas de alumnos y revisiones de profesores.</p>
+      <div class="hero-actions">
         {% if not user.is_authenticated %}
-        <a href="{% url 'login' %}" class="btn-hero">
-            <i class="fas fa-rocket"></i> Comenzar Ahora
-        </a>
+          <a href="{% url 'login' %}" class="btn-hero"><i class="fas fa-rocket"></i> Comenzar ahora</a>
         {% else %}
-        <a href="{% url 'profile' %}" class="btn-hero">
-            <i class="fas fa-user-circle"></i> Ir a mi Perfil
-        </a>
+          <a href="{% url 'profile' %}" class="btn-hero"><i class="fas fa-user-circle"></i> Ir a mi perfil</a>
         {% endif %}
+        <a href="#roles" class="btn-ghost">Ver roles</a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-pill">
+          <span class="stat-number">3</span>
+          <span class="stat-label">Modos de despliegue: imagen del catálogo, Dockerfile propio o docker-compose propio</span>
+        </div>
+        <div class="stat-pill">
+          <span class="stat-number">24/7</span>
+          <span class="stat-label">Terminal web y logs disponibles todo el día</span>
+        </div>
+      </div>
     </div>
+
+    <div class="hero-right card shadow-sm">
+      <div class="card-body">
+        <div class="checklist-title">Flujo rápido</div>
+        <ul class="checklist">
+          <li><i class="fas fa-check-circle"></i> Selecciona imagen o sube tu Dockerfile/compose</li>
+          <li><i class="fas fa-check-circle"></i> Define puertos y variables en un paso</li>
+          <li><i class="fas fa-check-circle"></i> Abre la terminal web y prueba tu app</li>
+        </ul>
+        <div class="mini-cta">
+          <div>
+            <p class="mini-cta-title">Portafolio listo</p>
+            <p class="mini-cta-text">Comparte servicios en clase y obtén feedback inmediato.</p>
+          </div>
+          <div class="mini-cta-icon">
+            <i class="fas fa-terminal"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 
-<!-- Features Section -->
 <section class="features-section">
-    <div class="container">
-        <div class="text-center">
-            <h2 class="section-title">¿Qué puedes hacer con PaaSify?</h2>
-        </div>
-
-        <div class="row">
-            <!-- Feature 1 -->
-            <div class="col-md-4 mb-4">
-                <div class="feature-card">
-                    <i class="fas fa-cloud-upload-alt feature-icon"></i>
-                    <h3 class="h4 card-title mb-3">Despliegue Simple</h3>
-                    <p class="card-text text-muted">
-                        Sube tu código o Dockerfile y despliega aplicaciones en segundos sin configuraciones complejas
-                        de servidor.
-                    </p>
-                </div>
-            </div>
-
-            <!-- Feature 2 -->
-            <div class="col-md-4 mb-4">
-                <div class="feature-card">
-                    <i class="fas fa-project-diagram feature-icon"></i>
-                    <h3 class="h4 card-title mb-3">Gestión de Proyectos</h3>
-                    <p class="card-text text-muted">
-                        Organiza tu trabajo por asignaturas y proyectos. Colabora con profesores y compañeros de forma
-                        eficiente.
-                    </p>
-                </div>
-            </div>
-
-            <!-- Feature 3 -->
-            <div class="col-md-4 mb-4">
-                <div class="feature-card">
-                    <i class="fab fa-docker feature-icon"></i>
-                    <h3 class="h4 card-title mb-3">Poder de Docker</h3>
-                    <p class="card-text text-muted">
-                        Aprende y utiliza estándares de la industria como Docker y Docker Compose con una interfaz
-                        amigable.
-                    </p>
-                </div>
-            </div>
-        </div>
+  <div class="container">
+    <div class="text-center mb-4">
+      <h2 class="section-title">¿Qué puedes hacer con PaaSify?</h2>
+      <p class="text-muted">Pensado para clases de DevOps, revisión de prácticas y demos rápidas.</p>
     </div>
+    <div class="row">
+      <div class="col-md-4 mb-4">
+        <div class="feature-card">
+          <i class="fas fa-cloud-upload-alt feature-icon"></i>
+          <h3 class="h4 card-title mb-3">Despliegue simple</h3>
+          <p class="card-text text-muted">Sube tu código o Dockerfile y despliega en segundos sin configurar servidores.</p>
+        </div>
+      </div>
+      <div class="col-md-4 mb-4">
+        <div class="feature-card">
+          <i class="fas fa-project-diagram feature-icon"></i>
+          <h3 class="h4 card-title mb-3">Gestión por asignaturas</h3>
+          <p class="card-text text-muted">Organiza prácticas por curso y revisa servicios de alumnos en un mismo panel.</p>
+        </div>
+      </div>
+      <div class="col-md-4 mb-4">
+        <div class="feature-card">
+          <i class="fab fa-docker feature-icon"></i>
+          <h3 class="h4 card-title mb-3">Poder de Docker</h3>
+          <p class="card-text text-muted">Compatible con imágenes oficiales, Docker Compose y terminal web integrada.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 
-<!-- Roles Section -->
-<section class="py-5 bg-white">
-    <div class="container">
-        <div class="text-center">
-            <h2 class="section-title">Roles en la Plataforma</h2>
-        </div>
-
-        <div class="row justify-content-center">
-            <!-- Admin Role -->
-            <div class="col-md-4 mb-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body text-center p-4">
-                        <div class="mb-3 text-primary">
-                            <i class="fas fa-user-shield fa-3x"></i>
-                        </div>
-                        <h4 class="card-title">Administrador</h4>
-                        <p class="card-text text-muted small">
-                            Gestión global de usuarios, asignaturas y recursos del sistema.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Teacher Role -->
-            <div class="col-md-4 mb-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body text-center p-4">
-                        <div class="mb-3 text-success">
-                            <i class="fas fa-chalkboard-teacher fa-3x"></i>
-                        </div>
-                        <h4 class="card-title">Profesor</h4>
-                        <p class="card-text text-muted small">
-                            Creación de proyectos, asignación de tareas y revisión de despliegues.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Student Role -->
-            <div class="col-md-4 mb-4">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body text-center p-4">
-                        <div class="mb-3 text-info">
-                            <i class="fas fa-user-graduate fa-3x"></i>
-                        </div>
-                        <h4 class="card-title">Estudiante</h4>
-                        <p class="card-text text-muted small">
-                            Despliegue de aplicaciones, gestión de contenedores y aprendizaje práctico.
-                        </p>
-                    </div>
-                </div>
-            </div>
-        </div>
+<section class="steps-section">
+  <div class="container">
+    <div class="text-center mb-4">
+      <h2 class="section-title">Cómo funciona</h2>
     </div>
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="step-card">
+          <div class="step-number">1</div>
+          <h5>Elige tu modo</h5>
+          <p class="text-muted mb-0">Imagen por defecto del catálogo o despliegue custom con Dockerfile/compose.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="step-card">
+          <div class="step-number">2</div>
+          <h5>Sube y configura</h5>
+          <p class="text-muted mb-0">Adjunta ZIP, define puertos y variables. PaaSify gestiona el build y el arranque.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="step-card">
+          <div class="step-number">3</div>
+          <h5>Prueba en vivo</h5>
+          <p class="text-muted mb-0">Abre la terminal web o visita el puerto expuesto. Lista la demo para clase.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="roles" class="roles-section">
+  <div class="container">
+    <div class="text-center mb-4">
+      <h2 class="section-title">Roles en la plataforma</h2>
+    </div>
+    <div class="row justify-content-center">
+      <div class="col-md-4 mb-4">
+        <div class="role-card shadow-sm h-100">
+          <div class="role-icon text-primary"><i class="fas fa-user-shield"></i></div>
+          <h4>Administrador</h4>
+          <p class="text-muted small">Gestión global de usuarios, asignaturas y recursos.</p>
+        </div>
+      </div>
+      <div class="col-md-4 mb-4">
+        <div class="role-card shadow-sm h-100">
+          <div class="role-icon text-success"><i class="fas fa-chalkboard-teacher"></i></div>
+          <h4>Profesor</h4>
+          <p class="text-muted small">Crea proyectos, asigna prácticas y revisa despliegues de alumnos.</p>
+        </div>
+      </div>
+      <div class="col-md-4 mb-4">
+        <div class="role-card shadow-sm h-100">
+          <div class="role-icon text-info"><i class="fas fa-user-graduate"></i></div>
+          <h4>Estudiante</h4>
+          <p class="text-muted small">Despliega aplicaciones, gestiona contenedores y aprende DevOps.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 </section>
 {% endblock %}
