@@ -1,7 +1,14 @@
 {% extends "base.html" %}
 
 {% block body %}
-<h2 class="mb-4">Mis asignaturas</h2>
+<div class="dashboard-hero-band mb-3">
+  <div class="d-flex align-items-center gap-2">
+    <div>
+      <div class="dashboard-hero-title mb-0">Mis asignaturas</div>
+      <p class="dashboard-hero-subtitle mb-0">Tu lista de cursos activos y acceso a sus servicios.</p>
+    </div>
+  </div>
+</div>
 
 {% if subjects %}
   <div class="list-group">
@@ -10,7 +17,10 @@
         class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
         href="{% url 'containers:student_services_in_subject' s.id %}">
         <div>
-          <div class="fw-semibold">{{ s.name }}</div>
+          <div class="fw-semibold d-flex align-items-center gap-2">
+            <i class="fas fa-book text-primary"></i>
+            <span class="ms-2">{{ s.name }}</span>
+          </div>
           <small class="text-muted">
             {{ s.get_category_display|default:s.category }}
             · Curso {{ s.genero }}
@@ -37,4 +47,3 @@
 
 <a href="{% url 'containers:student_subjects' %}" class="btn btn-outline-secondary mt-3">Volver</a>
 {% endblock %}
-
