@@ -77,10 +77,30 @@ class Service(models.Model):
 
 class AllowedImage(models.Model):
     """Catalogo de imagenes permitidas para el modo catalogo."""
-
+    
+    IMAGE_TYPES = [
+        ('web', 'Web / Frontend'),
+        ('database', 'Base de Datos'),
+        ('api', 'Generador de API'),
+        ('misc', 'Miscelánea'),
+    ]
+    
     name = models.CharField(max_length=80)
     tag = models.CharField(max_length=40, default="latest")
     description = models.CharField(max_length=150, blank=True)
+    image_type = models.CharField(
+        max_length=20,
+        choices=IMAGE_TYPES,
+        default='misc',
+        verbose_name='Tipo de imagen',
+        help_text='Categoría de la imagen Docker. Define las funcionalidades disponibles a nivel de servicio.'
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Fecha de creación',
+        null=True,  # Para permitir migración de datos existentes
+        blank=True
+    )
 
     class Meta:
         unique_together = ("name", "tag")
