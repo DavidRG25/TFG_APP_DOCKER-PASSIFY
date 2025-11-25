@@ -242,11 +242,13 @@ class UserProfileAdminForm(forms.ModelForm):
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
     form = UserProfileAdminForm
-    list_display = ("nombre", "year", "user", "es_usuario_alumno")
+    list_display = ("nombre", "year", "user", "es_usuario_alumno", "display_token", "token_created_at")
     search_fields = ("nombre", "year", "user__username", "user__email")
     list_filter = ()
     autocomplete_fields = ("user",)
     inlines = [UserProjectInlineForProfile]
+    readonly_fields = ("api_token", "token_created_at")
+    actions = ["refresh_api_tokens"]
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -264,6 +266,30 @@ class UserProfileAdmin(admin.ModelAdmin):
         )
     es_usuario_alumno.boolean = True
     es_usuario_alumno.short_description = "Es alumno"
+    
+    def display_token(self, obj):
+        """Muestra el token parcialmente oculto (ultimos 8 caracteres)."""
+        if obj.api_token:
+            return obj.get_masked_token()
+        return "-"
+    display_token.short_description = "Token API"
+    
+    @admin.action(description="Refrescar tokens API de usuarios seleccionados")
+    def refresh_api_tokens(self, request, queryset):
+        """Action para refrescar tokens de multiples usuarios."""
+        from django.contrib import messages
+        
+        count = 0
+        for profile in queryset:
+            if profile.user:
+                try:
+                    profile.refresh_token(expiration_days=365)
+                    count += 1
+                except Exception as e:
+                    messages.error(request, f"Error al refrescar token de {profile.nombre}: {e}")
+        
+        if count > 0:
+            messages.success(request, f"Se refrescaron {count} token(es) exitosamente.")
 
 
 # UserProject (Proyectos)
