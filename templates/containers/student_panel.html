@@ -138,9 +138,9 @@
     <small class="text-muted">Ejemplos: Flask 5000, Django 8000, Node 3000. Por defecto 80.</small>
   </div>
 
-  <div class="mb-3 custom-block" id="block-dockerfile">
-    <label class="form-label">
-      Dockerfile (opcional, exclusivo con compose)
+          <div class="mb-3 custom-block" id="block-dockerfile">
+            <label class="form-label">
+              Dockerfile (opcional, exclusivo con compose)
               <button type="button"
                       class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
                       aria-label="Instrucciones Dockerfile"
@@ -152,7 +152,10 @@
                 <i class="bi bi-info-circle" aria-hidden="true"></i>
               </button>
             </label>
-            <input type="file" name="dockerfile" accept="*/*" class="form-control">
+            <div class="input-group">
+              <input type="file" name="dockerfile" accept="*/*" class="form-control">
+              <button type="button" class="btn btn-outline-secondary" onclick="clearFile('dockerfile')">Limpiar</button>
+            </div>
           </div>
 
           <div class="mb-3 custom-block" id="block-compose">
@@ -169,7 +172,10 @@
                 <i class="bi bi-info-circle" aria-hidden="true"></i>
               </button>
             </label>
-            <input type="file" name="compose" accept=".yml,.yaml" class="form-control">
+            <div class="input-group">
+              <input type="file" name="compose" accept=".yml,.yaml" class="form-control">
+              <button type="button" class="btn btn-outline-secondary" onclick="clearFile('compose')">Limpiar</button>
+            </div>
           </div>
 
           <div class="mb-3 custom-block" id="block-code">
@@ -186,7 +192,10 @@
                 <i class="bi bi-info-circle" aria-hidden="true"></i>
               </button>
             </label>
-            <input type="file" name="code" accept=".zip,.rar" class="form-control">
+            <div class="input-group">
+              <input type="file" name="code" accept=".zip,.rar" class="form-control">
+              <button type="button" class="btn btn-outline-secondary" onclick="clearFile('code')">Limpiar</button>
+            </div>
           </div>
 
         </div>
@@ -257,6 +266,7 @@
       if (input) {
         input.value = '';
         input.disabled = false;
+        input.dispatchEvent(new Event('change'));
       }
     });
     applyMode();
@@ -319,22 +329,46 @@
       imgSel.disabled = false;
       customBlocks.forEach((b) => b.classList.add('opacity-50'));
       [dockerfile, compose, code].forEach((input) => {
+        if (!input) return;
         input.disabled = true;
         input.value = '';
+        input.dispatchEvent(new Event('change'));
       });
+      if (internalPort) {
+        internalPort.value = '';
+        internalPort.disabled = true;
+      }
     } else {
       imgSel.disabled = true;
       customBlocks.forEach((b) => b.classList.remove('opacity-50'));
-      [dockerfile, compose, code, internalPort].forEach((input) => {
-        input.disabled = false;
+      [dockerfile, compose, code].forEach((input) => {
+        if (input) input.disabled = false;
       });
-      syncExclusion();
+      if (internalPort) {
+        internalPort.disabled = false;
+      }
     }
+    syncExclusion();
   }
 
   function syncExclusion() {
     const dockerfile = document.querySelector('input[name="dockerfile"]');
     const compose = document.querySelector('input[name="compose"]');
+    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'default';
+
+    if (mode === 'default') {
+      const codeInput = document.querySelector('input[name="code"]');
+      if (dockerfile) {
+        dockerfile.disabled = true;
+      }
+      if (compose) {
+        compose.disabled = true;
+      }
+      if (codeInput) {
+        codeInput.disabled = true;
+      }
+      return;
+    }
 
     if (dockerfile.files?.length) {
       compose.value = '';
@@ -346,6 +380,17 @@
       dockerfile.disabled = false;
       compose.disabled = false;
     }
+
+  }
+
+  function clearFile(name) {
+    const input = document.querySelector(`input[name="${name}"]`);
+    if (!input) return;
+    const newInput = input.cloneNode(true);
+    newInput.value = '';
+    input.parentNode.replaceChild(newInput, input);
+    newInput.addEventListener('change', syncExclusion);
+    syncExclusion();
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -353,7 +398,7 @@
     document.querySelectorAll('input[name="mode"]').forEach((radio) => {
       radio.addEventListener('change', applyMode);
     });
-    ['dockerfile', 'compose'].forEach((name) => {
+    ['dockerfile', 'compose', 'code'].forEach((name) => {
       const input = document.querySelector(`input[name="${name}"]`);
       if (input) input.addEventListener('change', syncExclusion);
     });
