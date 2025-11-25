@@ -1,16 +1,78 @@
 ﻿{% extends "base.html" %}
 {% load static %}
 
-{% block body %}
-<h2 class="mb-4">
-  {% if current_subject %}{{ current_subject.name }} - Mis servicios{% else %}Mis servicios{% endif %}
-</h2>
+{% block extrahead %}
+<link rel="stylesheet" href="{% static 'assets/css/dashboard.css' %}">
+{% endblock %}
 
-<button class="btn btn-primary mb-3"
-        data-bs-toggle="modal"
-        data-bs-target="#newServiceModal">
-  Nuevo servicio
-</button>
+{% block body %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-3">
+  <div class="dashboard-hero-band w-100">
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between">
+      <div class="mb-3 mb-lg-0">
+        <div class="dashboard-hero-title">
+          {% if current_subject %}{{ current_subject.name }} - Mis servicios{% else %}Mis servicios{% endif %}
+        </div>
+        <p class="dashboard-hero-subtitle">Gestiona tus contenedores y despliegues activos.</p>
+      </div>
+      <div>
+        <button class="btn btn-light"
+                data-bs-toggle="modal"
+                data-bs-target="#newServiceModal">
+          Nuevo servicio
+        </button>
+      </div>
+    </div>
+    {% if stats %}
+    <div class="row g-3 mt-3">
+      <div class="col-6 col-md-3">
+        <div class="stat-card bg-white">
+          <p class="stat-label"><i class="fas fa-layer-group me-1 text-primary"></i> - Totales</p>
+          <p class="stat-value text-primary mb-0">{{ stats.total }}</p>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card bg-white">
+          <p class="stat-label"><i class="fas fa-play-circle me-1 text-success"></i> - Ejecutando</p>
+          <p class="stat-value text-success mb-0">{{ stats.running }}</p>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card bg-white">
+          <p class="stat-label"><i class="fas fa-pause-circle me-1 text-secondary"></i> - Detenidos</p>
+          <p class="stat-value text-secondary mb-0">{{ stats.stopped }}</p>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card bg-white">
+          <p class="stat-label"><i class="fas fa-book me-1 text-info"></i> - Asignaturas</p>
+          <p class="stat-value text-info mb-0">{{ stats.subjects }}</p>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if available_subjects %}
+<div class="card mb-3 border-0 shadow-sm">
+  <div class="card-body">
+    <div class="d-flex align-items-center mb-2">
+      <i class="fas fa-book-open text-info me-2"></i>
+      <h5 class="mb-0"> - Mis asignaturas</h5>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      {% for subject in available_subjects %}
+        <span class="badge bg-light text-dark border">
+          {{ subject.name }}
+        </span>
+      {% empty %}
+        <span class="text-muted small"> - Aún no tienes asignaturas.</span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
   <div id="toast-container"></div>

@@ -127,7 +127,42 @@ python manage.py makemigrations
 python manage.py migrate
 ```
 
-### 4. Arranca la app
+### 4. (Opcional) Poblar Datos de Ejemplo
+
+#### 4.1. Crear Usuarios de Demostración
+
+Para facilitar las pruebas, puedes crear usuarios de ejemplo con credenciales predefinidas:
+
+```bash
+python manage.py create_demo_users
+```
+
+Este comando crea 3 usuarios:
+- 👤 **Admin:** `admin` / `Admin!123` (Superusuario)
+- 👨‍🎓 **Alumno:** `alumno` / `Alumno!2025` (Estudiante)
+- 👨‍🏫 **Profesor:** `profesor` / `Profesor!2025` (Profesor)
+
+**Nota:** Este comando es idempotente (puedes ejecutarlo múltiples veces sin duplicar usuarios).
+
+#### 4.2. Crear Imágenes Docker de Ejemplo
+
+Para facilitar el uso de la plataforma, puedes crear imágenes de ejemplo pre-clasificadas por tipo:
+
+```bash
+python manage.py populate_example_images
+```
+
+Este comando crea 11 imágenes de ejemplo:
+- 🌐 **Web/Frontend:** nginx, httpd
+- 🗄️ **Base de Datos:** mysql, postgres, mongo, redis
+- 🚀 **Generador de API:** strapi, hasura, postgrest
+- 📦 **Miscelánea:** python, node
+
+Cada imagen está clasificada con su tipo correspondiente, lo que habilitará funcionalidades específicas a nivel de servicio en futuras versiones.
+
+**Nota:** Ambos comandos se ejecutan automáticamente al usar `bash scripts/start.sh`.
+
+### 5. Arranca la app
 
 ```bash
 # Desarrollo
@@ -137,7 +172,7 @@ python manage.py runserver 0.0.0.0:8000
 python -m daphne -b 0.0.0.0 -p 8080 app_passify.asgi:application
 ```
 
-### 5. Variables de entorno (ejemplo .env)
+### 6. Variables de entorno (ejemplo .env)
 
 ```
 DJANGO_SECRET_KEY=pon_aqui_una_clave_segura
