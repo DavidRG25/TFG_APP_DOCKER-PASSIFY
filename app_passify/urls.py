@@ -23,7 +23,7 @@ router.register(r'images', AllowedImageViewSet, basename='allowed-image')
 
 urlpatterns = [
     # Vistas públicas / HTML
-    path('', RedirectView.as_view(url='/paasify/login/', permanent=False), name='index'),
+    path('', RedirectView.as_view(url='/paasify/', permanent=False), name='index'),
     path('paasify/', include('paasify.urls', namespace='paasify')),
 
     # Auth

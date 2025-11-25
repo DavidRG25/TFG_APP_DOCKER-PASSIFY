@@ -90,36 +90,109 @@ def probar_imagen_con_log(modeladmin, request, queryset):
 @admin.register(AllowedImage)
 class AllowedImageAdmin(admin.ModelAdmin):
     form = AllowedImageForm
-    list_display = ('name', 'tag', 'description')
+    
+    # Lista mejorada con tipo e iconos
+    list_display = ('name', 'tag', 'get_type_icon', 'image_type', 'description', 'created_at')
     search_fields = ('name', 'tag', 'description')
-
+    list_filter = ('image_type', 'created_at')
+    
     # Incluimos ambas acciones: la tuya (solo pull) y la nueva (con log)
     actions = [probar_imagen_con_log, 'probar_imagen']
+    
+    def get_type_icon(self, obj):
+        """Muestra icono según el tipo de imagen"""
+        icons = {
+            'web': '🌐',
+            'database': '🗄️',
+            'api': '🚀',
+            'misc': '📦',
+        }
+        return icons.get(obj.image_type, '📦')
+    get_type_icon.short_description = 'Icono'
 
     def get_form(self, request, obj=None, **kwargs):
         form = super().get_form(request, obj, **kwargs)
         if obj and obj.name:
             tags = self._get_docker_hub_tags(obj.name)
-            form.base_fields['suggested_tags'].initial = "\n".join(tags)
+            form.base_fields['suggested_tags'].initial = "\\n".join(tags)
         return form
 
     def _get_docker_hub_tags(self, name):
+        """
+        Consulta DockerHub para obtener tags disponibles.
+        Soporta imágenes oficiales (library/) y de usuarios.
+        """
+        # Intentar primero como imagen oficial
         url = f"https://hub.docker.com/v2/repositories/library/{name}/tags/"
-        response = requests.get(url)
+        try:
+            response = requests.get(url, params={'page_size': 50}, timeout=5)
+        except requests.RequestException:
+            return []
+        
+        if response.status_code != 200:
+            # Intentar como imagen de usuario (ej: bitnami/nginx)
+            if '/' in name:
+                url = f"https://hub.docker.com/v2/repositories/{name}/tags/"
+                try:
+                    response = requests.get(url, params={'page_size': 50}, timeout=5)
+                except requests.RequestException:
+                    return []
+        
         if response.status_code != 200:
             return []
+        
         results = response.json().get('results', [])
-        return [r['name'] for r in results]
+        tags = [r['name'] for r in results]
+        
+        # Ordenar: latest primero, luego numéricos, luego alfabéticos
+        def sort_key(tag):
+            if tag == 'latest':
+                return (0, tag)
+            elif tag.replace('.', '').replace('-', '').isdigit():
+                return (1, tag)
+            else:
+                return (2, tag)
+        
+        return sorted(tags, key=sort_key)[:50]  # Limitar a 50 tags
 
     def save_model(self, request, obj, form, change):
         name = form.cleaned_data.get('name')
         tag = form.cleaned_data.get('tag')
         url = f"https://hub.docker.com/v2/repositories/library/{name}/tags/{tag}"
-        response = requests.get(url)
-        if response.status_code != 200:
-            messages.error(request, f"La imagen '{name}:{tag}' no existe en Docker Hub.")
+        
+        try:
+            response = requests.get(url, timeout=5)
+        except requests.RequestException:
+            messages.error(request, f"No se pudo verificar la imagen '{name}:{tag}' en Docker Hub.")
             return
+        
+        if response.status_code != 200:
+            # Intentar como imagen de usuario
+            if '/' in name:
+                url = f"https://hub.docker.com/v2/repositories/{name}/tags/{tag}"
+                try:
+                    response = requests.get(url, timeout=5)
+                except requests.RequestException:
+                    messages.error(request, f"No se pudo verificar la imagen '{name}:{tag}' en Docker Hub.")
+                    return
+                
+                if response.status_code != 200:
+                    messages.error(request, f"La imagen '{name}:{tag}' no existe en Docker Hub.")
+                    return
+            else:
+                messages.error(request, f"La imagen '{name}:{tag}' no existe en Docker Hub.")
+                return
+        
         super().save_model(request, obj, form, change)
+        
+        # Mensaje informativo sobre funcionalidades futuras según tipo
+        type_messages = {
+            'web': '🌐 Imagen Web guardada. Funcionalidad a nivel de servicio: Editor HTML/CSS/JS integrado.',
+            'database': '🗄️ Base de Datos guardada. Funcionalidad a nivel de servicio: Configuración de credenciales.',
+            'api': '🚀 Generador de API guardado. Funcionalidad a nivel de servicio: Generación rápida de APIs.',
+            'misc': '📦 Imagen guardada correctamente.',
+        }
+        messages.info(request, type_messages.get(obj.image_type, 'Imagen guardada correctamente.'))
 
     def probar_imagen(self, request, queryset):
         """
