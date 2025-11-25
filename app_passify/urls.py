@@ -9,6 +9,7 @@ from django.conf.urls.static import static
 
 from containers.views import ServiceViewSet, AllowedImageViewSet
 from containers import views as container_views
+from paasify.views import ProfileView
 
 # Django REST framework & JWT
 from rest_framework import routers
@@ -36,6 +37,13 @@ urlpatterns = [
     path('professor/',  container_views.professor_dashboard, name='professor_dashboard'),
     path('professor/subjects/<int:subject_id>/', container_views.professor_subject_detail, name='professor_subject_detail'),
     path('professor/projects/<int:project_id>/', container_views.professor_project_detail, name='professor_project_detail'),
+
+    # Perfil de usuario
+    path('profile/', ProfileView.profile_view, name='profile'),
+    path('profile/change-password/', ProfileView.change_password_view, name='change_password'),
+    path('profile/generate-token/', ProfileView.generate_token_view, name='generate_token'),
+    path('profile/refresh-token/', ProfileView.refresh_token_view, name='refresh_token'),
+    path('profile/copy-token/', ProfileView.copy_token_view, name='copy_token'),
 
     # Admin
     path('admin/', admin.site.urls),
