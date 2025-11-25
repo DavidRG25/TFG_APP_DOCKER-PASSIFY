@@ -25,6 +25,8 @@ HOST="${DJANGO_HOST:-0.0.0.0}"
 PORT="${DJANGO_PORT:-8000}"
 
 python manage.py migrate --noinput
-python manage.py collectstatic --noinput
+python manage.py create_demo_users 2>/dev/null || true
+python manage.py populate_example_images --noinput 2>/dev/null || true
+python manage.py collectstatic --noinput --verbosity 0
 
 python -m daphne -b "$HOST" -p "$PORT" app_passify.asgi:application

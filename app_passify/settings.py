@@ -156,6 +156,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 WHITENOISE_USE_FINDERS = True  # útil en dev para localizar estáticos dentro de apps
 
+# Silenciar warnings de archivos estáticos duplicados (no afectan funcionalidad)
+SILENCED_SYSTEM_CHECKS = ['staticfiles.W004']
+
 # ---------------------------------------------------------------------
 # Archivos de usuario (media)
 # ---------------------------------------------------------------------
