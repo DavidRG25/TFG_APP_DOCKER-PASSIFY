@@ -327,7 +327,279 @@ class UserProjectAdmin(admin.ModelAdmin):
 
 
 
+# ============================================================================
+# Custom User Admin - Mejoras Fase 1
+# ============================================================================
+
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.forms import UserCreationForm
+from django.utils.html import format_html
+from paasify.admin_filters import RoleFilter
+from paasify.utils import generate_password
 
 
+class CustomUserCreationForm(UserCreationForm):
+    """Formulario personalizado para crear usuarios con selección de rol"""
+    
+    role = forms.ChoiceField(
+        choices=[
+            ('', '--- Seleccionar rol ---'),
+            ('admin', 'Administrador'),
+            ('teacher', 'Profesor'),
+            ('student', 'Alumno'),
+        ],
+        required=True,
+        label='Rol del usuario',
+        help_text='Selecciona el rol que tendrá este usuario en el sistema',
+        widget=forms.RadioSelect,
+    )
+    
+    auto_generate_password = forms.BooleanField(
+        required=False,
+        initial=True,
+        label='Generar contraseña automáticamente',
+        help_text='Si se marca, se generará una contraseña aleatoria segura (recomendado)',
+    )
+    
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ('username', 'email', 'first_name', 'last_name')
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Hacer campos obligatorios
+        self.fields['email'].required = True
+        self.fields['first_name'].required = True
+        self.fields['last_name'].required = True
+        
+        # Mejorar help_texts
+        self.fields['username'].help_text = 'Nombre de usuario único para iniciar sesión'
+        self.fields['email'].help_text = 'Email del usuario (será usado como campo "year" en el perfil)'
+        self.fields['first_name'].help_text = 'Nombre del usuario'
+        self.fields['last_name'].help_text = 'Apellidos del usuario'
+        
+        # Si auto_generate_password está marcado, hacer password1 y password2 opcionales
+        if self.data.get('auto_generate_password'):
+            self.fields['password1'].required = False
+            self.fields['password2'].required = False
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        auto_gen = cleaned_data.get('auto_generate_password')
+        password1 = cleaned_data.get('password1')
+        
+        # Si auto_generate está marcado, generar contraseña
+        if auto_gen:
+            password = generate_password()
+            cleaned_data['password1'] = password
+            cleaned_data['password2'] = password
+            # Guardar para mostrar después
+            self._generated_password = password
+        elif not password1:
+            raise forms.ValidationError(
+                'Debes proporcionar una contraseña o marcar "Generar contraseña automáticamente"'
+            )
+        
+        return cleaned_data
+    
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        role = self.cleaned_data.get('role')
+        
+        # Asignar permisos según rol
+        if role == 'admin':
+            user.is_staff = True
+            user.is_superuser = True
+        elif role in ['teacher', 'student']:
+            user.is_staff = False
+            user.is_superuser = False
+        
+        if commit:
+            user.save()
+            # La asignación de grupos y creación de UserProfile se hace en save_model del admin
+        
+        return user
 
+
+class CustomUserAdmin(BaseUserAdmin):
+    """Admin personalizado para el modelo User con mejoras de Fase 1"""
+    
+    add_form = CustomUserCreationForm
+    
+    # Campos a mostrar en la lista
+    list_display = [
+        'username',
+        'email',
+        'get_full_name_display',
+        'get_role_display',
+        'get_subjects_count',
+        'get_active_services',
+        'date_joined',
+        'is_active',
+    ]
+    
+    # Filtros
+    list_filter = [
+        'is_active',
+        'is_staff',
+        'is_superuser',
+        'date_joined',
+        RoleFilter,  # Filtro personalizado
+    ]
+    
+    # Búsqueda mejorada
+    search_fields = [
+        'username',
+        'email',
+        'first_name',
+        'last_name',
+        'user_profile__nombre',
+    ]
+    
+    # Fieldsets para edición
+    fieldsets = BaseUserAdmin.fieldsets
+    
+    # Fieldsets para creación
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': (
+                'username',
+                'email',
+                'first_name',
+                'last_name',
+                'role',
+                'auto_generate_password',
+                'password1',
+                'password2',
+            ),
+        }),
+    )
+    
+    def get_full_name_display(self, obj):
+        """Muestra el nombre completo del usuario"""
+        full_name = f"{obj.first_name} {obj.last_name}".strip()
+        return full_name or "-"
+    get_full_name_display.short_description = 'Nombre Completo'
+    
+    def get_role_display(self, obj):
+        """Muestra el rol del usuario con badge de color"""
+        if obj.is_superuser:
+            return format_html(
+                '<span style="background: #dc3545; color: white; padding: 3px 8px; '
+                'border-radius: 3px; font-size: 11px; font-weight: bold;">🔑 ADMIN</span>'
+            )
+        
+        # Verificar grupos
+        groups = obj.groups.values_list('name', flat=True)
+        
+        if any(name.lower() in [g.lower() for g in groups] for name in TEACHER_GROUP_NAMES):
+            return format_html(
+                '<span style="background: #007bff; color: white; padding: 3px 8px; '
+                'border-radius: 3px; font-size: 11px; font-weight: bold;">👨‍🏫 PROFESOR</span>'
+            )
+        
+        if any(name.lower() in [g.lower() for g in groups] for name in STUDENT_GROUP_NAMES):
+            return format_html(
+                '<span style="background: #28a745; color: white; padding: 3px 8px; '
+                'border-radius: 3px; font-size: 11px; font-weight: bold;">👨‍🎓 ALUMNO</span>'
+            )
+        
+        return format_html(
+            '<span style="background: #6c757d; color: white; padding: 3px 8px; '
+            'border-radius: 3px; font-size: 11px;">Sin rol</span>'
+        )
+    get_role_display.short_description = 'Rol'
+    
+    def get_subjects_count(self, obj):
+        """Muestra el número de asignaturas del usuario"""
+        # Si es profesor
+        teacher_subjects = Subject.objects.filter(teacher_user=obj).count()
+        if teacher_subjects > 0:
+            return format_html('📚 {} (profesor)', teacher_subjects)
+        
+        # Si es estudiante (usar related_name correcto)
+        student_subjects = obj.subjects_as_student.count()
+        if student_subjects > 0:
+            return format_html('📚 {} (alumno)', student_subjects)
+        
+        return "-"
+    get_subjects_count.short_description = 'Asignaturas'
+    
+    def get_active_services(self, obj):
+        """Muestra el número de servicios activos del usuario"""
+        try:
+            from containers.models import Service
+            running_count = Service.objects.filter(
+                owner=obj,
+                status='running'
+            ).count()
+            total_count = Service.objects.filter(owner=obj).exclude(status='removed').count()
+            
+            if total_count == 0:
+                return "-"
+            
+            if running_count == total_count:
+                color = 'green'
+            elif running_count > 0:
+                color = 'orange'
+            else:
+                color = 'gray'
+            
+            return format_html(
+                '<span style="color: {};">🐳 {}/{}</span>',
+                color,
+                running_count,
+                total_count
+            )
+        except Exception:
+            return "-"
+    get_active_services.short_description = 'Servicios Activos'
+    
+    def save_model(self, request, obj, form, change):
+        """Guardar modelo y mostrar contraseña generada si aplica"""
+        # Si es un usuario nuevo (no change), ejecutar lógica del formulario
+        if not change and hasattr(form, 'cleaned_data'):
+            role = form.cleaned_data.get('role')
+            
+            # Guardar usuario primero
+            super().save_model(request, obj, form, change)
+            
+            # Asignar grupo según rol
+            if role == 'teacher':
+                ensure_user_group(obj, TEACHER_GROUP_NAMES, DEFAULT_TEACHER_GROUP)
+            elif role == 'student':
+                ensure_user_group(obj, STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP)
+            
+            # Crear UserProfile automáticamente para student y teacher
+            if role in ['student', 'teacher']:
+                UserProfile.objects.get_or_create(
+                    user=obj,
+                    defaults={
+                        'nombre': f"{obj.first_name} {obj.last_name}".strip(),
+                        'year': obj.email,
+                    }
+                )
+        else:
+            # Si es edición, solo guardar
+            super().save_model(request, obj, form, change)
+        
+        # Si se generó una contraseña, mostrarla
+        if hasattr(form, '_generated_password'):
+            from django.contrib import messages
+            messages.success(
+                request,
+                format_html(
+                    '<strong>Usuario creado exitosamente.</strong><br>'
+                    'Contraseña generada: <code style="background: #f0f0f0; padding: 5px; '
+                    'font-size: 14px; color: #d63384;">{}</code><br>'
+                    '<em>Guarda esta contraseña, no se volverá a mostrar.</em>',
+                    form._generated_password
+                )
+            )
+
+
+# Desregistrar el UserAdmin por defecto y registrar el personalizado
+admin.site.unregister(User)
+admin.site.register(User, CustomUserAdmin)
 
