@@ -194,29 +194,25 @@ python manage.py test
 pytest
 ```
 
-### 🛠️ Ejecución rápida con el script `start_app.sh`
+## Scripts de arranque
 
-Si prefieres automatizar los pasos anteriores, puedes usar el script incluido:
+- **start.sh**: inicializacion completa. Crea/activa `venv`, instala dependencias, corre `makemigrations` y `migrate`, ejecuta `collectstatic`, intenta `generate_default_images` y `populate_example_images`, y arranca el servidor con las variables de entorno (`DJANGO_SETTINGS_MODULE`, `DJANGO_DEBUG`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_SECRET_KEY`, `DJANGO_RUNSERVER_HOST`, `DJANGO_RUNSERVER_PORT`). Usalo en el primer arranque o cuando cambien dependencias/migraciones. No usar en produccion sin control de entorno/secretos.
+- **run.sh**: arranque rapido. Carga `.env`, exporta variables Django, ejecuta `migrate`, `collectstatic` y `runserver` con host/puerto definidos. Util para desarrollo cuando ya tienes el entorno listo.
 
+Ejemplos:
 ```bash
-bash scripts/start_app.sh
+# Arranque completo (crea venv, instala, migra y levanta)
+./scripts/start.sh
+
+# Arranque rapido (asume venv y dependencias listas)
+./scripts/run.sh
 ```
 
-El script realiza:
-1. Crea (si es necesario) el entorno virtual en `./venv` usando el Python disponible en tu sistema.
-2. Instala dependencias (`pip install -r requirements.txt`).
-3. Ejecuta `python manage.py makemigrations` y `python manage.py migrate`.
-4. Arranca Daphne en `0.0.0.0:8080`.
-
-Opciones útiles:
-```bash
-bash scripts/start_app.sh --skip-install --skip-migrate       # Reutiliza dependencias y migraciones existentes
-bash scripts/start_app.sh --port 9000                         # Arranca Daphne en otro puerto
-HOST=127.0.0.1 bash scripts/start_app.sh                      # Cambia el host de escucha
-```
-
-> Antes de usar el script, asegúrate de tener Python 3 instalado y accesible desde la terminal (`python --version`).
-
+Notas:
+- Define `DJANGO_SECRET_KEY` en `.env` para ejecucion con `DJANGO_DEBUG=false`.
+- Ajusta `DJANGO_RUNSERVER_HOST`/`DJANGO_RUNSERVER_PORT` en `.env` si necesitas otros valores.
+- Ambos scripts esperan el venv en `./venv`; si no existe, `start.sh` lo crea.
+- Usuarios de ejemplo (opcional): `python manage.py create_demo_users`.
 ### 👥 Usuarios de ejemplo
 
 Para generar usuarios base (admin, alumno y profesor) ejecuta el comando:
