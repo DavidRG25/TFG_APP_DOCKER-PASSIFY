@@ -2,7 +2,7 @@
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
 
-from .models import Service, AllowedImage
+from .models import Service, AllowedImage, ServiceContainer
 from paasify.models.SubjectModel import Subject
 
 
@@ -36,6 +36,9 @@ class ServiceSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
 
+    # Campo calculado para indicar si usa docker-compose
+    has_compose = serializers.ReadOnlyField()
+
     class Meta:
         model = Service
         fields = (
@@ -53,8 +56,9 @@ class ServiceSerializer(serializers.ModelSerializer):
             "volumes",
             "subject",
             "internal_port",
+            "has_compose",  # Añadido
         )
-        read_only_fields = ("id", "assigned_port", "status", "logs")
+        read_only_fields = ("id", "assigned_port", "status", "logs", "has_compose")
 
     # ---- Validaciones de alto nivel ----
 
@@ -186,3 +190,20 @@ class AllowedImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = AllowedImage
         fields = ("id", "name", "tag", "description")
+
+
+class ServiceContainerSerializer(serializers.ModelSerializer):
+    """Serializer para contenedores individuales en servicios docker-compose"""
+    class Meta:
+        model = ServiceContainer
+        fields = (
+            "id",
+            "name",
+            "container_id",
+            "status",
+            "internal_ports",
+            "assigned_ports",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields  # Todos son de solo lectura
