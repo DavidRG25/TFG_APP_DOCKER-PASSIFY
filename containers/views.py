@@ -26,9 +26,16 @@ from paasify.roles import (
 )
 
 from .docker_client import get_docker_client
-from .models import AllowedImage, Service
+from .models import AllowedImage, Service, ServiceContainer
 from .serializers import AllowedImageSerializer, ServiceSerializer
-from .services import remove_container, run_container, stop_container
+from .services import (
+    remove_container, 
+    run_container, 
+    stop_container,
+    start_service_container_record,
+    stop_service_container_record,
+    fetch_container_logs,
+)
 
 
 # ----------------------------- helpers -----------------------------
@@ -306,21 +313,42 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"])
     def logs(self, request, pk=None):
+        """
+        Obtiene logs del servicio o de un contenedor específico.
+        
+        MODO SIMPLE: Muestra logs de service.container_id (comportamiento anterior)
+        MODO COMPOSE: Si se pasa ?container=<id>, muestra logs de ese contenedor
+        """
         service = self.get_object()
-        log_content = service.logs or "(sin logs)"
-        if service.container_id:
-            docker_client = get_docker_client()
-            if docker_client:
-                try:
-                    container = docker_client.containers.get(service.container_id)
-                    log_content = container.logs(tail=200).decode(errors="replace")
-                except Exception as e:
-                    log_content = f"(error leyendo logs: {e})"
+        container_id_param = request.query_params.get("container")
+        
+        # Determinar de dónde obtener los logs
+        if container_id_param:
+            # Modo compose: logs de contenedor específico
+            try:
+                container_record = ServiceContainer.objects.get(pk=container_id_param, service=service)
+                log_content = fetch_container_logs(container_record)
+                title = f"Logs de {service.name} - {container_record.name}"
+            except ServiceContainer.DoesNotExist:
+                log_content = "(contenedor no encontrado)"
+                title = f"Logs de {service.name}"
+        else:
+            # Modo simple: logs del servicio (comportamiento anterior)
+            log_content = service.logs or "(sin logs)"
+            if service.container_id:
+                docker_client = get_docker_client()
+                if docker_client:
+                    try:
+                        container = docker_client.containers.get(service.container_id)
+                        log_content = container.logs(tail=200).decode(errors="replace")
+                    except Exception as e:
+                        log_content = f"(error leyendo logs: {e})"
+            title = f"Logs de {service.name}"
         
         if self._is_htmx(request):
             html = f"""
                 <div class="modal-header">
-                    <h5 class="modal-title">Logs de {service.name}</h5>
+                    <h5 class="modal-title">{title}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body">
@@ -328,29 +356,110 @@ class ServiceViewSet(viewsets.ModelViewSet):
                 </div>
             """
             return HttpResponse(html)
-        
+
         return HttpResponse(log_content, content_type="text/plain")
 
     # ---- ver Dockerfile/compose subidos ----
     CODE_MAX = 256 * 1024
 
-    def _serve_code(self, filefield, language):
-        if not filefield:
-            return HttpResponse("(archivo no disponible)", status=404)
-        if filefield.size > self.CODE_MAX:
+    def _serve_code(self, service, filename, language):
+        """
+        Lee y muestra el contenido de un archivo del workspace del servicio.
+        Busca en media/services/<id>/<filename>
+        """
+        from pathlib import Path
+        from django.conf import settings
+        
+        # Construir la ruta esperada
+        workspace = Path(settings.MEDIA_ROOT) / "services" / str(service.pk)
+        file_path = workspace / filename
+        
+        if not file_path.exists():
+            return HttpResponse(f"(archivo {filename} no disponible)", status=404)
+        
+        if file_path.stat().st_size > self.CODE_MAX:
             return HttpResponse("(archivo demasiado grande)", status=413)
-        with filefield.open("rb"):
-            code = filefield.read().decode(errors="replace")
+        
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                code = f.read()
+        except Exception as e:
+            return HttpResponse(f"(error leyendo archivo: {e})", status=500)
+        
         html = f'<code class="language-{language}">{escape(code)}</code>'
         return HttpResponse(html)
 
     @action(detail=True, methods=["get"])
     def dockerfile(self, request, pk=None):
-        return self._serve_code(self.get_object().dockerfile, "dockerfile")
+        service = self.get_object()
+        return self._serve_code(service, "Dockerfile", "dockerfile")
 
     @action(detail=True, methods=["get"])
     def compose(self, request, pk=None):
-        return self._serve_code(self.get_object().compose, "yaml")
+        service = self.get_object()
+        return self._serve_code(service, "docker-compose.yml", "yaml")
+
+    # ---- Endpoints para ServiceContainer (docker-compose multi-contenedor) ----
+    
+    def _get_service_container(self, service: Service, container_pk: str) -> ServiceContainer:
+        """Helper para obtener un ServiceContainer validando permisos"""
+        try:
+            return ServiceContainer.objects.get(pk=container_pk, service=service)
+        except ServiceContainer.DoesNotExist:
+            raise Http404("Contenedor no encontrado")
+    
+    @action(detail=True, methods=["post"], url_path="containers/(?P<container_pk>\\d+)/start")
+    def start_container(self, request, pk=None, container_pk=None):
+        """Inicia un contenedor específico de un servicio compose"""
+        service = self.get_object()
+        container = self._get_service_container(service, container_pk)
+        
+        try:
+            start_service_container_record(container)
+        except Exception as exc:
+            if self._is_htmx(request):
+                return self._htmx_response(
+                    request,
+                    status=500,
+                    message=str(exc),
+                    level="text-bg-danger",
+                )
+            return DRF_Response({"status": "error", "message": str(exc)}, status=500)
+        
+        if self._is_htmx(request):
+            return self._htmx_response(
+                request,
+                message=f"Contenedor {container.name} iniciado.",
+                level="text-bg-success",
+            )
+        return DRF_Response({"status": "started", "message": f"Contenedor {container.name} iniciado."})
+    
+    @action(detail=True, methods=["post"], url_path="containers/(?P<container_pk>\\d+)/stop")
+    def stop_container_action(self, request, pk=None, container_pk=None):
+        """Detiene un contenedor específico de un servicio compose"""
+        service = self.get_object()
+        container = self._get_service_container(service, container_pk)
+        
+        try:
+            stop_service_container_record(container)
+        except Exception as exc:
+            if self._is_htmx(request):
+                return self._htmx_response(
+                    request,
+                    status=500,
+                    message=str(exc),
+                    level="text-bg-danger",
+                )
+            return DRF_Response({"status": "error", "message": str(exc)}, status=500)
+        
+        if self._is_htmx(request):
+            return self._htmx_response(
+                request,
+                message=f"Contenedor {container.name} detenido.",
+                level="text-bg-warning",
+            )
+        return DRF_Response({"status": "stopped", "message": f"Contenedor {container.name} detenido."})
+
 
 
 class AllowedImageViewSet(viewsets.ReadOnlyModelViewSet):
