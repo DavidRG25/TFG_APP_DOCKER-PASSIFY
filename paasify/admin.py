@@ -69,13 +69,30 @@ class SubjectAdminForm(forms.ModelForm):
         # teacher_user: solo usuarios en grupos profesor/Teacher
         self.fields["teacher_user"].queryset = User.objects.filter(
             groups__name__in=[*TEACHER_GROUP_NAMES, DEFAULT_TEACHER_GROUP]
-        ).distinct()
+        ).distinct().order_by('username')
         self.fields["teacher_user"].required = True
+        
+        # Mejorar label del profesor
+        self.fields["teacher_user"].label_from_instance = lambda obj: (
+            f"{obj.username} - {obj.get_full_name() or 'Sin nombre'}"
+        )
+        
+        # Help text mejorado para teacher_user
+        self.fields["teacher_user"].help_text = (
+            'Selecciona el profesor responsable de esta asignatura. '
+            'Solo se muestran usuarios con rol de Profesor.'
+        )
 
         # students: solo usuarios del grupo Student (case-insensitive)
         self.fields["students"].queryset = User.objects.filter(
             groups__name__in=[*STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP]
-        ).distinct()
+        ).distinct().order_by('username')
+        
+        # Help text mejorado para students
+        self.fields["students"].help_text = (
+            'Selecciona los alumnos matriculados en esta asignatura. '
+            'Solo se muestran usuarios con rol de Alumno.'
+        )
 
     def clean_teacher_user(self):
         u = self.cleaned_data.get("teacher_user")
@@ -104,7 +121,14 @@ class SubjectAdminForm(forms.ModelForm):
 @admin.register(Subject)
 class SubjectAdmin(admin.ModelAdmin):
     form = SubjectAdminForm
-    list_display = ("name", "category", "genero", "teacher_user")
+    list_display = (
+        "name",
+        "teacher_user",
+        "category",
+        "genero",
+        "get_students_count",    # Nuevo
+        "get_services_count",    # Nuevo
+    )
     search_fields = ("name", "teacher_user__username", "teacher_user__email")
     list_filter = ("category", "genero")
     autocomplete_fields = ("teacher_user",)
@@ -119,6 +143,21 @@ class SubjectAdmin(admin.ModelAdmin):
                 groups__name__in=[*TEACHER_GROUP_NAMES, DEFAULT_TEACHER_GROUP]
             ).distinct()
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
+    def get_students_count(self, obj):
+        """Muestra el número de alumnos matriculados"""
+        count = obj.students.count()
+        return f"👥 {count}"
+    get_students_count.short_description = 'Alumnos'
+    
+    def get_services_count(self, obj):
+        """Muestra el número de servicios activos en esta asignatura"""
+        from containers.models import Service
+        count = Service.objects.filter(subject=obj).exclude(status='removed').count()
+        if count == 0:
+            return "-"
+        return f"🐳 {count}"
+    get_services_count.short_description = 'Servicios'
 
     # Auto-matricular: si en el inline se añade un UserProject, matriculamos al user del alumno
     def save_formset(self, request, form, formset, change):
@@ -242,9 +281,19 @@ class UserProfileAdminForm(forms.ModelForm):
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
     form = UserProfileAdminForm
-    list_display = ("nombre", "year", "user", "es_usuario_alumno", "display_token", "token_created_at")
+    list_display = (
+        "nombre",
+        "user",
+        "get_role",              # Nuevo
+        "year",
+        "get_subjects_count",    # Nuevo
+        "display_token",
+        "token_created_at"
+    )
     search_fields = ("nombre", "year", "user__username", "user__email")
-    list_filter = ()
+    list_filter = (
+        'token_created_at',
+    )
     autocomplete_fields = ("user",)
     inlines = [UserProjectInlineForProfile]
     readonly_fields = ("api_token", "token_created_at")
@@ -256,6 +305,41 @@ class UserProfileAdmin(admin.ModelAdmin):
             user__isnull=False,
             user__groups__name__in=[DEFAULT_STUDENT_GROUP, *STUDENT_GROUP_NAMES],
         ).distinct()
+    
+    def get_role(self, obj):
+        """Muestra el rol del usuario con badge de color"""
+        from django.utils.html import format_html
+        
+        if not obj.user:
+            return "-"
+        
+        # Verificar si es profesor
+        if obj.user.groups.filter(name__in=TEACHER_GROUP_NAMES).exists():
+            return format_html(
+                '<span style="background: #4caf50; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px;">👨‍🏫 Profesor</span>'
+            )
+        # Verificar si es alumno
+        elif obj.user.groups.filter(name__in=STUDENT_GROUP_NAMES).exists():
+            return format_html(
+                '<span style="background: #2196f3; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px;">👨‍🎓 Alumno</span>'
+            )
+        else:
+            return format_html(
+                '<span style="background: #9e9e9e; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px;">Sin rol</span>'
+            )
+    get_role.short_description = 'Rol'
+    
+    def get_subjects_count(self, obj):
+        """Muestra el número de asignaturas del alumno"""
+        if not obj.user:
+            return "-"
+        
+        # Contar asignaturas donde el usuario es estudiante
+        count = obj.user.subjects_as_student.count()
+        if count == 0:
+            return "-"
+        return f"📚 {count}"
+    get_subjects_count.short_description = 'Asignaturas'
 
     def es_usuario_alumno(self, obj):
         return bool(
@@ -597,6 +681,89 @@ class CustomUserAdmin(BaseUserAdmin):
                     form._generated_password
                 )
             )
+
+
+#  UserProject (Proyectos de Alumnos)
+
+@admin.register(UserProject)
+class UserProjectAdmin(admin.ModelAdmin):
+    list_display = (
+        'place',
+        'get_student_name',      # Nuevo
+        'subject',
+        'get_services_count',    # Nuevo
+        'get_project_status',    # Nuevo
+    )
+    search_fields = (
+        'place',
+        'user_profile__nombre',
+        'user_profile__user__username',
+        'subject__name',
+    )
+    list_filter = ('subject',)
+    autocomplete_fields = ('user_profile', 'subject')
+    
+    def get_student_name(self, obj):
+        """Muestra el nombre completo del alumno"""
+        if obj.user_profile and obj.user_profile.user:
+            full_name = obj.user_profile.user.get_full_name()
+            if full_name:
+                return full_name
+            return obj.user_profile.user.username
+        return obj.user_profile.nombre if obj.user_profile else "-"
+    get_student_name.short_description = 'Alumno'
+    get_student_name.admin_order_field = 'user_profile__nombre'
+    
+    def get_services_count(self, obj):
+        """Muestra el número de servicios del proyecto"""
+        if obj.user_profile and obj.user_profile.user:
+            from containers.models import Service
+            count = Service.objects.filter(
+                owner=obj.user_profile.user,
+                subject=obj.subject
+            ).exclude(status='removed').count()
+            
+            if count == 0:
+                return "-"
+            return f"🐳 {count}"
+        return "0"
+    get_services_count.short_description = 'Servicios'
+    
+    def get_project_status(self, obj):
+        """Muestra el estado del proyecto según sus servicios"""
+        from django.utils.html import format_html
+        
+        if not obj.user_profile or not obj.user_profile.user:
+            return format_html('<span style="color: gray;">⚪ Sin usuario</span>')
+        
+        from containers.models import Service
+        services = Service.objects.filter(
+            owner=obj.user_profile.user,
+            subject=obj.subject
+        ).exclude(status='removed')
+        
+        if not services.exists():
+            return format_html('<span style="color: gray;">⚪ Sin servicios</span>')
+        
+        running = services.filter(status='running').count()
+        total = services.count()
+        
+        if running == total:
+            return format_html(
+                '<span style="color: green; font-weight: bold;">✅ Todos activos ({}/{})</span>',
+                running, total
+            )
+        elif running > 0:
+            return format_html(
+                '<span style="color: orange; font-weight: bold;">⚠️ Parcialmente activo ({}/{})</span>',
+                running, total
+            )
+        else:
+            return format_html(
+                '<span style="color: red; font-weight: bold;">❌ Detenido (0/{})</span>',
+                total
+            )
+    get_project_status.short_description = 'Estado'
 
 
 # Desregistrar el UserAdmin por defecto y registrar el personalizado
