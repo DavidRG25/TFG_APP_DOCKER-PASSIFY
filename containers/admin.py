@@ -225,10 +225,176 @@ class ServiceAdmin(admin.ModelAdmin):
         'name',
         'owner',
         'image',
+        'get_image_type',      # Nuevo
         'assigned_port',
         'status',
+        'get_volume_info',     # Nuevo
         'created_at',
     )
     search_fields = ('name', 'owner__username', 'image')
     list_filter = ('status', 'created_at')
-    readonly_fields = ('logs', 'container_id', 'created_at', 'updated_at')
+    readonly_fields = (
+        'logs',
+        'container_id',
+        'created_at',
+        'updated_at',
+        'get_port_info',        # Nuevo
+        'get_volume_details',   # Nuevo
+        'get_image_options',    # Nuevo
+    )
+    
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('name', 'owner', 'image', 'subject')
+        }),
+        ('Configuración de Red', {
+            'fields': ('assigned_port', 'internal_port', 'get_port_info'),
+            'description': 'Configuración de puertos y acceso al servicio'
+        }),
+        ('Configuración Avanzada', {
+            'fields': ('env_vars', 'volumes', 'get_volume_details'),
+            'classes': ('collapse',),
+        }),
+        ('Archivos de Configuración', {
+            'fields': ('dockerfile', 'compose', 'code'),
+            'classes': ('collapse',),
+        }),
+        ('Estado y Logs', {
+            'fields': ('status', 'container_id', 'logs'),
+        }),
+        ('Opciones de Imagen', {
+            'fields': ('get_image_options',),
+            'description': 'Funcionalidades disponibles según el tipo de imagen'
+        }),
+        ('Información del Sistema', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',),
+        }),
+    )
+    
+    def get_image_type(self, obj):
+        """Muestra el tipo de imagen con icono"""
+        try:
+            image_name = obj.image.split(':')[0]
+            image_tag = obj.image.split(':')[1] if ':' in obj.image else 'latest'
+            
+            allowed = AllowedImage.objects.get(name=image_name, tag=image_tag)
+            icons = {
+                'web': '🌐',
+                'database': '🗄️',
+                'api': '🚀',
+                'misc': '📦',
+            }
+            icon = icons.get(allowed.image_type, '📦')
+            return f"{icon} {allowed.get_image_type_display()}"
+        except AllowedImage.DoesNotExist:
+            return "❓ Desconocido"
+    get_image_type.short_description = 'Tipo'
+    
+    def get_volume_info(self, obj):
+        """Muestra información resumida de volúmenes"""
+        if obj.volumes:
+            try:
+                import json
+                volumes = json.loads(obj.volumes) if isinstance(obj.volumes, str) else obj.volumes
+                count = len(volumes) if isinstance(volumes, dict) else 0
+                return f"📁 {count} volumen{'es' if count != 1 else ''}"
+            except:
+                return "📁 Configurado"
+        return "-"
+    get_volume_info.short_description = 'Volúmenes'
+    
+    def get_port_info(self, obj):
+        """Muestra información detallada del puerto"""
+        from django.utils.html import format_html
+        
+        if obj.assigned_port:
+            return format_html(
+                '<div style="background: #e8f5e9; padding: 15px; border-radius: 5px; border-left: 4px solid #4caf50;">'
+                '<strong style="color: #2e7d32;">Puerto asignado:</strong> {}<br>'
+                '<strong style="color: #2e7d32;">Puerto interno:</strong> {}<br>'
+                '<strong style="color: #2e7d32;">URL de acceso:</strong> '
+                '<a href="http://localhost:{}" target="_blank" style="color: #1976d2; text-decoration: none;">'
+                'http://localhost:{}</a>'
+                '</div>',
+                obj.assigned_port,
+                obj.internal_port or 80,
+                obj.assigned_port,
+                obj.assigned_port
+            )
+        return format_html('<span style="color: #999;">Puerto no asignado</span>')
+    get_port_info.short_description = 'Información de Puerto'
+    
+    def get_volume_details(self, obj):
+        """Muestra detalles de los volúmenes configurados"""
+        from django.utils.html import format_html
+        
+        if not obj.volumes:
+            return format_html('<span style="color: #999;">Sin volúmenes configurados</span>')
+        
+        try:
+            import json
+            volumes = json.loads(obj.volumes) if isinstance(obj.volumes, str) else obj.volumes
+            
+            if not isinstance(volumes, dict) or not volumes:
+                return format_html('<span style="color: #999;">Sin volúmenes configurados</span>')
+            
+            html = '<ul style="margin: 0; padding-left: 20px;">'
+            for host_path, container_path in volumes.items():
+                html += f'<li><code style="background: #f5f5f5; padding: 2px 6px; border-radius: 3px;">{host_path}</code> → <code style="background: #e3f2fd; padding: 2px 6px; border-radius: 3px;">{container_path}</code></li>'
+            html += '</ul>'
+            return format_html(html)
+        except:
+            return format_html('<span style="color: #ff9800;">Error al parsear volúmenes</span>')
+    get_volume_details.short_description = 'Detalles de Volúmenes'
+    
+    def get_image_options(self, obj):
+        """Muestra opciones disponibles según el tipo de imagen (placeholder para futuras funcionalidades)"""
+        from django.utils.html import format_html
+        
+        try:
+            image_name = obj.image.split(':')[0]
+            image_tag = obj.image.split(':')[1] if ':' in obj.image else 'latest'
+            
+            allowed = AllowedImage.objects.get(name=image_name, tag=image_tag)
+            
+            if allowed.image_type == 'web':
+                return format_html(
+                    '<div style="background: #fff3e0; padding: 15px; border-radius: 5px; border-left: 4px solid #ff9800;">'
+                    '<strong style="color: #e65100;">🌐 Imagen Web / Frontend</strong><br>'
+                    '<em style="color: #666;">Funcionalidad futura: Editor HTML/CSS/JS integrado en el panel del alumno</em><br>'
+                    '<small style="color: #999;">Permitirá editar archivos web directamente desde el navegador</small>'
+                    '</div>'
+                )
+            elif allowed.image_type == 'database':
+                return format_html(
+                    '<div style="background: #e3f2fd; padding: 15px; border-radius: 5px; border-left: 4px solid #2196f3;">'
+                    '<strong style="color: #0d47a1;">🗄️ Base de Datos</strong><br>'
+                    '<em style="color: #666;">Funcionalidad futura: Configuración de credenciales en el panel del alumno</em><br>'
+                    '<small style="color: #999;">Permitirá configurar usuario/contraseña de la base de datos</small>'
+                    '</div>'
+                )
+            elif allowed.image_type == 'api':
+                return format_html(
+                    '<div style="background: #f3e5f5; padding: 15px; border-radius: 5px; border-left: 4px solid #9c27b0;">'
+                    '<strong style="color: #4a148c;">🚀 Generador de API</strong><br>'
+                    '<em style="color: #666;">Funcionalidad futura: Generación rápida de APIs en el panel del alumno</em><br>'
+                    '<small style="color: #999;">Permitirá generar estructura base y configurar endpoints</small>'
+                    '</div>'
+                )
+            else:
+                return format_html(
+                    '<div style="background: #f5f5f5; padding: 15px; border-radius: 5px; border-left: 4px solid #9e9e9e;">'
+                    '<strong style="color: #424242;">📦 Imagen Miscelánea</strong><br>'
+                    '<em style="color: #666;">Sin funcionalidades especiales</em>'
+                    '</div>'
+                )
+        except AllowedImage.DoesNotExist:
+            return format_html(
+                '<div style="background: #fafafa; padding: 15px; border-radius: 5px; border-left: 4px solid #bdbdbd;">'
+                '<strong style="color: #616161;">❓ Imagen no catalogada</strong><br>'
+                '<em style="color: #999;">Esta imagen no está en el catálogo de imágenes permitidas</em>'
+                '</div>'
+            )
+    get_image_options.short_description = 'Opciones de Imagen'
+
