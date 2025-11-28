@@ -106,28 +106,19 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> 
                 service.code.save(code_rel, fh, save=False)
             service.save(update_fields=["code"])
         
-        # Determinar dónde descomprimir según el modo
-        if service.has_compose:
-            # Modo compose: descomprimir en src/
-            code_target = workspace / "src"
-        else:
-            # Modo Dockerfile o simple: descomprimir en la raíz del workspace
-            # para que COPY requirements.txt funcione directamente
-            code_target = workspace
+        # SIEMPRE descomprimir en la raíz del workspace
+        # Esto funciona para:
+        # - Dockerfile: COPY requirements.txt funciona
+        # - Compose: build context "." encuentra Dockerfile y archivos
+        code_target = workspace
         
-        # Si el target es el workspace, no eliminar todo (solo limpiar archivos viejos)
-        if code_target == workspace:
-            # Limpiar archivos de código previos pero mantener Dockerfile/compose
-            for item in workspace.iterdir():
-                if item.name not in ["Dockerfile", "docker-compose.yml", "source.zip", "source.rar"]:
-                    if item.is_file():
-                        item.unlink()
-                    elif item.is_dir() and item.name not in [".vs"]:
-                        shutil.rmtree(item)
-        else:
-            # Si es src/, eliminar completamente
-            if code_target.exists():
-                shutil.rmtree(code_target)
+        # Limpiar archivos de código previos pero mantener Dockerfile/compose
+        for item in workspace.iterdir():
+            if item.name not in ["Dockerfile", "docker-compose.yml", "source.zip", "source.rar"]:
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir() and item.name not in [".vs"]:
+                    shutil.rmtree(item)
         
         _unpack_code_archive_to(str(code_target), service.code)
     
@@ -540,43 +531,60 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool):
     Ejecuta un servicio docker-compose.
     Crea ServiceContainer records para cada contenedor.
     """
-    workspace = prepare_service_workspace(service)
-    compose_path = workspace / "docker-compose.yml"
-    
-    if not compose_path.exists():
-        raise RuntimeError("No se encontró docker-compose.yml en el workspace del servicio.")
-    
-    # Cargar y procesar puertos
-    data = _load_compose_data(compose_path)
-    previous_ports = _previous_port_assignments(service)
-    reserved_ports = _ensure_compose_ports(data, previous_ports)
-    
-    # Guardar el YAML modificado con puertos asignados
-    with compose_path.open("w", encoding="utf-8") as fh:
-        yaml.dump(data, fh)
-    
-    # Ejecutar docker compose desde workspace
-    project = f"svc{service.id}"
-    cmd = _compose_cmd() + ["-p", project, "-f", str(compose_path), "up", "--build", "-d"]
-    
     try:
+        workspace = prepare_service_workspace(service)
+        compose_path = workspace / "docker-compose.yml"
+        
+        if not compose_path.exists():
+            raise RuntimeError("No se encontró docker-compose.yml en el workspace del servicio.")
+        
+        # Cargar y procesar puertos
+        data = _load_compose_data(compose_path)
+        previous_ports = _previous_port_assignments(service)
+        reserved_ports = _ensure_compose_ports(data, previous_ports)
+        
+        # Guardar el YAML modificado con puertos asignados
+        with compose_path.open("w", encoding="utf-8") as fh:
+            yaml.dump(data, fh)
+        
+        # Ejecutar docker compose desde workspace
+        project = f"svc{service.id}"
+        cmd = _compose_cmd() + ["-p", project, "-f", str(compose_path), "up", "--build", "-d"]
+        
+        _append_log(service, f"Ejecutando: {' '.join(cmd)}")
+        _append_log(service, f"Workspace: {workspace}")
+        service.save(update_fields=["logs"])
+        
         proc = subprocess.run(
             cmd, 
             cwd=str(workspace),  # ← IMPORTANTE: ejecutar desde workspace
             check=True, 
             capture_output=True, 
-            text=True
+            text=True,
+            encoding='utf-8',  # ← FIX: Evitar UnicodeDecodeError en Windows
+            errors='replace'    # ← FIX: Reemplazar caracteres inválidos
         )
         stdout = proc.stdout or ""
         stderr = proc.stderr or ""
+        
+        _append_log(service, f"STDOUT: {stdout}")
+        _append_log(service, f"STDERR: {stderr}")
+        service.save(update_fields=["logs"])
+        
     except subprocess.CalledProcessError as e:
         # Liberar puertos reservados si falla
         for port in reserved_ports:
             _release_port(port)
         service.status = "error"
-        service.logs = (e.stderr or e.stdout or str(e)).strip()
+        error_msg = (e.stderr or e.stdout or str(e)).strip()
+        _append_log(service, f"ERROR subprocess: {error_msg}")
         service.save()
-        raise RuntimeError(f"Error al ejecutar docker compose:\n{service.logs}")
+        raise RuntimeError(f"Error al ejecutar docker compose:\n{error_msg}")
+    except Exception as e:
+        service.status = "error"
+        _append_log(service, f"ERROR general: {str(e)}")
+        service.save()
+        raise
     
     # Detectar contenedores creados
     containers = docker_client.containers.list(
@@ -586,9 +594,12 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool):
     
     if not containers:
         service.status = "error"
-        service.logs = "docker-compose: no se detectó ningún contenedor con el proyecto especificado."
+        _append_log(service, "docker-compose: no se detectó ningún contenedor con el proyecto especificado.")
         service.save()
-        raise RuntimeError(service.logs)
+        raise RuntimeError("No se detectaron contenedores")
+    
+    _append_log(service, f"Contenedores detectados: {len(containers)}")
+    service.save(update_fields=["logs"])
     
     # Crear/actualizar ServiceContainer por cada uno
     for ctr in containers:
@@ -610,11 +621,12 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool):
                 "assigned_ports": assigned_ports,
             }
         )
+        _append_log(service, f"ServiceContainer creado: {svc_name} ({ctr.status})")
     
     # Actualizar Service
     service.container_id = containers[0].id  # Contenedor principal para compatibilidad
     service.status = "running"
-    service.logs = ("docker-compose up -d completado.\n" + stdout + "\n" + stderr).strip()
+    _append_log(service, "docker-compose up -d completado.")
     service.save()
 
 
@@ -734,7 +746,10 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
         ports = {}
         if port:
             ports[f"{internal_port}/tcp"] = port
-        container_name = f"svc_{service.id}_{slug}_ctr"
+        
+        # Nombre descriptivo: usar nombre del servicio o slug como fallback
+        safe_name = re.sub(r'[^a-z0-9_-]', '_', (service.name or slug).lower())
+        container_name = f"{safe_name}_ctr"
 
         normalized_command = command
         if isinstance(normalized_command, (list, tuple)):
@@ -825,77 +840,129 @@ def stop_container(service: Service):
     Detiene el servicio.
     
     MODO SIMPLE: Detiene el contenedor único
-    MODO COMPOSE: Detiene todos los contenedores del compose
+    MODO COMPOSE: Usa docker compose stop para detener todos simultáneamente
     """
     docker_client = get_docker_client()
     if docker_client is None:
         raise RuntimeError("Docker no está disponible para detener el servicio.")
     
     if service.has_compose:
-        # Detener todos los contenedores del compose
-        for sc in service.containers.all():
-            if sc.container_id:
-                try:
-                    docker_client.containers.get(sc.container_id).stop()
-                    sc.status = "stopped"
-                    sc.save()
-                except NotFound:
-                    sc.status = "removed"
-                    sc.save()
-                except DockerException:
-                    pass
-    
-    # Detener contenedor principal (compatible con ambos modos)
-    if service.container_id:
+        # ===== MODO COMPOSE: Usar docker compose stop =====
         try:
-            docker_client.containers.get(service.container_id).stop()
+            workspace = ensure_service_workspace(service)
+            compose_path = workspace / "docker-compose.yml"
+            
+            if not compose_path.exists():
+                raise RuntimeError("No se encontró docker-compose.yml")
+            
+            project = f"svc{service.id}"
+            cmd = _compose_cmd() + ["-p", project, "-f", str(compose_path), "stop"]
+            
+            subprocess.run(
+                cmd,
+                cwd=str(workspace),
+                check=True,
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace'
+            )
+            
+            # Actualizar estado de todos los ServiceContainer
+            service.containers.all().update(status="stopped")
+            
             service.status = "stopped"
+            _append_log(service, "docker-compose stop completado.")
             service.save()
-        except NotFound:
-            service.status = "removed"
+            
+        except subprocess.CalledProcessError as e:
+            error_msg = (e.stderr or e.stdout or str(e)).strip()
+            service.status = "error"
+            _append_log(service, f"Error al detener compose: {error_msg}")
             service.save()
-        except DockerException as exc:
-            service.logs = str(exc)
+            raise RuntimeError(f"Error al detener docker-compose: {error_msg}")
+        except Exception as e:
+            service.status = "error"
+            _append_log(service, f"Error al detener: {str(e)}")
             service.save()
             raise
+    else:
+        # ===== MODO SIMPLE: Detener contenedor único =====
+        if service.container_id:
+            try:
+                docker_client.containers.get(service.container_id).stop()
+                service.status = "stopped"
+                service.save()
+            except NotFound:
+                service.status = "removed"
+                service.save()
+            except DockerException as exc:
+                service.logs = str(exc)
+                service.save()
+                raise
 
 
 def remove_container(service: Service):
     """
     Elimina el servicio completamente.
     
-    MODO SIMPLE: Elimina contenedor, volumen y libera puerto
-    MODO COMPOSE: Elimina todos los contenedores, libera puertos
+    MODO SIMPLE: Elimina contenedor, volumen, imagen (si fue construida) y libera puerto
+    MODO COMPOSE: Usa docker compose down --rmi local --volumes para limpieza completa
     """
     docker_client = get_docker_client()
     if docker_client is None:
         raise RuntimeError("Docker no está disponible para eliminar el servicio.")
 
     if service.has_compose:
-        # Eliminar todos los contenedores del compose
-        for sc in service.containers.all():
-            if sc.container_id:
-                try:
-                    container = docker_client.containers.get(sc.container_id)
-                    container.remove(force=True)
-                except NotFound:
-                    pass
-                except DockerException as exc:
-                    _append_log(service, f"Error al eliminar contenedor {sc.name}: {exc}")
+        # ===== MODO COMPOSE: Usar docker compose down =====
+        try:
+            workspace = ensure_service_workspace(service)
+            compose_path = workspace / "docker-compose.yml"
             
-            # Liberar puertos del contenedor
-            for port_info in sc.assigned_ports or []:
-                external = port_info.get("external")
-                if external:
-                    _release_port(external)
-        
-        # Eliminar registros de ServiceContainer
-        service.containers.all().delete()
+            if compose_path.exists():
+                project = f"svc{service.id}"
+                cmd = _compose_cmd() + [
+                    "-p", project,
+                    "-f", str(compose_path),
+                    "down",
+                    "--rmi", "local",  # Solo eliminar imágenes construidas localmente
+                    "--volumes"         # Eliminar volúmenes
+                ]
+                
+                subprocess.run(
+                    cmd,
+                    cwd=str(workspace),
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace'
+                )
+            
+            # Liberar puertos de todos los contenedores
+            for sc in service.containers.all():
+                for port_info in sc.assigned_ports or []:
+                    external = port_info.get("external")
+                    if external:
+                        _release_port(external)
+            
+            # Eliminar registros de ServiceContainer
+            service.containers.all().delete()
+            
+        except subprocess.CalledProcessError as e:
+            error_msg = (e.stderr or e.stdout or str(e)).strip()
+            _append_log(service, f"Error al eliminar compose: {error_msg}")
+            service.save(update_fields=["logs"])
+            # Continuar con limpieza aunque falle
+        except Exception as e:
+            _append_log(service, f"Error al eliminar: {str(e)}")
+            service.save(update_fields=["logs"])
         
         # Limpiar workspace
         cleanup_service_workspace(service)
+        
     else:
-        # MODO SIMPLE: mantener funcionalidad anterior
+        # ===== MODO SIMPLE: Limpieza manual =====
         # Eliminar contenedor principal
         if service.container_id:
             try:
@@ -907,7 +974,7 @@ def remove_container(service: Service):
                 _append_log(service, f"Error al eliminar el contenedor: {exc}")
                 service.save(update_fields=["logs"])
 
-        # Liberar puertos
+        # Liberar puerto
         _release_port(service.assigned_port)
 
         # Eliminar volumen
@@ -920,6 +987,21 @@ def remove_container(service: Service):
             except DockerException as exc:
                 _append_log(service, f"Error al eliminar el volumen: {exc}")
                 service.save(update_fields=["logs"])
+        
+        # Eliminar imagen si fue construida con Dockerfile
+        if service.dockerfile:
+            slug = _service_slug(service)
+            image_tag = f"svc_{service.id}_{slug}_image"
+            try:
+                docker_client.images.remove(image_tag, force=True)
+            except NotFound:
+                pass
+            except DockerException as exc:
+                _append_log(service, f"Error al eliminar imagen: {exc}")
+                service.save(update_fields=["logs"])
+        
+        # Limpiar workspace
+        cleanup_service_workspace(service)
 
     service.container_id = None
     service.assigned_port = None

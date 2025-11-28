@@ -38,6 +38,9 @@ class ServiceSerializer(serializers.ModelSerializer):
 
     # Campo calculado para indicar si usa docker-compose
     has_compose = serializers.ReadOnlyField()
+    
+    # Relación con contenedores (para modo compose)
+    containers = ServiceContainerSerializer(many=True, read_only=True)
 
     class Meta:
         model = Service
@@ -57,8 +60,9 @@ class ServiceSerializer(serializers.ModelSerializer):
             "subject",
             "internal_port",
             "has_compose",  # Añadido
+            "containers",    # Añadido
         )
-        read_only_fields = ("id", "assigned_port", "status", "logs", "has_compose")
+        read_only_fields = ("id", "assigned_port", "status", "logs", "has_compose", "containers")
 
     # ---- Validaciones de alto nivel ----
 
