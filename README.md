@@ -194,28 +194,90 @@ python manage.py test
 pytest
 ```
 
-### 🛠️ Ejecución rápida con el script `start_app.sh`
+## 🚀 Scripts de Ejecución
 
-Si prefieres automatizar los pasos anteriores, puedes usar el script incluido:
+PaaSify incluye dos scripts principales para facilitar el desarrollo:
+
+### 📦 Primera vez o entorno limpio: `start.sh`
+
+Inicializa el proyecto completo (crea venv, instala dependencias, configura BD y datos de ejemplo):
 
 ```bash
-bash scripts/start_app.sh
+bash start.sh
 ```
 
-El script realiza:
-1. Crea (si es necesario) el entorno virtual en `./venv` usando el Python disponible en tu sistema.
-2. Instala dependencias (`pip install -r requirements.txt`).
-3. Ejecuta `python manage.py makemigrations` y `python manage.py migrate`.
-4. Arranca Daphne en `0.0.0.0:8080`.
+**El script realiza:**
+1. ✅ Detecta Python disponible (python/py/python3)
+2. ✅ Crea entorno virtual en `./venv` (si no existe)
+3. ✅ Instala/actualiza dependencias desde `requirements.txt`
+4. ✅ Ejecuta `makemigrations` y `migrate`
+5. ✅ Crea usuarios de demostración (admin, alumno, profesor)
+6. ✅ Pobla imágenes Docker de ejemplo
+7. ✅ Recolecta archivos estáticos
+8. ✅ Arranca Daphne (servidor ASGI) en `0.0.0.0:8000`
 
-Opciones útiles:
+**Opciones disponibles:**
 ```bash
-bash scripts/start_app.sh --skip-install --skip-migrate       # Reutiliza dependencias y migraciones existentes
-bash scripts/start_app.sh --port 9000                         # Arranca Daphne en otro puerto
-HOST=127.0.0.1 bash scripts/start_app.sh                      # Cambia el host de escucha
+bash start.sh --skip-install              # No reinstala dependencias
+bash start.sh --skip-migrate              # No ejecuta migraciones
+bash start.sh --skip-setup                # No crea usuarios ni datos de ejemplo
+bash start.sh --port 8080                 # Puerto personalizado
+bash start.sh --host 127.0.0.1            # Host personalizado
+bash start.sh --help                      # Muestra ayuda completa
 ```
 
-> Antes de usar el script, asegúrate de tener Python 3 instalado y accesible desde la terminal (`python --version`).
+**Ejemplo combinado:**
+```bash
+bash start.sh --skip-install --skip-setup --port 9000
+```
+
+---
+
+### ⚡ Desarrollo diario: `run.sh`
+
+Ejecuta el servidor rápidamente (asume que el entorno ya está configurado):
+
+```bash
+bash run.sh                    # Modo desarrollo (runserver)
+bash run.sh --production       # Modo producción (Daphne)
+```
+
+**El script realiza:**
+1. ✅ Carga variables de entorno desde `.env`
+2. ✅ Ejecuta migraciones (rápido si no hay cambios)
+3. ✅ Recolecta archivos estáticos
+4. ✅ Arranca servidor:
+   - **Sin flags**: `runserver` en `127.0.0.1:8000` (desarrollo)
+   - **Con `--production`**: Daphne en `0.0.0.0:8000` (producción)
+
+**Opciones disponibles:**
+```bash
+bash run.sh --production              # Usa Daphne (ASGI) en lugar de runserver
+bash run.sh --port 9000               # Puerto personalizado
+bash run.sh --host 0.0.0.0            # Host personalizado
+bash run.sh --help                    # Muestra ayuda completa
+```
+
+**Ejemplos:**
+```bash
+bash run.sh                                      # Desarrollo local
+bash run.sh --production --host 0.0.0.0 --port 8080  # Producción
+```
+
+---
+
+### 📝 ¿Cuándo usar cada script?
+
+| Situación | Script | Comando |
+|-----------|--------|---------|
+| 🆕 Primera vez que clonas el proyecto | `start.sh` | `bash start.sh` |
+| 🔄 Actualizaste dependencias (`requirements.txt`) | `start.sh` | `bash start.sh` |
+| 🗑️ Borraste el entorno virtual | `start.sh` | `bash start.sh` |
+| ⚙️ Necesitas recrear usuarios/datos de ejemplo | `start.sh` | `bash start.sh` |
+| 💻 Desarrollo diario (código ya configurado) | `run.sh` | `bash run.sh` |
+| 🚀 Prueba rápida en modo producción | `run.sh` | `bash run.sh --production` |
+
+> **Nota:** Ambos scripts están disponibles en la raíz del proyecto (`start.sh`, `run.sh`) y en `scripts/` (`scripts/start.sh`, `scripts/run.sh`). Puedes ejecutarlos desde cualquier ubicación.
 
 ### 👥 Usuarios de ejemplo
 

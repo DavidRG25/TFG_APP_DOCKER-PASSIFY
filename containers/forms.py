@@ -4,11 +4,16 @@ from .models import AllowedImage
 
 
 class AllowedImageForm(forms.ModelForm):
-    suggested_tags = forms.CharField(
-        widget=forms.Textarea(attrs={'rows': 5, 'readonly': 'readonly'}),
+    suggested_tags = forms.ChoiceField(
+        choices=[('', '--- Selecciona un tag para actualizar el campo Tag ---')],
         required=False,
         label='Tags disponibles en DockerHub',
-        help_text='Tags encontrados automáticamente al consultar DockerHub'
+        help_text='Selecciona un tag de la lista para actualizar automáticamente el campo Tag',
+        widget=forms.Select(attrs={
+            'id': 'id_suggested_tags',
+            'style': 'width: 100%; max-width: 400px;',
+            'onchange': 'document.getElementById("id_tag").value = this.value; if(this.value) { this.style.background = "#e8f5e9"; } else { this.style.background = ""; }'
+        })
     )
     
     image_type = forms.ChoiceField(

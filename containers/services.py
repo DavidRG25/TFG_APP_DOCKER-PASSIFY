@@ -443,7 +443,9 @@ def _run_container_internal(
         service.container_id = container.id
         service.assigned_port = port
         service.status = "running"
-        # Guardar build logs si venÃ­a de Dockerfile
+        # Guardar el tag de la imagen (importante para servicios con Dockerfile)
+        service.image = image_to_run
+        # Guardar build logs si venía de Dockerfile
         if service.dockerfile:
             _append_log(service, "Imagen construida y contenedor arrancado.")
         service.save()
