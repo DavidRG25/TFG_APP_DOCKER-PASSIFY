@@ -1,4 +1,3 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 set -e
 "$(dirname "$0")/scripts/run.sh" "$@"
-
