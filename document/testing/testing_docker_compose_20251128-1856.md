@@ -14,22 +14,22 @@
 2. Subir código ZIP con `requirements.txt` y `app.py`
 3. Hacer clic en "Iniciar"
 4. **Verificar**:
-   - [ ] Build exitoso
-   - [ ] Contenedor inicia (estado RUNNING)
-   - [ ] Nombre del contenedor es descriptivo (ej: `proyecto-nombre_ctr`)
-   - [ ] Botón "Dockerfile" muestra contenido
-   - [ ] Botón "Logs" muestra logs del build
-   - [ ] Botón "Terminal" abre shell
-   - [ ] Botón "Acceder" abre la aplicación
+   - [SI] Build exitoso
+   - [SI] Contenedor inicia (estado RUNNING)
+   - [SI] Nombre del contenedor es descriptivo (ej: `proyecto-nombre_ctr`)
+   - [SI] Botón "Dockerfile" muestra contenido
+   - [SI] Botón "Logs" muestra logs del build
+   - [SOLUCION-FUTURA] Botón "Terminal" abre shell
+   - [SI] Botón "Acceder" abre la aplicación
 5. Hacer clic en "Detener"
 6. **Verificar**:
-   - [ ] Contenedor se detiene (estado STOPPED)
+   - [SI] Contenedor se detiene (estado STOPPED)
 7. Hacer clic en "Eliminar"
 8. **Verificar**:
-   - [ ] Contenedor eliminado
-   - [ ] Imagen eliminada de Docker
-   - [ ] Volumen eliminado
-   - [ ] Workspace limpiado
+   - [SI] Contenedor eliminado
+   - [SI] Imagen eliminada de Docker
+   - [SI] Volumen eliminado
+   - [SI] Workspace limpiado
 
 **Resultado Esperado**: ✅ Todo funciona sin errores
 

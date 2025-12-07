@@ -363,29 +363,75 @@ def _service_slug(service: Service) -> str:
 def _ensure_container_running(service: Service, container, reserved_port: int | None):
     """Verifica que Docker haya iniciado el contenedor.
 
+    Espera hasta 15 segundos para que el contenedor arranque.
     Si el contenedor termina inmediatamente (estado exited/dead) registramos los logs,
     liberamos el puerto reservado y lanzamos una excepción para notificar al usuario.
     """
+    import time
+    
+    # Esperar hasta 15 segundos para que el contenedor arranque
+    # Algunos contenedores (Flask, Django) tardan en inicializar
+    max_attempts = 30  # 30 intentos x 0.5s = 15 segundos
+    
+    for attempt in range(max_attempts):
+        try:
+            container.reload()
+            status = (container.status or "").lower()
+        except DockerException:
+            # Si no podemos recargar, asumimos que está arrancando
+            time.sleep(0.5)
+            continue
+        
+        # ✅ Contenedor arrancado correctamente
+        if status == "running":
+            return
+        
+        # Estados temporales: esperar un poco más
+        if status in {"created", "restarting"}:
+            time.sleep(0.5)
+            continue
+        
+        # Estados de error definitivos: salir inmediatamente
+        if status in {"exited", "dead", "removing"}:
+            break
+        
+        # Estado "paused" o desconocido: dar más oportunidades
+        time.sleep(0.5)
+    
+    # Verificación final: dar una última oportunidad
+    time.sleep(1)  # Espera extra de 1 segundo
     try:
         container.reload()
         status = (container.status or "").lower()
     except DockerException:
+        status = "unknown"
+    
+    # Si finalmente está running, todo bien
+    if status == "running":
         return
-
-    if status not in {"running"}:
-        try:
-            log_tail = container.logs(tail=200).decode(errors="replace")
-        except Exception:
-            log_tail = "(logs no disponibles)"
-        service.status = "error"
-        _append_log(service, f"[Docker] {log_tail}".strip())
-        service.save(update_fields=["status", "logs"])
-        try:
-            container.remove(force=True)
-        except DockerException:
-            pass
-        _release_port(reserved_port)
-        raise RuntimeError("El contenedor finalizó inmediatamente. Revisa los logs para más detalles.")
+    
+    # Si llegamos aquí y NO está en un estado de error definitivo, asumir que está OK
+    # Esto evita falsos positivos con contenedores que tardan en arrancar
+    if status not in {"exited", "dead", "removing"}:
+        _append_log(service, f"[Advertencia] Contenedor en estado '{status}', pero se asume correcto.")
+        service.save(update_fields=["logs"])
+        return
+    
+    # Solo marcar como error si está definitivamente muerto
+    try:
+        log_tail = container.logs(tail=200).decode(errors="replace")
+    except Exception:
+        log_tail = "(logs no disponibles)"
+    service.status = "error"
+    _append_log(service, f"[Docker] Contenedor en estado '{status}'. Logs:")
+    _append_log(service, log_tail.strip())
+    service.save(update_fields=["status", "logs"])
+    try:
+        container.remove(force=True)
+    except DockerException:
+        pass
+    _release_port(reserved_port)
+    raise RuntimeError(f"El contenedor no arrancó correctamente (estado: {status}). Revisa los logs para más detalles.")
 
 
 # ==================== FILE UTILITIES ====================
@@ -848,6 +894,11 @@ def stop_container(service: Service):
     if docker_client is None:
         raise RuntimeError("Docker no está disponible para detener el servicio.")
     
+    # Establecer estado "stopping" antes de comenzar
+    service.status = "stopping"
+    _append_log(service, "Deteniendo servicio...")
+    service.save(update_fields=["status", "logs", "updated_at"])
+    
     if service.has_compose:
         # ===== MODO COMPOSE: Usar docker compose stop =====
         try:
@@ -855,6 +906,8 @@ def stop_container(service: Service):
             compose_path = workspace / "docker-compose.yml"
             
             if not compose_path.exists():
+                service.status = "error"
+                service.save(update_fields=["status"])
                 raise RuntimeError("No se encontró docker-compose.yml")
             
             project = f"svc{service.id}"
@@ -892,16 +945,35 @@ def stop_container(service: Service):
         # ===== MODO SIMPLE: Detener contenedor único =====
         if service.container_id:
             try:
-                docker_client.containers.get(service.container_id).stop()
-                service.status = "stopped"
+                container = docker_client.containers.get(service.container_id)
+                container.stop(timeout=10)  # Timeout de 10 segundos
+                
+                # Verificar que realmente se detuvo
+                container.reload()
+                docker_status = (container.status or "").lower()
+                
+                if docker_status in {"exited", "stopped"}:
+                    service.status = "stopped"
+                    _append_log(service, "Contenedor detenido correctamente.")
+                else:
+                    service.status = "stopped"  # Asumir detenido aunque el estado sea otro
+                    _append_log(service, f"Contenedor en estado '{docker_status}', marcado como detenido.")
+                
                 service.save()
+                
             except NotFound:
                 service.status = "removed"
+                _append_log(service, "Contenedor no encontrado, marcado como eliminado.")
                 service.save()
             except DockerException as exc:
-                service.logs = str(exc)
+                service.status = "error"
+                _append_log(service, f"Error al detener: {str(exc)}")
                 service.save()
                 raise
+        else:
+            # No hay container_id, marcar como stopped
+            service.status = "stopped"
+            service.save()
 
 
 def remove_container(service: Service):
