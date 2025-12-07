@@ -1,5 +1,6 @@
 import logging
 import threading
+from urllib.parse import parse_qs
 
 from channels.generic.websocket import WebsocketConsumer
 from django.http import Http404
@@ -8,13 +9,18 @@ from django.shortcuts import get_object_or_404
 from docker.errors import DockerException
 
 from .docker_client import get_docker_client
-from .models import Service
+from .models import Service, ServiceContainer
 
 logger = logging.getLogger(__name__)
 
 
 class TerminalConsumer(WebsocketConsumer):
-    """Canal WebSocket que expone una shell simple dentro del contenedor."""
+    """
+    Canal WebSocket que expone una shell simple dentro del contenedor.
+    
+    MODO SIMPLE: Usa service.container_id (comportamiento anterior)
+    MODO COMPOSE: Si se pasa ?container=<id>, usa ese ServiceContainer
+    """
 
     def connect(self):
         service_id = self.scope["url_route"]["kwargs"].get("service_id")
@@ -32,7 +38,31 @@ class TerminalConsumer(WebsocketConsumer):
             self.close(code=4403)
             return
 
-        if not service.container_id:
+        # Determinar qué contenedor usar
+        container_id_to_use = None
+        container_name = "servicio"
+        
+        # Parsear query string para obtener parámetro container
+        query_string = self.scope.get("query_string", b"").decode("utf-8")
+        query_params = parse_qs(query_string)
+        container_param = query_params.get("container", [None])[0]
+        
+        if container_param:
+            # Modo compose: usar ServiceContainer específico
+            try:
+                container_record = ServiceContainer.objects.get(pk=container_param, service=service)
+                container_id_to_use = container_record.container_id
+                container_name = container_record.name
+            except ServiceContainer.DoesNotExist:
+                self.accept()
+                self.send("\r\n[ERROR] Contenedor no encontrado.\r\n")
+                self.close()
+                return
+        else:
+            # Modo simple: usar service.container_id (comportamiento anterior)
+            container_id_to_use = service.container_id
+        
+        if not container_id_to_use:
             self.accept()
             self.send("\r\n[ERROR] El servicio no esta en ejecucion.\r\n")
             self.close()
@@ -49,7 +79,7 @@ class TerminalConsumer(WebsocketConsumer):
         try:
             api = docker_client.api
             exec_obj = api.exec_create(
-                container=service.container_id,
+                container=container_id_to_use,
                 cmd="/bin/sh",
                 tty=True,
                 stdin=True,
@@ -71,7 +101,7 @@ class TerminalConsumer(WebsocketConsumer):
             )
             self._reader_thread.start()
 
-            self.send("Conexión establecida con el contenedor.\r\n")
+            self.send(f"Conexión establecida con {container_name}.\r\n")
         except (DockerException, Exception) as exc:  # pragma: no cover - dependencias externas
             self.send(f"\r\n[ERROR al iniciar shell]: {exc}\r\n")
             self.close()

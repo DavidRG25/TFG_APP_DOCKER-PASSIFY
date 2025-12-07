@@ -189,9 +189,9 @@ echo "    âœ“ Archivos estaticos recolectados"
 
 # Paso 6: Validar SECRET_KEY en produccion
 export DJANGO_SETTINGS_MODULE="${DJANGO_SETTINGS_MODULE:-app_passify.settings}"
-export DJANGO_DEBUG="${DJANGO_DEBUG:-false}"
-export DJANGO_ALLOWED_HOSTS="${DJANGO_ALLOWED_HOSTS:-0.0.0.0,localhost,127.0.0.1}"
-export DJANGO_SECRET_KEY="${DJANGO_SECRET_KEY:-}"
+export DJANGO_DEBUG="${DJANGO_DEBUG:-true}"
+export DJANGO_ALLOWED_HOSTS="${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1}"
+export DJANGO_SECRET_KEY="${DJANGO_SECRET_KEY:-dev-secret-key-change-me}"
 
 if [[ -z "$DJANGO_SECRET_KEY" && "$DJANGO_DEBUG" != "true" ]]; then
   echo "[!] ERROR: DJANGO_SECRET_KEY debe estar configurada cuando DJANGO_DEBUG=false." >&2
