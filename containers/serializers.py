@@ -6,6 +6,23 @@ from .models import Service, AllowedImage, ServiceContainer
 from paasify.models.SubjectModel import Subject
 
 
+class ServiceContainerSerializer(serializers.ModelSerializer):
+    """Serializer para contenedores individuales en servicios docker-compose"""
+    class Meta:
+        model = ServiceContainer
+        fields = (
+            "id",
+            "name",
+            "container_id",
+            "status",
+            "internal_ports",
+            "assigned_ports",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = fields  # Todos son de solo lectura
+
+
 class ServiceSerializer(serializers.ModelSerializer):
     """
     Serializador de Service con reglas de negocio:
@@ -194,20 +211,3 @@ class AllowedImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = AllowedImage
         fields = ("id", "name", "tag", "description")
-
-
-class ServiceContainerSerializer(serializers.ModelSerializer):
-    """Serializer para contenedores individuales en servicios docker-compose"""
-    class Meta:
-        model = ServiceContainer
-        fields = (
-            "id",
-            "name",
-            "container_id",
-            "status",
-            "internal_ports",
-            "assigned_ports",
-            "created_at",
-            "updated_at",
-        )
-        read_only_fields = fields  # Todos son de solo lectura

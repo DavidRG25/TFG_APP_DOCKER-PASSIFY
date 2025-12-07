@@ -41,7 +41,13 @@ from .services import (
 # ----------------------------- helpers -----------------------------
 
 def _sync_service(service: Service):
-    """Si el container_id ya no existe en Docker, marcamos el servicio como 'removed'."""
+    """
+    Sincroniza el estado del servicio con Docker.
+    
+    Mejorado para manejar estados transitorios correctamente:
+    - No marca error si el servicio está en "stopping", "pending", "deleting"
+    - Solo marca error si el contenedor está definitivamente muerto (exited, dead)
+    """
     if not service.container_id:
         return
 
@@ -53,17 +59,40 @@ def _sync_service(service: Service):
         container = docker_client.containers.get(service.container_id)
         container.reload()
         docker_status = (container.status or "").lower()
-        if docker_status not in {"running"} and service.status in {"running", "pending"}:
-            try:
-                log_tail = container.logs(tail=200).decode(errors="replace")
-            except Exception:
-                log_tail = "(logs no disponibles)"
-            service.status = "error"
-            service.logs = (service.logs or "") + f"\n[Docker] {log_tail}".strip()
-            service.save(update_fields=["status", "logs"])
+        
+        # Estados transitorios: no hacer nada, dejar que el proceso termine
+        if service.status in {"stopping", "pending", "deleting"}:
+            return
+        
+        # Si el servicio cree que está running pero Docker dice que no
+        if service.status == "running" and docker_status not in {"running"}:
+            # Solo marcar error si está definitivamente muerto
+            if docker_status in {"exited", "dead"}:
+                try:
+                    log_tail = container.logs(tail=200).decode(errors="replace")
+                except Exception:
+                    log_tail = "(logs no disponibles)"
+                service.status = "error"
+                service.logs = (service.logs or "") + f"\n[Docker] Contenedor en estado '{docker_status}'. Logs:\n{log_tail}".strip()
+                service.save(update_fields=["status", "logs"])
+            # Si está en otro estado (created, restarting), dar tiempo
+            elif docker_status in {"created", "restarting"}:
+                pass  # Esperar, puede estar arrancando
+            else:
+                # Estado desconocido, asumir stopped
+                service.status = "stopped"
+                service.save(update_fields=["status"])
+        
+        # Si el servicio cree que está stopped pero Docker dice running
+        elif service.status == "stopped" and docker_status == "running":
+            service.status = "running"
+            service.save(update_fields=["status"])
+            
     except NotFound:
-        service.status = "removed"
-        service.save()
+        # Solo marcar como removed si no está en proceso de eliminación
+        if service.status != "deleting":
+            service.status = "removed"
+            service.save()
     except DockerException:
         # Si no podemos verificar el contenedor, conservamos el estado actual.
         return
@@ -96,6 +125,7 @@ def user_is_admin(user) -> bool:
 # ------------------------------ API --------------------------------
 
 class ServiceViewSet(viewsets.ModelViewSet):
+    CODE_MAX = 1024 * 1024  # 1 MB max para mostrar código
     serializer_class = ServiceSerializer
     permission_classes = [IsAuthenticated]
 

@@ -16,9 +16,7 @@
         <p class="dashboard-hero-subtitle">Gestiona tus contenedores y despliegues activos.</p>
       </div>
       <div>
-        <button class="btn btn-light"
-                data-bs-toggle="modal"
-                data-bs-target="#newServiceModal">
+        <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#newServiceModal">
           Nuevo servicio
         </button>
       </div>
@@ -63,11 +61,11 @@
     </div>
     <div class="d-flex flex-wrap gap-2">
       {% for subject in available_subjects %}
-        <span class="badge bg-light text-dark border">
-          {{ subject.name }}
-        </span>
+      <span class="badge bg-light text-dark border">
+        {{ subject.name }}
+      </span>
       {% empty %}
-        <span class="text-muted small"> - Aún no tienes asignaturas.</span>
+      <span class="text-muted small"> - Aún no tienes asignaturas.</span>
       {% endfor %}
     </div>
   </div>
@@ -89,9 +87,8 @@
     </tr>
   </thead>
   <tbody id="service-table"
-         hx-get="{% url 'containers:service_table' %}{% if current_subject %}?subject={{ current_subject.id }}{% endif %}"
-         hx-trigger="load, every 5s, service:table-refresh from:body"
-         hx-swap="innerHTML">
+    hx-get="{% url 'containers:service_table' %}{% if current_subject %}?subject={{ current_subject.id }}{% endif %}"
+    hx-trigger="load, every 5s, service:table-refresh from:body" hx-swap="innerHTML">
     {% include "containers/_service_rows.html" %}
   </tbody>
 </table>
@@ -104,34 +101,31 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
 
-      <form id="newServiceForm"
-            method="POST" enctype="multipart/form-data"
-            hx-post="/api/containers/"
-            hx-target="#service-table"
-            hx-swap="none">
+      <form id="newServiceForm" method="POST" enctype="multipart/form-data" hx-post="/api/containers/"
+        hx-target="#service-table" hx-swap="none">
         {% csrf_token %}
         <div id="form-errors"></div>
         {% if current_subject %}
-          <input type="hidden" name="subject" value="{{ current_subject.id }}">
+        <input type="hidden" name="subject" value="{{ current_subject.id }}">
         {% else %}
-          <div class="mb-3">
-            <label class="form-label">Asignatura</label>
-            {% if available_subjects %}
-              <select name="subject" class="form-select" required>
-                <option value="">Selecciona una asignatura</option>
-                {% for subject in available_subjects %}
-                  <option value="{{ subject.id }}">{{ subject.name }}</option>
-                {% endfor %}
-              </select>
-              <small class="text-muted d-block mt-1">
-                Selecciona la asignatura para asociar el servicio.
-              </small>
-            {% else %}
-              <div class="alert alert-warning mb-0">
-                No tienes asignaturas disponibles todavía.
-              </div>
-            {% endif %}
+        <div class="mb-3">
+          <label class="form-label">Asignatura</label>
+          {% if available_subjects %}
+          <select name="subject" class="form-select" required>
+            <option value="">Selecciona una asignatura</option>
+            {% for subject in available_subjects %}
+            <option value="{{ subject.id }}">{{ subject.name }}</option>
+            {% endfor %}
+          </select>
+          <small class="text-muted d-block mt-1">
+            Selecciona la asignatura para asociar el servicio.
+          </small>
+          {% else %}
+          <div class="alert alert-warning mb-0">
+            No tienes asignaturas disponibles todavía.
           </div>
+          {% endif %}
+        </div>
         {% endif %}
 
         <div class="modal-body">
@@ -148,7 +142,8 @@
             </div>
             <div class="form-check">
               <input class="form-check-input" type="radio" name="mode" id="mode_custom" value="custom">
-              <label class="form-check-label" for="mode_custom">Configuracion personalizada (Dockerfile o docker-compose)</label>
+              <label class="form-check-label" for="mode_custom">Configuracion personalizada (Dockerfile o
+                docker-compose)</label>
             </div>
           </div>
 
@@ -156,61 +151,50 @@
             <label class="form-label">Imagen</label>
             <select name="image" class="form-select" required>
               {% for img in images %}
-                <option value="{{ img.name }}:{{ img.tag }}">
-                  {{ img.name }}:{{ img.tag }} - {{ img.description }}
-                </option>
+              <option value="{{ img.name }}:{{ img.tag }}">
+                {{ img.name }}:{{ img.tag }} - {{ img.description }}
+              </option>
               {% endfor %}
             </select>
             <small class="text-muted d-block mt-1">En modo personalizado este selector queda deshabilitado.</small>
           </div>
 
-  <div class="mb-3">
-    <label class="form-label">
-      Puerto personalizado (opcional)
-      <button type="button"
-              class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
-                      aria-label="Instrucciones puerto"
-                      data-bs-toggle="popover"
-                      data-bs-trigger="focus"
-                      data-bs-html="true"
-                      data-bs-title="Puerto personalizado"
-                      data-bs-content="Debe estar entre 40000 y 50000. Si no lo indicas se asigna uno libre.">
+          <div class="mb-3">
+            <label class="form-label">
+              Puerto personalizado (opcional)
+              <button type="button" class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
+                aria-label="Instrucciones puerto" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-html="true"
+                data-bs-title="Puerto personalizado"
+                data-bs-content="Debe estar entre 40000 y 50000. Si no lo indicas se asigna uno libre.">
                 <i class="bi bi-info-circle" aria-hidden="true"></i>
               </button>
             </label>
-    <input name="custom_port" class="form-control" type="number" min="40000" max="50000" placeholder="Ej: 49123">
-    <small class="text-muted">Debe estar entre 40000 y 50000.</small>
-  </div>
+            <input name="custom_port" class="form-control" type="number" min="40000" max="50000"
+              placeholder="Ej: 49123">
+            <small class="text-muted">Debe estar entre 40000 y 50000.</small>
+          </div>
 
-  <div class="mb-3 custom-block" id="block-internal-port">
-    <label class="form-label">
-      Puerto interno del contenedor (opcional)
-      <button type="button"
-              class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
-              aria-label="Instrucciones puerto interno"
-              data-bs-toggle="popover"
-              data-bs-trigger="focus"
-              data-bs-html="true"
-              data-bs-title="Puerto interno"
-              data-bs-content="Puerto dentro del contenedor que escucha tu aplicacion. Ejemplos: Flask 5000, Django 8000, Node.js 3000. Si no lo indicas se usa 80 por defecto.">
-        <i class="bi bi-info-circle" aria-hidden="true"></i>
-      </button>
-    </label>
-    <input name="internal_port" class="form-control" type="number" min="1" max="65535" placeholder="Ej: 5000">
-    <small class="text-muted">Ejemplos: Flask 5000, Django 8000, Node 3000. Por defecto 80.</small>
-  </div>
+          <div class="mb-3 custom-block" id="block-internal-port">
+            <label class="form-label">
+              Puerto interno del contenedor (opcional)
+              <button type="button" class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
+                aria-label="Instrucciones puerto interno" data-bs-toggle="popover" data-bs-trigger="focus"
+                data-bs-html="true" data-bs-title="Puerto interno"
+                data-bs-content="Puerto dentro del contenedor que escucha tu aplicacion. Ejemplos: Flask 5000, Django 8000, Node.js 3000. Si no lo indicas se usa 80 por defecto.">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+              </button>
+            </label>
+            <input name="internal_port" class="form-control" type="number" min="1" max="65535" placeholder="Ej: 5000">
+            <small class="text-muted">Ejemplos: Flask 5000, Django 8000, Node 3000. Por defecto 80.</small>
+          </div>
 
           <div class="mb-3 custom-block" id="block-dockerfile">
             <label class="form-label">
               Dockerfile (opcional, exclusivo con compose)
-              <button type="button"
-                      class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
-                      aria-label="Instrucciones Dockerfile"
-                      data-bs-toggle="popover"
-                      data-bs-trigger="focus"
-                      data-bs-html="true"
-                      data-bs-title="Instrucciones Dockerfile"
-                      data-bs-content="Crea un archivo llamado Dockerfile con FROM base, copia el codigo (COPY . /app) y define CMD/ENTRYPOINT para arrancar la app.">
+              <button type="button" class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
+                aria-label="Instrucciones Dockerfile" data-bs-toggle="popover" data-bs-trigger="focus"
+                data-bs-html="true" data-bs-title="Instrucciones Dockerfile"
+                data-bs-content="Crea un archivo llamado Dockerfile con FROM base, copia el codigo (COPY . /app) y define CMD/ENTRYPOINT para arrancar la app.">
                 <i class="bi bi-info-circle" aria-hidden="true"></i>
               </button>
             </label>
@@ -223,14 +207,10 @@
           <div class="mb-3 custom-block" id="block-compose">
             <label class="form-label">
               docker-compose.yml (opcional, exclusivo con Dockerfile)
-              <button type="button"
-                      class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
-                      aria-label="Instrucciones docker-compose"
-                      data-bs-toggle="popover"
-                      data-bs-trigger="focus"
-                      data-bs-html="true"
-                      data-bs-title="Instrucciones compose"
-                      data-bs-content="Usa version 3 o superior. Define un servicio principal que exponga puertos y variables. El ZIP se monta como contexto de build o en /app.">
+              <button type="button" class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
+                aria-label="Instrucciones docker-compose" data-bs-toggle="popover" data-bs-trigger="focus"
+                data-bs-html="true" data-bs-title="Instrucciones compose"
+                data-bs-content="Usa version 3 o superior. Define un servicio principal que exponga puertos y variables. El ZIP se monta como contexto de build o en /app.">
                 <i class="bi bi-info-circle" aria-hidden="true"></i>
               </button>
             </label>
@@ -243,14 +223,10 @@
           <div class="mb-3 custom-block" id="block-code">
             <label class="form-label">
               Codigo fuente (.zip obligatorio en modo personalizado)
-              <button type="button"
-                      class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
-                      aria-label="Instrucciones ZIP"
-                      data-bs-toggle="popover"
-                      data-bs-trigger="focus"
-                      data-bs-html="true"
-                      data-bs-title="Contenido del ZIP"
-                      data-bs-content="Sube un ZIP con el codigo y dependencias minimas. Evita carpetas venv. Puedes incluir Dockerfile o compose dentro del ZIP si lo prefieres.">
+              <button type="button" class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
+                aria-label="Instrucciones ZIP" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-html="true"
+                data-bs-title="Contenido del ZIP"
+                data-bs-content="Sube un ZIP con el codigo y dependencias minimas. Evita carpetas venv. Puedes incluir Dockerfile o compose dentro del ZIP si lo prefieres.">
                 <i class="bi bi-info-circle" aria-hidden="true"></i>
               </button>
             </label>
@@ -276,6 +252,21 @@
   <div class="modal-dialog modal-lg">
     <div class="modal-content" id="genericModalContent">
       <!-- Contenido inyectado por HTMX -->
+    </div>
+  </div>
+</div>
+
+<!-- Modal para Dockerfile / docker-compose.yml -->
+<div class="modal fade" id="codeModal" tabindex="-1" aria-labelledby="codeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="codeModalLabel">Código</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <pre id="code-body"><code>Cargando...</code></pre>
+      </div>
     </div>
   </div>
 </div>
