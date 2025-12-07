@@ -783,6 +783,8 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
         service.container_id = container.id
         service.assigned_port = port
         service.status = "running"
+        # Guardar el tag de la imagen (importante para servicios con Dockerfile)
+        service.image = image_to_run
         # Guardar build logs si venía de Dockerfile
         if service.dockerfile:
             _append_log(service, "Imagen construida y contenedor arrancado.")

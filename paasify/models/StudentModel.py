@@ -154,3 +154,15 @@ class UserProfile(models.Model):
             return None
         
         return None
+
+
+class TeacherProfile(UserProfile):
+    """
+    Modelo proxy para perfiles de profesores.
+    Usa la misma tabla que UserProfile pero con un admin separado.
+    """
+    
+    class Meta:
+        proxy = True
+        verbose_name = "Perfil de profesor"
+        verbose_name_plural = "Perfiles de profesores"
