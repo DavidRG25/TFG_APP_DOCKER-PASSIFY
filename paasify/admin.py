@@ -3,7 +3,7 @@ from django import forms
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 
-from paasify.models.StudentModel import UserProfile
+from paasify.models.StudentModel import UserProfile, TeacherProfile
 from paasify.models.SubjectModel import Subject
 from paasify.models.ProjectModel import UserProject
 from paasify.roles import (
@@ -26,7 +26,7 @@ admin.site.site_title = "PaaSify"
 class UserProjectInlineForSubject(admin.TabularInline):
     model = UserProject
     fk_name = "subject"
-    extra = 1
+    extra = 0  # No crear formularios vacíos automáticamente
     autocomplete_fields = ("user_profile",)
 
     # Solo perfiles cuyo usuario pertenece al grupo Student
@@ -47,7 +47,7 @@ class UserProjectInlineForSubject(admin.TabularInline):
 class UserProjectInlineForProfile(admin.TabularInline):
     model = UserProject
     fk_name = "user_profile"
-    extra = 1
+    extra = 0  # No crear formularios vacíos automáticamente
     autocomplete_fields = ("subject",)
 
 
@@ -69,13 +69,30 @@ class SubjectAdminForm(forms.ModelForm):
         # teacher_user: solo usuarios en grupos profesor/Teacher
         self.fields["teacher_user"].queryset = User.objects.filter(
             groups__name__in=[*TEACHER_GROUP_NAMES, DEFAULT_TEACHER_GROUP]
-        ).distinct()
+        ).distinct().order_by('username')
         self.fields["teacher_user"].required = True
+        
+        # Mejorar label del profesor
+        self.fields["teacher_user"].label_from_instance = lambda obj: (
+            f"{obj.username} - {obj.get_full_name() or 'Sin nombre'}"
+        )
+        
+        # Help text mejorado para teacher_user
+        self.fields["teacher_user"].help_text = (
+            'Selecciona el profesor responsable de esta asignatura. '
+            'Solo se muestran usuarios con rol de Profesor.'
+        )
 
         # students: solo usuarios del grupo Student (case-insensitive)
         self.fields["students"].queryset = User.objects.filter(
             groups__name__in=[*STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP]
-        ).distinct()
+        ).distinct().order_by('username')
+        
+        # Help text mejorado para students
+        self.fields["students"].help_text = (
+            'Selecciona los alumnos matriculados en esta asignatura. '
+            'Solo se muestran usuarios con rol de Alumno.'
+        )
 
     def clean_teacher_user(self):
         u = self.cleaned_data.get("teacher_user")
@@ -104,13 +121,35 @@ class SubjectAdminForm(forms.ModelForm):
 @admin.register(Subject)
 class SubjectAdmin(admin.ModelAdmin):
     form = SubjectAdminForm
-    list_display = ("name", "category", "genero", "teacher_user")
+    list_display = (
+        "name",
+        "teacher_user",
+        "category",
+        "genero",
+        "get_students_count",    # Nuevo
+        "get_services_count",    # Nuevo
+    )
     search_fields = ("name", "teacher_user__username", "teacher_user__email")
     list_filter = ("category", "genero")
-    autocomplete_fields = ("teacher_user",)
+    # autocomplete_fields = ("teacher_user",)  # QUITADO: ignora el queryset del formulario
     filter_horizontal = ("students",)
     inlines = [UserProjectInlineForSubject]
     exclude = ("players",)  # oculta campo legacy
+    
+    # Fieldsets con diseño de franjas
+    fieldsets = (
+        ('Información Básica', {
+            'fields': ('name', 'genero', 'category')
+        }),
+        ('Profesor Asignado', {
+            'fields': ('teacher_user',),
+            'description': 'Selecciona el profesor responsable de esta asignatura'
+        }),
+        ('Alumnos Matriculados', {
+            'fields': ('students',),
+            'description': 'Selecciona los alumnos que cursarán esta asignatura'
+        }),
+    )
 
     # Defensa extra si se cambia el form
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
@@ -119,6 +158,21 @@ class SubjectAdmin(admin.ModelAdmin):
                 groups__name__in=[*TEACHER_GROUP_NAMES, DEFAULT_TEACHER_GROUP]
             ).distinct()
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
+    def get_students_count(self, obj):
+        """Muestra el número de alumnos matriculados"""
+        count = obj.students.count()
+        return f"👥 {count}"
+    get_students_count.short_description = 'Alumnos'
+    
+    def get_services_count(self, obj):
+        """Muestra el número de servicios activos en esta asignatura"""
+        from containers.models import Service
+        count = Service.objects.filter(subject=obj).exclude(status='removed').count()
+        if count == 0:
+            return "-"
+        return f"🐳 {count}"
+    get_services_count.short_description = 'Servicios'
 
     # Auto-matricular: si en el inline se añade un UserProject, matriculamos al user del alumno
     def save_formset(self, request, form, formset, change):
@@ -140,115 +194,288 @@ class SubjectAdmin(admin.ModelAdmin):
             obj.delete()
 
 
+
 #  UserProfile (Alumnos)
 
 class UserProfileAdminForm(forms.ModelForm):
     """
-    - Elegir usuario existente (sin UserProfile) o crear uno nuevo → añade a grupo Student.
-    - Al editar, si ya tiene user, no obliga a elegir uno.
+    Formulario para crear perfiles de alumno.
+    Crea automáticamente el usuario con rol Student.
     """
-    create_new_user = forms.BooleanField(required=False, label="Crear usuario nuevo")
-    new_username = forms.CharField(required=False, label="Usuario")
-    new_email = forms.EmailField(required=False, label="Email")
-    new_password1 = forms.CharField(required=False, widget=forms.PasswordInput, label="Contraseña")
-    new_password2 = forms.CharField(required=False, widget=forms.PasswordInput, label="Confirmar contraseña")
-
+    
+    # Campos para crear el usuario
+    username = forms.CharField(
+        label="Nombre de usuario",
+        help_text="Nombre de usuario único para iniciar sesión"
+    )
+    email = forms.EmailField(
+        label="Dirección de email",
+        help_text='Email del usuario (será usado como campo "year" en el perfil)'
+    )
+    first_name = forms.CharField(
+        label="Nombre",
+        required=False,
+        help_text="Nombre del usuario"
+    )
+    last_name = forms.CharField(
+        label="Apellido",
+        required=False,
+        help_text="Apellido del usuario"
+    )
+    
+    # Checkbox para generar contraseña automáticamente
+    generate_password = forms.BooleanField(
+        label="Generar contraseña automáticamente",
+        required=False,
+        initial=False,
+        help_text="Si se marca, se generará una contraseña aleatoria segura (recomendado)"
+    )
+    
+    password1 = forms.CharField(
+        label="Contraseña",
+        widget=forms.PasswordInput,
+        required=False,
+        help_text="Su contraseña no puede ser similar a otros componentes de su información personal.<br>"
+                  "Su contraseña debe contener por lo menos 8 caracteres.<br>"
+                  "Su contraseña no puede ser una contraseña usada muy comúnmente.<br>"
+                  "Su contraseña no puede estar formada exclusivamente por números."
+    )
+    password2 = forms.CharField(
+        label="Confirmación de contraseña",
+        widget=forms.PasswordInput,
+        required=False,
+        help_text="Introduzca la misma contraseña nuevamente, para poder verificar la misma."
+    )
+    
     class Meta:
         model = UserProfile
-        fields = ["user", "nombre", "year"]
+        fields = ["username", "email", "first_name", "last_name", "generate_password", "password1", "password2", "nombre", "year"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Users sin UserProfile; si estamos editando, incluir también el user actual
-        base_qs = User.objects.filter(user_profile__isnull=True)
-        if self.instance and self.instance.pk and self.instance.user_id:
-            base_qs = (base_qs | User.objects.filter(pk=self.instance.user_id)).distinct()
-        self.fields["user"].required = False
-        self.fields["user"].queryset = base_qs
+        
+        # Si estamos editando, pre-poblar campos del usuario
+        if self.instance and self.instance.pk and self.instance.user:
+            self.fields["username"].initial = self.instance.user.username
+            self.fields["username"].disabled = True
+            self.fields["username"].help_text = "No se puede cambiar el nombre de usuario"
+            
+            self.fields["email"].initial = self.instance.user.email
+            self.fields["first_name"].initial = self.instance.user.first_name
+            self.fields["last_name"].initial = self.instance.user.last_name
+            
+            # Ocultar checkbox de generar contraseña al editar
+            self.fields["generate_password"].widget = forms.HiddenInput()
+            
+            # No requerir contraseñas al editar
+            self.fields["password1"].help_text = "Dejar en blanco si no desea cambiar la contraseña"
+            self.fields["password2"].help_text = "Dejar en blanco si no desea cambiar la contraseña"
+        
+        # Autocompletar nombre si no existe (solo si el campo está en el formulario)
+        if "nombre" in self.fields:
+            if not self.instance.nombre and self.instance.user:
+                self.fields["nombre"].initial = (
+                    self.instance.user.get_full_name() 
+                    or self.instance.user.username
+                )
+            self.fields["nombre"].help_text = "Nombre completo del alumno"
+        
+        # Autocompletar year si no existe (solo si el campo está en el formulario)
+        if "year" in self.fields:
+            if not self.instance.year and self.instance.user:
+                self.fields["year"].initial = (
+                    self.instance.user.email 
+                    or f"{self.instance.user.username}@pendiente.local"
+                )
+            self.fields["year"].help_text = "Email o curso del alumno"
 
-        # Permitir autocompletado cuando se crea o vincula un usuario
-        self.fields["nombre"].required = False
-        self.fields["year"].required = False
-
+    def clean_username(self):
+        username = self.cleaned_data.get("username")
+        
+        # Si estamos editando, permitir el username actual
+        if self.instance and self.instance.pk and self.instance.user:
+            if username == self.instance.user.username:
+                return username
+        
+        # Verificar que no exista
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError("Este nombre de usuario ya existe")
+        
+        return username
+    
     def clean(self):
         cleaned = super().clean()
-        create = cleaned.get("create_new_user")
-        selected_user = cleaned.get("user")
-
-        # Si ya hay user enlazado y no se crea uno nuevo, permitir sin select
-        if self.instance and self.instance.pk and self.instance.user_id and not create:
-            return cleaned
-
-        if create:
-            for f in ("new_username", "new_email", "new_password1", "new_password2"):
-                if not cleaned.get(f):
-                    self.add_error(f, "Requerido")
-            if cleaned.get("new_password1") != cleaned.get("new_password2"):
-                self.add_error("new_password2", "Las contraseñas no coinciden")
-            if cleaned.get("new_username") and User.objects.filter(
-                username=cleaned["new_username"]
-            ).exists():
-                self.add_error("new_username", "Este usuario ya existe")
-            if not cleaned.get("nombre"):
-                cleaned["nombre"] = cleaned.get("new_username") or cleaned.get("new_email")
-            if not cleaned.get("year"):
-                cleaned["year"] = cleaned.get("new_email") or f"{cleaned.get('new_username') or 'alumno'}@pendiente.local"
+        
+        # Validar contraseñas
+        password1 = cleaned.get("password1")
+        password2 = cleaned.get("password2")
+        generate_password = cleaned.get("generate_password")
+        
+        # Si estamos creando un nuevo perfil
+        if not self.instance.pk:
+            # Si se marca generar contraseña, no requerir password1/password2
+            if generate_password:
+                # Generar contraseña aleatoria segura
+                from django.contrib.auth.hashers import make_random_password
+                random_password = make_random_password(length=12)
+                cleaned["password1"] = random_password
+                cleaned["password2"] = random_password
+            else:
+                # Si no se genera automáticamente, las contraseñas son obligatorias
+                if not password1 or not password2:
+                    raise forms.ValidationError(
+                        "Debes proporcionar una contraseña o marcar 'Generar contraseña automáticamente'"
+                    )
+                
+                # Validar que coincidan
+                if password1 != password2:
+                    raise forms.ValidationError("Las contraseñas no coinciden")
         else:
-            if not selected_user:
-                raise forms.ValidationError(
-                    "Seleccione un usuario existente o marque 'Crear usuario nuevo'."
-                )
-            if selected_user and not cleaned.get("nombre"):
-                cleaned["nombre"] = (
-                    selected_user.get_full_name()
-                    or selected_user.get_username()
-                    or selected_user.email
-                    or f"alumno-{selected_user.pk}"
-                )
-            if selected_user and not cleaned.get("year"):
-                cleaned["year"] = selected_user.email or f"{selected_user.get_username()}@pendiente.local"
-
+            # Al editar, solo validar si se proporcionaron contraseñas
+            if password1 or password2:
+                if password1 != password2:
+                    raise forms.ValidationError("Las contraseñas no coinciden")
+        
         return cleaned
 
     def save(self, commit=True):
         profile = super().save(commit=False)
-        create = self.cleaned_data.get("create_new_user")
-        if create:
-            u = User(username=self.cleaned_data["new_username"], email=self.cleaned_data["new_email"])
-            u._skip_user_profile_autocreate = True
-            u.set_password(self.cleaned_data["new_password1"])
-            u.save()
-            ensure_user_group(u, STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP)
-            profile.user = u
+        
+        # Crear o actualizar usuario
+        if self.instance.pk and self.instance.user:
+            # Editando: actualizar usuario existente
+            user = self.instance.user
+            user.email = self.cleaned_data["email"]
+            user.first_name = self.cleaned_data.get("first_name", "")
+            user.last_name = self.cleaned_data.get("last_name", "")
+            
+            # Cambiar contraseña solo si se proporcionó
+            if self.cleaned_data.get("password1"):
+                user.set_password(self.cleaned_data["password1"])
+            
+            user.save()
         else:
-            u = self.cleaned_data.get("user") or self.instance.user
-            if u:
-                ensure_user_group(u, STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP)
-                profile.user = u
-
-        # Autocompletar nombre/email si faltan
-        if profile.user:
-            if not profile.nombre:
-                profile.nombre = profile.user.get_username()
-            if not profile.year:
-                profile.year = profile.user.email
+            # Creando: crear nuevo usuario
+            user = User(
+                username=self.cleaned_data["username"],
+                email=self.cleaned_data["email"],
+                first_name=self.cleaned_data.get("first_name", ""),
+                last_name=self.cleaned_data.get("last_name", "")
+            )
+            user._skip_user_profile_autocreate = True
+            user.set_password(self.cleaned_data["password1"])
+            user.save()
+            
+            # Asignar rol Student
+            ensure_user_group(user, STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP)
+            
+            profile.user = user
+        
+        # SIEMPRE actualizar nombre/year desde los datos del usuario (tanto al crear como al editar)
+        profile.nombre = (
+            user.get_full_name() 
+            or user.username
+        )
+        
+        profile.year = (
+            user.email 
+            or f"{user.username}@pendiente.local"
+        )
 
         if commit:
             profile.save()
             self.save_m2m()
+        
         return profile
+
+
 
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
     form = UserProfileAdminForm
-    list_display = ("nombre", "year", "user", "es_usuario_alumno", "display_token", "token_created_at")
+    list_display = (
+        "nombre",
+        "user",
+        "get_role",              # Nuevo
+        "year",
+        "get_subjects_count",    # Nuevo
+        "display_token",
+        "token_created_at"
+    )
     search_fields = ("nombre", "year", "user__username", "user__email")
-    list_filter = ()
-    autocomplete_fields = ("user",)
+    list_filter = (
+        'token_created_at',
+    )
+    # autocomplete_fields = ("user",)  # QUITADO: interfiere con el queryset del formulario
     inlines = [UserProjectInlineForProfile]
-    readonly_fields = ("api_token", "token_created_at")
+    readonly_fields = ("display_token", "token_created_at", "get_nombre_display", "get_year_display")
     actions = ["refresh_api_tokens"]
+    
+    # Fieldsets con diseño de franjas
+    fieldsets = (
+        ('Datos de Usuario', {
+            'fields': ('username', 'email', 'first_name', 'last_name'),
+            'description': 'Información de la cuenta de usuario. El rol se asigna automáticamente como "Student".'
+        }),
+        ('Contraseña', {
+            'fields': ('generate_password', 'password1', 'password2'),
+            'description': 'Contraseña para iniciar sesión. Puedes generarla automáticamente o introducirla manualmente.'
+        }),
+        ('Información del Perfil', {
+            'fields': ('get_nombre_display', 'get_year_display'),
+            'description': 'Información adicional del alumno (generada automáticamente)'
+        }),
+        ('Token API', {
+            'fields': ('display_token', 'token_created_at'),
+            'description': 'Token JWT para autenticación en API. Se genera automáticamente.',
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_nombre_display(self, obj):
+        """Muestra el nombre completo del alumno de forma bonita"""
+        from django.utils.html import format_html
+        if obj and obj.nombre:
+            return format_html(
+                '<div style="background: #e3f2fd; padding: 10px; border-radius: 4px; border-left: 3px solid #2196f3;">'
+                '<strong style="color: #1976d2;">👤 {}</strong>'
+                '</div>',
+                obj.nombre
+            )
+        return format_html('<span style="color: #999;">No especificado</span>')
+    get_nombre_display.short_description = 'Nombre completo'
+    
+    def get_year_display(self, obj):
+        """Muestra el email/curso del alumno de forma bonita"""
+        from django.utils.html import format_html
+        if obj and obj.year:
+            return format_html(
+                '<div style="background: #f3e5f5; padding: 10px; border-radius: 4px; border-left: 3px solid #9c27b0;">'
+                '<strong style="color: #7b1fa2;">📧 {}</strong>'
+                '</div>',
+                obj.year
+            )
+        return format_html('<span style="color: #999;">No especificado</span>')
+    get_year_display.short_description = 'Email / Curso'
+    
+    def get_fieldsets(self, request, obj=None):
+        """Mostrar fieldsets dinámicamente según si estamos creando o editando"""
+        if obj is None:
+            # Creando: ocultar "Información del Perfil" y "Token API"
+            return (
+                ('Datos de Usuario', {
+                    'fields': ('username', 'email', 'first_name', 'last_name'),
+                    'description': 'Información de la cuenta de usuario. El rol se asigna automáticamente como "Student".'
+                }),
+                ('Contraseña', {
+                    'fields': ('generate_password', 'password1', 'password2'),
+                    'description': 'Contraseña para iniciar sesión. Puedes generarla automáticamente o introducirla manualmente.'
+                }),
+            )
+        else:
+            # Editando: mostrar todos los fieldsets
+            return self.fieldsets
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -256,6 +483,41 @@ class UserProfileAdmin(admin.ModelAdmin):
             user__isnull=False,
             user__groups__name__in=[DEFAULT_STUDENT_GROUP, *STUDENT_GROUP_NAMES],
         ).distinct()
+    
+    def get_role(self, obj):
+        """Muestra el rol del usuario con badge de color"""
+        from django.utils.html import format_html
+        
+        if not obj.user:
+            return "-"
+        
+        # Verificar si es profesor
+        if obj.user.groups.filter(name__in=TEACHER_GROUP_NAMES).exists():
+            return format_html(
+                '<span style="background: #4caf50; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px;">👨‍🏫 Profesor</span>'
+            )
+        # Verificar si es alumno
+        elif obj.user.groups.filter(name__in=STUDENT_GROUP_NAMES).exists():
+            return format_html(
+                '<span style="background: #2196f3; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px;">👨‍🎓 Alumno</span>'
+            )
+        else:
+            return format_html(
+                '<span style="background: #9e9e9e; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px;">Sin rol</span>'
+            )
+    get_role.short_description = 'Rol'
+    
+    def get_subjects_count(self, obj):
+        """Muestra el número de asignaturas del alumno"""
+        if not obj.user:
+            return "-"
+        
+        # Contar asignaturas donde el usuario es estudiante
+        count = obj.user.subjects_as_student.count()
+        if count == 0:
+            return "-"
+        return f"📚 {count}"
+    get_subjects_count.short_description = 'Asignaturas'
 
     def es_usuario_alumno(self, obj):
         return bool(
@@ -272,7 +534,7 @@ class UserProfileAdmin(admin.ModelAdmin):
         if obj.api_token:
             return obj.get_masked_token()
         return "-"
-    display_token.short_description = "Token API"
+    display_token.short_description = "Token API (JWT)"
     
     @admin.action(description="Refrescar tokens API de usuarios seleccionados")
     def refresh_api_tokens(self, request, queryset):
@@ -292,38 +554,216 @@ class UserProfileAdmin(admin.ModelAdmin):
             messages.success(request, f"Se refrescaron {count} token(es) exitosamente.")
 
 
-# UserProject (Proyectos)
+#  TeacherProfile (Profesores)
 
-@admin.register(UserProject)
-class UserProjectAdmin(admin.ModelAdmin):
-    list_display = ("place", "user_profile", "subject", "date", "time")
-    list_filter = ("subject", "date")
-    search_fields = ("place", "user_profile__nombre", "subject__name")
-    autocomplete_fields = ("user_profile", "subject")
-
-    # Solo UserProfiles cuyo user pertenece al grupo Student
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if db_field.name == "user_profile":
-            qs = (
-                UserProfile.objects
-                .filter(
-                    user__isnull=False,
-                    user__groups__name__in=[DEFAULT_STUDENT_GROUP, *STUDENT_GROUP_NAMES],
-                )
-                .select_related("user")
-                .distinct()
+class TeacherProfileAdminForm(UserProfileAdminForm):
+    """
+    Formulario para crear perfiles de profesor.
+    Hereda de UserProfileAdminForm pero asigna rol Teacher automáticamente.
+    """
+    
+    def save(self, commit=True):
+        profile = forms.ModelForm.save(self, commit=False)
+        
+        # Crear o actualizar usuario
+        if self.instance.pk and self.instance.user:
+            # Editando: actualizar usuario existente
+            user = self.instance.user
+            user.email = self.cleaned_data["email"]
+            user.first_name = self.cleaned_data.get("first_name", "")
+            user.last_name = self.cleaned_data.get("last_name", "")
+            
+            # Cambiar contraseña solo si se proporcionó
+            if self.cleaned_data.get("password1"):
+                user.set_password(self.cleaned_data["password1"])
+            
+            user.save()
+        else:
+            # Creando: crear nuevo usuario
+            user = User(
+                username=self.cleaned_data["username"],
+                email=self.cleaned_data["email"],
+                first_name=self.cleaned_data.get("first_name", ""),
+                last_name=self.cleaned_data.get("last_name", "")
             )
-            kwargs["queryset"] = qs
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+            user._skip_user_profile_autocreate = True
+            user.set_password(self.cleaned_data["password1"])
+            user.save()
+            
+            # Asignar rol Teacher (diferencia con UserProfileAdminForm)
+            ensure_user_group(user, TEACHER_GROUP_NAMES, DEFAULT_TEACHER_GROUP)
+            
+            profile.user = user
+        
+        # SIEMPRE actualizar nombre/year desde los datos del usuario (tanto al crear como al editar)
+        profile.nombre = (
+            user.get_full_name() 
+            or user.username
+        )
+        
+        profile.year = (
+            user.email 
+            or f"{user.username}@pendiente.local"
+        )
 
-    # Al guardar un UserProject, matricula automáticamente al user del alumno en la asignatura
-    def save_model(self, request, obj, form, change):
-        super().save_model(request, obj, form, change)
-        profile = getattr(obj, "user_profile", None)
-        user = getattr(profile, "user", None) if profile else None
-        if user:
-            obj.subject.students.add(user)
+        if commit:
+            profile.save()
+            self.save_m2m()
+        
+        return profile
 
+
+@admin.register(TeacherProfile)
+class TeacherProfileAdmin(admin.ModelAdmin):
+    form = TeacherProfileAdminForm
+    list_display = (
+        "nombre",
+        "user",
+        "get_role",
+        "year",
+        "get_subjects_count",
+        "display_token",
+        "token_created_at"
+    )
+    search_fields = ("nombre", "year", "user__username", "user__email")
+    list_filter = (
+        'token_created_at',
+    )
+    inlines = []  # Sin inlines para profesores
+    readonly_fields = ("display_token", "token_created_at", "get_nombre_display", "get_year_display")
+    actions = ["refresh_api_tokens"]
+    
+    # Fieldsets con diseño de franjas
+    fieldsets = (
+        ('Datos de Usuario', {
+            'fields': ('username', 'email', 'first_name', 'last_name'),
+            'description': 'Información de la cuenta de usuario. El rol se asigna automáticamente como "Teacher".'
+        }),
+        ('Contraseña', {
+            'fields': ('generate_password', 'password1', 'password2'),
+            'description': 'Contraseña para iniciar sesión. Puedes generarla automáticamente o introducirla manualmente.'
+        }),
+        ('Información del Perfil', {
+            'fields': ('get_nombre_display', 'get_year_display'),
+            'description': 'Información adicional del profesor (generada automáticamente)'
+        }),
+        ('Token API', {
+            'fields': ('display_token', 'token_created_at'),
+            'description': 'Token JWT para autenticación en API. Se genera automáticamente.',
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_nombre_display(self, obj):
+        """Muestra el nombre completo del profesor de forma bonita"""
+        from django.utils.html import format_html
+        if obj and obj.nombre:
+            return format_html(
+                '<div style="background: #e8f5e9; padding: 10px; border-radius: 4px; border-left: 3px solid #4caf50;">'
+                '<strong style="color: #2e7d32;">👨‍🏫 {}</strong>'
+                '</div>',
+                obj.nombre
+            )
+        return format_html('<span style="color: #999;">No especificado</span>')
+    get_nombre_display.short_description = 'Nombre completo'
+    
+    def get_year_display(self, obj):
+        """Muestra el email/curso del profesor de forma bonita"""
+        from django.utils.html import format_html
+        if obj and obj.year:
+            return format_html(
+                '<div style="background: #fff3e0; padding: 10px; border-radius: 4px; border-left: 3px solid #ff9800;">'
+                '<strong style="color: #e65100;">📧 {}</strong>'
+                '</div>',
+                obj.year
+            )
+        return format_html('<span style="color: #999;">No especificado</span>')
+    get_year_display.short_description = 'Email / Curso'
+    
+    def get_fieldsets(self, request, obj=None):
+        """Mostrar fieldsets dinámicamente según si estamos creando o editando"""
+        if obj is None:
+            # Creando: ocultar "Información del Perfil" y "Token API"
+            return (
+                ('Datos de Usuario', {
+                    'fields': ('username', 'email', 'first_name', 'last_name'),
+                    'description': 'Información de la cuenta de usuario. El rol se asigna automáticamente como "Teacher".'
+                }),
+                ('Contraseña', {
+                    'fields': ('generate_password', 'password1', 'password2'),
+                    'description': 'Contraseña para iniciar sesión. Puedes generarla automáticamente o introducirla manualmente.'
+                }),
+            )
+        else:
+            # Editando: mostrar todos los fieldsets
+            return self.fieldsets
+
+    def get_queryset(self, request):
+        """Filtrar solo perfiles con usuarios Teacher"""
+        from django.db.models import Q
+        qs = super().get_queryset(request)
+        
+        # Construir filtro OR para todos los nombres de grupos Teacher
+        teacher_filter = Q()
+        for group_name in [DEFAULT_TEACHER_GROUP] + list(TEACHER_GROUP_NAMES):
+            teacher_filter |= Q(user__groups__name__iexact=group_name)
+        
+        return qs.filter(
+            user__isnull=False
+        ).filter(teacher_filter).distinct()
+    
+    def get_role(self, obj):
+        """Muestra el rol del usuario con badge de color"""
+        from django.utils.html import format_html
+        
+        if not obj.user:
+            return "-"
+        
+        # Verificar si es profesor
+        if obj.user.groups.filter(name__in=TEACHER_GROUP_NAMES).exists():
+            return format_html(
+                '<span style="background: #4caf50; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px;">👨‍🏫 Profesor</span>'
+            )
+        else:
+            return format_html(
+                '<span style="background: #9e9e9e; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px;">Sin rol</span>'
+            )
+    get_role.short_description = 'Rol'
+    
+    def get_subjects_count(self, obj):
+        """Muestra el número de asignaturas que imparte el profesor"""
+        if not obj.user:
+            return "-"
+        
+        # Contar asignaturas donde el usuario es profesor
+        count = Subject.objects.filter(teacher_user=obj.user).count()
+        if count == 0:
+            return "-"
+        return f"📚 {count}"
+    get_subjects_count.short_description = 'Asignaturas'
+    
+    def display_token(self, obj):
+        """Muestra el token parcialmente oculto (ultimos 8 caracteres)."""
+        if obj.api_token:
+            return obj.get_masked_token()
+        return "-"
+    display_token.short_description = "Token API (JWT)"
+    
+    @admin.action(description="Refrescar tokens API de usuarios seleccionados")
+    def refresh_api_tokens(self, request, queryset):
+        """Action para refrescar tokens de multiples usuarios."""
+        from django.contrib import messages
+        count = 0
+        for profile in queryset:
+            if profile.user:
+                try:
+                    profile.refresh_token(expiration_days=365)
+                    count += 1
+                except Exception as e:
+                    messages.error(request, f"Error al refrescar token de {profile.nombre}: {e}")
+        
+        if count > 0:
+            messages.success(request, f"Se refrescaron {count} token(es) exitosamente.")
 
 
 
@@ -597,6 +1037,216 @@ class CustomUserAdmin(BaseUserAdmin):
                     form._generated_password
                 )
             )
+
+
+
+#  UserProject (Proyectos de Alumnos)
+
+@admin.register(UserProject)
+class UserProjectAdmin(admin.ModelAdmin):
+    list_display = (
+        'place',
+        'get_student_name',      # Nuevo
+        'subject',
+        'get_services_count',    # Nuevo
+        'get_project_status',    # Nuevo
+        'date',                  # De version anterior
+        'time',                  # De version anterior
+    )
+    search_fields = (
+        'place',
+        'user_profile__nombre',
+        'user_profile__user__username',
+        'subject__name',
+    )
+    list_filter = ('subject', 'date')  # Agregado 'date' de version anterior
+    autocomplete_fields = ('user_profile', 'subject')
+    readonly_fields = ('get_services_list',)
+    
+    # Fieldsets con diseño de franjas
+    fieldsets = (
+        ('Información del Proyecto', {
+            'fields': ('place',),
+            'description': 'Nombre identificativo del proyecto'
+        }),
+        ('Asignación', {
+            'fields': ('user_profile', 'subject'),
+            'description': 'Alumno y asignatura asociados al proyecto'
+        }),
+        ('Servicios Desplegados', {
+            'fields': ('get_services_list',),
+            'description': 'Contenedores Docker desplegados en este proyecto',
+            'classes': ('collapse',)
+        }),
+        ('Fecha y Hora', {
+            'fields': ('date', 'time'),
+            'description': 'Fecha y hora de creación del proyecto',
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def get_services_list(self, obj):
+        """Muestra la lista de servicios desplegados en este proyecto"""
+        from django.utils.html import format_html
+        from django.utils.safestring import mark_safe
+        
+        # Verificar objeto
+        if not obj:
+            return format_html('<span style="color: red;">❌ Objeto no existe</span>')
+        
+        if not obj.user_profile:
+            return format_html('<span style="color: orange;">⚠️ Sin perfil de usuario asignado</span>')
+        
+        if not obj.user_profile.user:
+            return format_html('<span style="color: orange;">⚠️ Sin usuario asignado al perfil</span>')
+        
+        from containers.models import Service
+        services = Service.objects.filter(
+            owner=obj.user_profile.user,
+            subject=obj.subject
+        ).exclude(status='removed')
+        
+        count = services.count()
+        
+        if count == 0:
+            return format_html(
+                '<div style="padding: 10px; background: #f0f0f0; border-radius: 4px;">'
+                '<span style="color: gray;">📦 No hay servicios desplegados para este proyecto</span><br>'
+                '<small>Usuario: <strong>{}</strong> | Asignatura: <strong>{}</strong></small>'
+                '</div>',
+                obj.user_profile.user.username,
+                obj.subject.name
+            )
+        
+        # Construir tabla HTML
+        try:
+            html = f'<div style="margin: 10px 0;"><strong>🐳 {count} servicio(s) encontrado(s)</strong></div>'
+            html += '<table style="width: 100%; border-collapse: collapse; border: 1px solid #ddd;">'
+            html += '<thead><tr style="background: #417690; color: white;">'
+            html += '<th style="padding: 8px; text-align: left;">Nombre</th>'
+            html += '<th style="padding: 8px; text-align: left;">Imagen</th>'
+            html += '<th style="padding: 8px; text-align: left;">Estado</th>'
+            html += '<th style="padding: 8px; text-align: left;">Puertos</th>'
+            html += '</tr></thead><tbody>'
+            
+            for service in services:
+                # Color según estado
+                if service.status == 'running':
+                    status_color = 'green'
+                    status_icon = '✅'
+                elif service.status == 'stopped':
+                    status_color = 'red'
+                    status_icon = '❌'
+                else:
+                    status_color = 'orange'
+                    status_icon = '🟡'
+                
+                # Formatear puertos
+                if service.assigned_port and service.internal_port:
+                    ports_display = f"{service.assigned_port}:{service.internal_port}"
+                elif service.assigned_port:
+                    ports_display = str(service.assigned_port)
+                else:
+                    ports_display = "-"
+                
+                html += '<tr style="border-bottom: 1px solid #ddd;">'
+                html += f'<td style="padding: 8px;"><strong>{service.name}</strong></td>'
+                html += f'<td style="padding: 8px;"><code>{service.image or "-"}</code></td>'
+                html += f'<td style="padding: 8px; color: {status_color};">{status_icon} {service.status}</td>'
+                html += f'<td style="padding: 8px;">{ports_display}</td>'
+                html += '</tr>'
+            
+            html += '</tbody></table>'
+            return mark_safe(html)
+        except Exception as e:
+            return format_html('<span style="color: red;">❌ Error: {}</span>', str(e))
+    get_services_list.short_description = 'Servicios Desplegados'
+
+    
+    def get_student_name(self, obj):
+        """Muestra el nombre completo del alumno"""
+        if obj.user_profile and obj.user_profile.user:
+            full_name = obj.user_profile.user.get_full_name()
+            if full_name:
+                return full_name
+            return obj.user_profile.user.username
+        return obj.user_profile.nombre if obj.user_profile else "-"
+    get_student_name.short_description = 'Alumno'
+    get_student_name.admin_order_field = 'user_profile__nombre'
+    
+    def get_services_count(self, obj):
+        """Muestra el número de servicios del proyecto"""
+        if obj.user_profile and obj.user_profile.user:
+            from containers.models import Service
+            count = Service.objects.filter(
+                owner=obj.user_profile.user,
+                subject=obj.subject
+            ).exclude(status='removed').count()
+            
+            if count == 0:
+                return "-"
+            return f"🐳 {count}"
+        return "0"
+    get_services_count.short_description = 'Servicios'
+    
+    def get_project_status(self, obj):
+        """Muestra el estado del proyecto según sus servicios"""
+        from django.utils.html import format_html
+        
+        if not obj.user_profile or not obj.user_profile.user:
+            return format_html('<span style="color: gray;">⚪ Sin usuario</span>')
+        
+        from containers.models import Service
+        services = Service.objects.filter(
+            owner=obj.user_profile.user,
+            subject=obj.subject
+        ).exclude(status='removed')
+        
+        if not services.exists():
+            return format_html('<span style="color: gray;">⚪ Sin servicios</span>')
+        
+        running = services.filter(status='running').count()
+        total = services.count()
+        
+        if running == total:
+            return format_html(
+                '<span style="color: green; font-weight: bold;">✅ Todos activos ({}/{})</span>',
+                running, total
+            )
+        elif running > 0:
+            return format_html(
+                '<span style="color: orange; font-weight: bold;">🟡 Algunos activos ({}/{} encendidos)</span>',
+                running, total
+            )
+        else:
+            return format_html(
+                '<span style="color: red; font-weight: bold;">❌ Todos detenidos (0/{})</span>',
+                total
+            )
+    get_project_status.short_description = 'Estado'
+    
+    # De version anterior: filtrar solo alumnos en el selector de user_profile
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if db_field.name == "user_profile":
+            qs = (
+                UserProfile.objects
+                .filter(
+                    user__isnull=False,
+                    user__groups__name__in=[DEFAULT_STUDENT_GROUP, *STUDENT_GROUP_NAMES],
+                )
+                .select_related("user")
+                .distinct()
+            )
+            kwargs["queryset"] = qs
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
+    # De version anterior: matricular automaticamente al alumno en la asignatura
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        profile = getattr(obj, "user_profile", None)
+        user = getattr(profile, "user", None) if profile else None
+        if user:
+            obj.subject.students.add(user)
 
 
 # Desregistrar el UserAdmin por defecto y registrar el personalizado

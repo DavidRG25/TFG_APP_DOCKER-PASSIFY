@@ -1,0 +1,247 @@
+<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  function copyToClipboard(elementSelector) {
+    const element = document.querySelector(elementSelector);
+    if (!element) return;
+    element.select();
+    document.execCommand('copy');
+    showToast('¡Copiado!');
+  }
+
+  htmx.on('htmx:configRequest', (e) => {
+    const token = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
+    if (token) {
+      e.detail.headers['X-CSRFToken'] = token;
+    }
+  });
+
+  function showToast(message, extraClass = 'text-bg-success') {
+    const box = document.getElementById('toast-container');
+    if (!box) return;
+    const el = document.createElement('div');
+    el.className = `toast align-items-center ${extraClass} border-0 show`;
+    el.role = 'alert';
+    el.innerHTML = `
+      <div class="d-flex">
+        <div class="toast-body">${message}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto"
+                data-bs-dismiss="toast" aria-label="Cerrar"></button>
+      </div>`;
+    box.appendChild(el);
+    setTimeout(() => el.remove(), 2500);
+  }
+
+  function resetNewServiceForm() {
+    const form = document.getElementById('newServiceForm');
+    if (!form) return;
+    form.reset();
+    const errors = document.getElementById('form-errors');
+    if (errors) errors.innerHTML = '';
+    ['dockerfile', 'compose', 'code'].forEach((name) => {
+      const input = document.querySelector(`input[name="${name}"]`);
+      if (input) {
+        input.value = '';
+        input.disabled = false;
+        input.dispatchEvent(new Event('change'));
+      }
+    });
+    applyMode();
+    syncExclusion();
+    document.querySelectorAll('[data-bs-toggle="popover"]').forEach((el) => {
+      const inst = bootstrap.Popover.getInstance(el);
+      if (inst) inst.hide();
+    });
+  }
+
+  document.body.addEventListener('service:modal-close', (evt) => {
+    const modalId = evt.detail?.modalId || 'newServiceModal';
+    const modalEl = document.getElementById(modalId);
+    if (!modalEl) return;
+    (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).hide();
+    resetNewServiceForm();
+  });
+
+  document.body.addEventListener('service:toast', (evt) => {
+    const detail = evt.detail || {};
+    showToast(detail.message || 'Operacion completada', detail.variant || 'text-bg-success');
+  });
+
+  const newServiceModal = document.getElementById('newServiceModal');
+  if (newServiceModal) {
+    newServiceModal.addEventListener('hidden.bs.modal', () => {
+      resetNewServiceForm();
+    });
+  }
+
+  htmx.on('htmx:afterRequest', (evt) => {
+    if (evt.detail?.requestConfig?.elt?.id === 'newServiceForm') {
+      const status = evt.detail.xhr?.status || 0;
+      if (status < 400) {
+        resetNewServiceForm();
+        if (newServiceModal) {
+          (bootstrap.Modal.getInstance(newServiceModal) || new bootstrap.Modal(newServiceModal)).hide();
+        }
+      }
+    }
+  });
+
+  htmx.on('htmx:responseError', (evt) => {
+    const xhr = evt.detail.xhr;
+    const status = xhr?.status ?? 0;
+    const msg = xhr?.responseText || 'Se produjo un error inesperado';
+    showToast(`Error (${status}): ${msg}`, 'text-bg-danger');
+  });
+
+  function applyMode() {
+    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'default';
+    const imgSel = document.querySelector('select[name="image"]');
+    const dockerfile = document.querySelector('input[name="dockerfile"]');
+    const compose = document.querySelector('input[name="compose"]');
+    const code = document.querySelector('input[name="code"]');
+    const internalPort = document.querySelector('input[name="internal_port"]');
+    const customBlocks = document.querySelectorAll('.custom-block');
+
+    if (mode === 'default') {
+      imgSel.disabled = false;
+      customBlocks.forEach((b) => b.classList.add('opacity-50'));
+      [dockerfile, compose, code].forEach((input) => {
+        if (!input) return;
+        input.disabled = true;
+        input.value = '';
+        input.dispatchEvent(new Event('change'));
+      });
+      if (internalPort) {
+        internalPort.value = '';
+        internalPort.disabled = true;
+      }
+    } else {
+      imgSel.disabled = true;
+      customBlocks.forEach((b) => b.classList.remove('opacity-50'));
+      [dockerfile, compose, code].forEach((input) => {
+        if (input) input.disabled = false;
+      });
+      if (internalPort) {
+        internalPort.disabled = false;
+      }
+    }
+    syncExclusion();
+  }
+
+  function syncExclusion() {
+    const dockerfile = document.querySelector('input[name="dockerfile"]');
+    const compose = document.querySelector('input[name="compose"]');
+    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'default';
+
+    if (mode === 'default') {
+      const codeInput = document.querySelector('input[name="code"]');
+      if (dockerfile) {
+        dockerfile.disabled = true;
+      }
+      if (compose) {
+        compose.disabled = true;
+      }
+      if (codeInput) {
+        codeInput.disabled = true;
+      }
+      return;
+    }
+
+    if (dockerfile.files?.length) {
+      compose.value = '';
+      compose.disabled = true;
+    } else if (compose.files?.length) {
+      dockerfile.value = '';
+      dockerfile.disabled = true;
+    } else {
+      dockerfile.disabled = false;
+      compose.disabled = false;
+    }
+
+  }
+
+  function clearFile(name) {
+    const input = document.querySelector(`input[name="${name}"]`);
+    if (!input) return;
+    const newInput = input.cloneNode(true);
+    newInput.value = '';
+    input.parentNode.replaceChild(newInput, input);
+    newInput.addEventListener('change', syncExclusion);
+    syncExclusion();
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    applyMode();
+    document.querySelectorAll('input[name="mode"]').forEach((radio) => {
+      radio.addEventListener('change', applyMode);
+    });
+    ['dockerfile', 'compose', 'code'].forEach((name) => {
+      const input = document.querySelector(`input[name="${name}"]`);
+      if (input) input.addEventListener('change', syncExclusion);
+    });
+    const popoverTriggerList = Array.from(document.querySelectorAll('[data-bs-toggle="popover"]'));
+    popoverTriggerList.forEach((el) => new bootstrap.Popover(el));
+
+    // Función para refrescar la tabla
+    function refreshTable() {
+      const tableElement = document.getElementById('service-table');
+      if (tableElement && typeof htmx !== 'undefined') {
+        const url = tableElement.getAttribute('hx-get') || '{% url "containers:service_table" %}';
+        htmx.ajax('GET', url, {
+          target: '#service-table',
+          swap: 'innerHTML'
+        });
+      }
+    }
+
+    // Calcular estadísticas desde el DOM (sin recargar página)
+    function updateStatsFromTable() {
+      let running = 0;
+      let stopped = 0;
+      
+      // Seleccionar solo las filas directas de la tabla
+      const rows = document.querySelectorAll('#service-table > tr');
+      
+      rows.forEach(row => {
+        // La columna de estado es la 5ª (índice 4) ahora: Proyecto, Nombre, Imagen, Puerto, Estado, Acciones
+        const statusCell = row.children[4]; 
+        if (!statusCell) return;
+
+        // Buscar badges solo dentro de la celda de estado
+        const badge = statusCell.querySelector('.badge');
+        if (badge) {
+          const text = badge.textContent.trim().toLowerCase();
+          if (text.includes('running')) {
+            running++;
+          } else if (text.includes('stopped') || text.includes('exited')) {
+            stopped++;
+          }
+        }
+      });
+
+      // Actualizar DOM
+      const statRunning = document.getElementById('stat-running');
+      const statStopped = document.getElementById('stat-stopped');
+      
+      if (statRunning) statRunning.textContent = running;
+      if (statStopped) statStopped.textContent = stopped;
+    }
+
+    // Auto-refresh de la tabla cada 2 segundos
+    setInterval(refreshTable, 2000);
+
+    // Al terminar cualquier request HTMX (tabla actualizada o acción botón)
+    document.body.addEventListener('htmx:afterOnLoad', (evt) => {
+       // Recalcular estadísticas inmediatamente
+       setTimeout(updateStatsFromTable, 100);
+    });
+
+    // Detectar cambios de estado y forzar refresh inmediato de tabla
+    document.body.addEventListener('htmx:afterRequest', (evt) => {
+      const url = evt.detail.pathInfo.requestPath;
+      if (url.includes('/start/') || url.includes('/stop/') || url.includes('/remove/')) {
+        setTimeout(refreshTable, 200); // Refresh tabla rápido
+      }
+    });
+  });
+</script>

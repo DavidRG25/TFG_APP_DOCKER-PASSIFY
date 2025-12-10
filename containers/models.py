@@ -46,8 +46,16 @@ class Service(models.Model):
         related_name="services",
         verbose_name="Asignatura",
     )
+    project = models.ForeignKey(
+        "paasify.UserProject",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="services",
+        verbose_name="Proyecto",
+    )
     name = models.CharField("Nombre", max_length=100)
-    image = models.CharField("Imagen", max_length=200)
+    image = models.CharField("Imagen", max_length=200, blank=True)
     container_id = models.CharField("ID de contenedor", max_length=100, blank=True, null=True)
     assigned_port = models.PositiveIntegerField("Puerto asignado", null=True, blank=True)
     internal_port = models.PositiveIntegerField("Puerto interno", default=80)
@@ -73,6 +81,62 @@ class Service(models.Model):
     def __str__(self) -> str:
         subject_suffix = f" -> {self.subject.name}" if getattr(self, "subject", None) else ""
         return f"{self.name} ({self.owner.username}){subject_suffix}"
+
+    @property
+    def has_compose(self) -> bool:
+        """
+        Indica si el servicio tiene docker-compose asociado.
+        Verifica que exista el archivo en media/services/<id>/docker-compose.yml
+        """
+        if not self.compose:
+            return False
+        from django.core.files.storage import default_storage
+        from pathlib import Path
+        # Verificar que existe en la ruta esperada
+        expected_path = f"services/{self.pk}/docker-compose.yml"
+        try:
+            return default_storage.exists(expected_path) or default_storage.exists(self.compose.name)
+        except Exception:
+            return False
+    
+    
+    def get_compose_status_summary(self):
+        """Retorna estado agregado: running 2/3, stopped 0/2, etc."""
+        if not self.has_compose:
+            return ""
+        total = self.containers.count()
+        if total == 0:
+            return ""
+        running = self.containers.filter(status="running").count()
+        return f"{running}/{total}"
+
+class ServiceContainer(models.Model):
+    """
+    Representa cada contenedor individual en un servicio docker-compose.
+    Para servicios simples, no se usa este modelo.
+    """
+    service = models.ForeignKey(
+        Service,
+        on_delete=models.CASCADE,
+        related_name="containers",
+        verbose_name="Servicio",
+    )
+    name = models.CharField("Nombre del contenedor", max_length=100)
+    container_id = models.CharField("ID Docker", max_length=100, blank=True, null=True)
+    status = models.CharField("Estado", max_length=20, default="unknown")
+    internal_ports = models.JSONField("Puertos internos", blank=True, null=True)
+    assigned_ports = models.JSONField("Puertos asignados", blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("service", "name")
+        ordering = ("service", "name")
+        verbose_name = "Contenedor de Servicio"
+        verbose_name_plural = "Contenedores de Servicio"
+
+    def __str__(self) -> str:
+        return f"{self.service.name}:{self.name}"
 
 
 class AllowedImage(models.Model):
