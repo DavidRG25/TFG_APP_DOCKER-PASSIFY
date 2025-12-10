@@ -1,0 +1,45 @@
+{# Partial: Modo COMPOSE - Multicontenedor #}
+<div class="d-flex flex-column gap-2 w-100">
+    {# Botones globales del servicio #}
+    <div class="d-flex flex-wrap gap-1">
+        <button class="btn btn-sm btn-success" {% if service.status == 'running' %}disabled{% endif %}
+            hx-post="{% url 'service-start' service.id %}" hx-swap="none"
+            title="Iniciar todos los contenedores">
+            Iniciar servicio
+        </button>
+
+        <button class="btn btn-sm btn-warning" {% if service.status != 'running' %}disabled{% endif %}
+            hx-post="{% url 'service-stop' service.id %}" hx-swap="none"
+            title="Detener todos los contenedores">
+            Detener servicios
+        </button>
+
+        <button class="btn btn-sm btn-danger" hx-post="{% url 'service-remove' service.id %}"
+            hx-target="#service-{{ service.id }}" hx-swap="outerHTML" hx-confirm="¿Eliminar definitivamente?"
+            title="Eliminar servicio">
+            Eliminar
+        </button>
+
+        <button class="btn btn-sm btn-secondary" hx-get="{% url 'service-logs' service.id %}"
+            hx-target="#genericModalContent" hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#genericModal"
+            title="Ver logs del servicio">
+            Logs
+        </button>
+
+        {% if service.compose %}
+        <button class="btn btn-sm btn-info" hx-get="{% url 'service-compose' service.id %}" hx-target="#code-body"
+            hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#codeModal" title="Ver docker-compose">
+            Compose
+        </button>
+        {% endif %}
+    </div>
+
+    {# Tarjetas de contenedores individuales #}
+    {% for container in service.containers.all %}
+    {% if container.name != "principal" %}
+    {% include "containers/_partials/services/_container_card.html" with container=container service=service host=host %}
+    {% endif %}
+    {% empty %}
+    <small class="text-muted">Sin contenedores detectados.</small>
+    {% endfor %}
+</div>

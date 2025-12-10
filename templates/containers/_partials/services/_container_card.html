@@ -1,0 +1,72 @@
+{# Partial: Tarjeta de contenedor individual #}
+<div class="border rounded-3 p-2 bg-light">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div>
+            {# Icono según tipo de servicio #}
+            {% if 'redis' in container.name|lower %}
+            <i class="fas fa-database text-danger me-2"></i>
+            {% elif 'postgres' in container.name|lower or 'mysql' in container.name|lower or 'mariadb' in container.name|lower %}
+            <i class="fas fa-database text-primary me-2"></i>
+            {% elif 'mongo' in container.name|lower %}
+            <i class="fas fa-leaf text-success me-2"></i>
+            {% elif 'web' in container.name|lower or 'app' in container.name|lower or 'nginx' in container.name|lower %}
+            <i class="fas fa-globe text-info me-2"></i>
+            {% elif 'worker' in container.name|lower or 'celery' in container.name|lower %}
+            <i class="fas fa-cog text-warning me-2"></i>
+            {% else %}
+            <i class="fas fa-cube text-secondary me-2"></i>
+            {% endif %}
+            <strong class="text-primary">{{ container.name }}</strong>
+        </div>
+        <span class="badge
+      {% if container.status == 'running' %} bg-success
+      {% elif container.status == 'stopped' %} bg-secondary
+      {% elif container.status == 'error' %} bg-danger
+      {% else %} bg-warning
+      {% endif %}">
+            {{ container.status|default:'unknown'|title }}
+        </span>
+    </div>
+
+    <div class="d-flex flex-wrap gap-1">
+        <button class="btn btn-sm btn-outline-success" {% if container.status == 'running' %}disabled{% endif %}
+            hx-post="{% url 'service-start-container' pk=service.id container_pk=container.id %}"
+            hx-target="#service-{{ service.id }}" hx-swap="outerHTML" title="Iniciar {{ container.name }}">
+            Iniciar
+        </button>
+
+        <button class="btn btn-sm btn-outline-warning" {% if container.status != 'running' %}disabled{% endif %}
+            hx-post="{% url 'service-stop-container-action' pk=service.id container_pk=container.id %}"
+            hx-target="#service-{{ service.id }}" hx-swap="outerHTML" title="Detener {{ container.name }}">
+            Detener
+        </button>
+
+        <button class="btn btn-sm btn-outline-secondary"
+            hx-get="{% url 'service-logs' service.id %}?container={{ container.id }}" hx-target="#genericModalContent"
+            hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#genericModal"
+            title="Ver logs de {{ container.name }}">
+            Logs
+        </button>
+
+        {% if container.status == 'running' and container.container_id %}
+        <a href="{% url 'containers:terminal_view' service.id %}?container={{ container.id }}"
+            class="btn btn-sm btn-outline-dark" title="Terminal de {{ container.name }}">
+            Terminal
+        </a>
+        {% else %}
+        <button class="btn btn-sm btn-outline-dark" disabled>Terminal</button>
+        {% endif %}
+
+        {# Botón Acceder si tiene puertos #}
+        {% if container.assigned_ports and host %}
+        {% with first_port=container.assigned_ports.0.external %}
+        {% if first_port %}
+        <a href="http://{{ host }}:{{ first_port }}" class="btn btn-sm btn-outline-primary" target="_blank"
+            rel="noopener" title="Acceder a {{ container.name }}">
+            Acceder
+        </a>
+        {% endif %}
+        {% endwith %}
+        {% endif %}
+    </div>
+</div>

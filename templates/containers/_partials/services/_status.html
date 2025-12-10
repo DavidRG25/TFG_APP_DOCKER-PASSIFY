@@ -1,0 +1,16 @@
+{# Partial: Badge de estado del servicio #}
+<span class="badge text-uppercase fw-semibold px-3 py-2
+    {% if service.status == 'running' %} bg-success text-white
+    {% elif service.status == 'stopped' %} bg-secondary text-white
+    {% elif service.status == 'error' %} bg-danger text-white
+    {% else %} bg-warning text-dark
+    {% endif %}">
+    {{ service.status|default:'unknown'|title }}
+    {% if service.has_compose %}
+    {% with summary=service.get_compose_status_summary %}
+    {% if summary %}
+    <small class="ms-1" style="font-size: 1em; opacity: 0.9;">({{ summary }})</small>
+    {% endif %}
+    {% endwith %}
+    {% endif %}
+</span>

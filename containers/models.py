@@ -46,8 +46,16 @@ class Service(models.Model):
         related_name="services",
         verbose_name="Asignatura",
     )
+    project = models.ForeignKey(
+        "paasify.UserProject",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="services",
+        verbose_name="Proyecto",
+    )
     name = models.CharField("Nombre", max_length=100)
-    image = models.CharField("Imagen", max_length=200)
+    image = models.CharField("Imagen", max_length=200, blank=True)
     container_id = models.CharField("ID de contenedor", max_length=100, blank=True, null=True)
     assigned_port = models.PositiveIntegerField("Puerto asignado", null=True, blank=True)
     internal_port = models.PositiveIntegerField("Puerto interno", default=80)
@@ -90,7 +98,17 @@ class Service(models.Model):
             return default_storage.exists(expected_path) or default_storage.exists(self.compose.name)
         except Exception:
             return False
-
+    
+    
+    def get_compose_status_summary(self):
+        """Retorna estado agregado: running 2/3, stopped 0/2, etc."""
+        if not self.has_compose:
+            return ""
+        total = self.containers.count()
+        if total == 0:
+            return ""
+        running = self.containers.filter(status="running").count()
+        return f"{running}/{total}"
 
 class ServiceContainer(models.Model):
     """

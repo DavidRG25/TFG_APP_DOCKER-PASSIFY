@@ -1,462 +1,64 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% load static %}
 
-{% block extrahead %}
-<link rel="stylesheet" href="{% static 'assets/css/dashboard.css' %}">
-{% endblock %}
-
 {% block body %}
-<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-3">
-  <div class="dashboard-hero-band w-100">
-    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between">
-      <div class="mb-3 mb-lg-0">
-        <div class="dashboard-hero-title">
-          {% if current_subject %}{{ current_subject.name }} - Mis servicios{% else %}Mis servicios{% endif %}
-        </div>
-        <p class="dashboard-hero-subtitle">Gestiona tus contenedores y despliegues activos.</p>
-      </div>
+<div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh;">
+  {# Header con degradado #}
+  <div class="rounded-3 p-4 mb-4 shadow-sm" style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+    <div class="d-flex justify-content-between align-items-center">
       <div>
-        <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#newServiceModal">
-          Nuevo servicio
-        </button>
+        <h1 class="h3 mb-1 text-white fw-bold">Mis servicios</h1>
+        <p class="text-white-50 mb-0">Gestiona tus contenedores y despliegues activos.</p>
       </div>
+      <button class="btn btn-light shadow-sm" data-bs-toggle="modal" data-bs-target="#newServiceModal">
+        <i class="fas fa-plus me-2"></i>Nuevo servicio
+      </button>
     </div>
-    {% if stats %}
-    <div class="row g-3 mt-3">
-      <div class="col-6 col-md-3">
-        <div class="stat-card bg-white">
-          <p class="stat-label"><i class="fas fa-layer-group me-1 text-primary"></i> - Totales</p>
-          <p class="stat-value text-primary mb-0">{{ stats.total }}</p>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="stat-card bg-white">
-          <p class="stat-label"><i class="fas fa-play-circle me-1 text-success"></i> - Ejecutando</p>
-          <p class="stat-value text-success mb-0">{{ stats.running }}</p>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="stat-card bg-white">
-          <p class="stat-label"><i class="fas fa-pause-circle me-1 text-secondary"></i> - Detenidos</p>
-          <p class="stat-value text-secondary mb-0">{{ stats.stopped }}</p>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div class="stat-card bg-white">
-          <p class="stat-label"><i class="fas fa-book me-1 text-info"></i> - Asignaturas</p>
-          <p class="stat-value text-info mb-0">{{ stats.subjects }}</p>
-        </div>
-      </div>
-    </div>
+  </div>
+
+  {# Contenedor actualizable con estadísticas y tabla #}
+  <div id="services-container">
+    {# 1. Estadísticas - Solo en vista general #}
+    {% if not current_subject %}
+    {% include "containers/_partials/panels/_stats.html" %}
     {% endif %}
-  </div>
-</div>
 
-{% if available_subjects %}
-<div class="card mb-3 border-0 shadow-sm">
-  <div class="card-body">
-    <div class="d-flex align-items-center mb-2">
-      <i class="fas fa-book-open text-info me-2"></i>
-      <h5 class="mb-0"> - Mis asignaturas</h5>
-    </div>
-    <div class="d-flex flex-wrap gap-2">
-      {% for subject in available_subjects %}
-      <span class="badge bg-light text-dark border">
-        {{ subject.name }}
-      </span>
-      {% empty %}
-      <span class="text-muted small"> - Aún no tienes asignaturas.</span>
-      {% endfor %}
-    </div>
-  </div>
-</div>
-{% endif %}
+    {# 2. Filtros - Solo en vista general #}
+    {% if not current_subject %}
+    {% include "containers/_partials/panels/_filters.html" %}
+    {% endif %}
 
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
-  <div id="toast-container"></div>
-</div>
-
-<table class="table table-striped">
-  <thead>
-    <tr>
-      <th>Nombre</th>
-      <th>Imagen</th>
-      <th>Puerto</th>
-      <th>Estado</th>
-      <th>Acciones</th>
-    </tr>
-  </thead>
-  <tbody id="service-table"
-    hx-get="{% url 'containers:service_table' %}{% if current_subject %}?subject={{ current_subject.id }}{% endif %}"
-    hx-trigger="load, every 5s, service:table-refresh from:body" hx-swap="innerHTML">
-    {% include "containers/_service_rows.html" %}
-  </tbody>
-</table>
-
-<div class="modal fade" id="newServiceModal" tabindex="-1" aria-hidden="true" aria-labelledby="newServiceModalLabel">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="newServiceModalLabel">Nuevo servicio</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-      </div>
-
-      <form id="newServiceForm" method="POST" enctype="multipart/form-data" hx-post="/api/containers/"
-        hx-target="#service-table" hx-swap="none">
-        {% csrf_token %}
-        <div id="form-errors"></div>
-        {% if current_subject %}
-        <input type="hidden" name="subject" value="{{ current_subject.id }}">
-        {% else %}
-        <div class="mb-3">
-          <label class="form-label">Asignatura</label>
-          {% if available_subjects %}
-          <select name="subject" class="form-select" required>
-            <option value="">Selecciona una asignatura</option>
-            {% for subject in available_subjects %}
-            <option value="{{ subject.id }}">{{ subject.name }}</option>
-            {% endfor %}
-          </select>
-          <small class="text-muted d-block mt-1">
-            Selecciona la asignatura para asociar el servicio.
-          </small>
-          {% else %}
-          <div class="alert alert-warning mb-0">
-            No tienes asignaturas disponibles todavía.
-          </div>
-          {% endif %}
+    {# 3. Tabla de servicios #}
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+              <tr>
+                <th class="text-white fw-semibold py-3 ps-4">Proyecto</th>
+                <th class="text-white fw-semibold py-3">Nombre</th>
+                <th class="text-white fw-semibold py-3">Imagen</th>
+                <th class="text-white fw-semibold py-3">Puerto</th>
+                <th class="text-white fw-semibold py-3">Estado</th>
+                <th class="text-white fw-semibold py-3">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="service-table" class="bg-white" hx-get="{% url 'containers:service_table' %}{% if current_subject %}?subject={{ current_subject.id }}{% endif %}">
+              {% include "containers/_service_rows.html" %}
+            </tbody>
+          </table>
         </div>
-        {% endif %}
-
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label">Nombre</label>
-            <input name="name" class="form-control" required placeholder="p.ej. mi-nginx">
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">Tipo de despliegue</label>
-            <div class="form-check">
-              <input class="form-check-input" type="radio" name="mode" id="mode_default" value="default" checked>
-              <label class="form-check-label" for="mode_default">Imagen por defecto (recomendada)</label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="radio" name="mode" id="mode_custom" value="custom">
-              <label class="form-check-label" for="mode_custom">Configuracion personalizada (Dockerfile o
-                docker-compose)</label>
-            </div>
-          </div>
-
-          <div class="mb-3" id="block-default-image">
-            <label class="form-label">Imagen</label>
-            <select name="image" class="form-select" required>
-              {% for img in images %}
-              <option value="{{ img.name }}:{{ img.tag }}">
-                {{ img.name }}:{{ img.tag }} - {{ img.description }}
-              </option>
-              {% endfor %}
-            </select>
-            <small class="text-muted d-block mt-1">En modo personalizado este selector queda deshabilitado.</small>
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label">
-              Puerto personalizado (opcional)
-              <button type="button" class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
-                aria-label="Instrucciones puerto" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-html="true"
-                data-bs-title="Puerto personalizado"
-                data-bs-content="Debe estar entre 40000 y 50000. Si no lo indicas se asigna uno libre.">
-                <i class="bi bi-info-circle" aria-hidden="true"></i>
-              </button>
-            </label>
-            <input name="custom_port" class="form-control" type="number" min="40000" max="50000"
-              placeholder="Ej: 49123">
-            <small class="text-muted">Debe estar entre 40000 y 50000.</small>
-          </div>
-
-          <div class="mb-3 custom-block" id="block-internal-port">
-            <label class="form-label">
-              Puerto interno del contenedor (opcional)
-              <button type="button" class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
-                aria-label="Instrucciones puerto interno" data-bs-toggle="popover" data-bs-trigger="focus"
-                data-bs-html="true" data-bs-title="Puerto interno"
-                data-bs-content="Puerto dentro del contenedor que escucha tu aplicacion. Ejemplos: Flask 5000, Django 8000, Node.js 3000. Si no lo indicas se usa 80 por defecto.">
-                <i class="bi bi-info-circle" aria-hidden="true"></i>
-              </button>
-            </label>
-            <input name="internal_port" class="form-control" type="number" min="1" max="65535" placeholder="Ej: 5000">
-            <small class="text-muted">Ejemplos: Flask 5000, Django 8000, Node 3000. Por defecto 80.</small>
-          </div>
-
-          <div class="mb-3 custom-block" id="block-dockerfile">
-            <label class="form-label">
-              Dockerfile (opcional, exclusivo con compose)
-              <button type="button" class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
-                aria-label="Instrucciones Dockerfile" data-bs-toggle="popover" data-bs-trigger="focus"
-                data-bs-html="true" data-bs-title="Instrucciones Dockerfile"
-                data-bs-content="Crea un archivo llamado Dockerfile con FROM base, copia el codigo (COPY . /app) y define CMD/ENTRYPOINT para arrancar la app.">
-                <i class="bi bi-info-circle" aria-hidden="true"></i>
-              </button>
-            </label>
-            <div class="input-group">
-              <input type="file" name="dockerfile" accept="*/*" class="form-control">
-              <button type="button" class="btn btn-outline-secondary" onclick="clearFile('dockerfile')">Limpiar</button>
-            </div>
-          </div>
-
-          <div class="mb-3 custom-block" id="block-compose">
-            <label class="form-label">
-              docker-compose.yml (opcional, exclusivo con Dockerfile)
-              <button type="button" class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
-                aria-label="Instrucciones docker-compose" data-bs-toggle="popover" data-bs-trigger="focus"
-                data-bs-html="true" data-bs-title="Instrucciones compose"
-                data-bs-content="Usa version 3 o superior. Define un servicio principal que exponga puertos y variables. El ZIP se monta como contexto de build o en /app.">
-                <i class="bi bi-info-circle" aria-hidden="true"></i>
-              </button>
-            </label>
-            <div class="input-group">
-              <input type="file" name="compose" accept=".yml,.yaml" class="form-control">
-              <button type="button" class="btn btn-outline-secondary" onclick="clearFile('compose')">Limpiar</button>
-            </div>
-          </div>
-
-          <div class="mb-3 custom-block" id="block-code">
-            <label class="form-label">
-              Codigo fuente (.zip obligatorio en modo personalizado)
-              <button type="button" class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
-                aria-label="Instrucciones ZIP" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-html="true"
-                data-bs-title="Contenido del ZIP"
-                data-bs-content="Sube un ZIP con el codigo y dependencias minimas. Evita carpetas venv. Puedes incluir Dockerfile o compose dentro del ZIP si lo prefieres.">
-                <i class="bi bi-info-circle" aria-hidden="true"></i>
-              </button>
-            </label>
-            <div class="input-group">
-              <input type="file" name="code" accept=".zip,.rar" class="form-control">
-              <button type="button" class="btn btn-outline-secondary" onclick="clearFile('code')">Limpiar</button>
-            </div>
-          </div>
-
-        </div>
-
-        <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-primary">Crear servicio</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<!-- Modal para Logs / SSH -->
-<div class="modal fade" id="genericModal" tabindex="-1" aria-labelledby="genericModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content" id="genericModalContent">
-      <!-- Contenido inyectado por HTMX -->
-    </div>
-  </div>
-</div>
-
-<!-- Modal para Dockerfile / docker-compose.yml -->
-<div class="modal fade" id="codeModal" tabindex="-1" aria-labelledby="codeModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="codeModalLabel">Código</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
-      </div>
-      <div class="modal-body">
-        <pre id="code-body"><code>Cargando...</code></pre>
       </div>
     </div>
   </div>
 </div>
+
+{# 4. Modales #}
+{% include "containers/_partials/panels/_modals.html" %}
 
 {% endblock %}
 
 {% block extrascripts %}
-<script src="https://unpkg.com/htmx.org@1.9.12"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-  function copyToClipboard(elementSelector) {
-    const element = document.querySelector(elementSelector);
-    if (!element) return;
-    element.select();
-    document.execCommand('copy');
-    showToast('Â¡Copiado!');
-  }
-
-  htmx.on('htmx:configRequest', (e) => {
-    const token = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
-    if (token) {
-      e.detail.headers['X-CSRFToken'] = token;
-    }
-  });
-
-  function showToast(message, extraClass = 'text-bg-success') {
-    const box = document.getElementById('toast-container');
-    if (!box) return;
-    const el = document.createElement('div');
-    el.className = `toast align-items-center ${extraClass} border-0 show`;
-    el.role = 'alert';
-    el.innerHTML = `
-      <div class="d-flex">
-        <div class="toast-body">${message}</div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto"
-                data-bs-dismiss="toast" aria-label="Cerrar"></button>
-      </div>`;
-    box.appendChild(el);
-    setTimeout(() => el.remove(), 2500);
-  }
-
-  function resetNewServiceForm() {
-    const form = document.getElementById('newServiceForm');
-    if (!form) return;
-    form.reset();
-    const errors = document.getElementById('form-errors');
-    if (errors) errors.innerHTML = '';
-    ['dockerfile', 'compose', 'code'].forEach((name) => {
-      const input = document.querySelector(`input[name=\"${name}\"]`);
-      if (input) {
-        input.value = '';
-        input.disabled = false;
-        input.dispatchEvent(new Event('change'));
-      }
-    });
-    applyMode();
-    syncExclusion();
-    document.querySelectorAll('[data-bs-toggle=\"popover\"]').forEach((el) => {
-      const inst = bootstrap.Popover.getInstance(el);
-      if (inst) inst.hide();
-    });
-  }
-
-  document.body.addEventListener('service:modal-close', (evt) => {
-    const modalId = evt.detail?.modalId || 'newServiceModal';
-    const modalEl = document.getElementById(modalId);
-    if (!modalEl) return;
-    (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).hide();
-    resetNewServiceForm();
-  });
-
-  document.body.addEventListener('service:toast', (evt) => {
-    const detail = evt.detail || {};
-    showToast(detail.message || 'Operacion completada', detail.variant || 'text-bg-success');
-  });
-
-  const newServiceModal = document.getElementById('newServiceModal');
-  if (newServiceModal) {
-    newServiceModal.addEventListener('hidden.bs.modal', () => {
-      resetNewServiceForm();
-    });
-  }
-
-  htmx.on('htmx:afterRequest', (evt) => {
-    if (evt.detail?.requestConfig?.elt?.id === 'newServiceForm') {
-      const status = evt.detail.xhr?.status || 0;
-      if (status < 400) {
-        resetNewServiceForm();
-        if (newServiceModal) {
-          (bootstrap.Modal.getInstance(newServiceModal) || new bootstrap.Modal(newServiceModal)).hide();
-        }
-      }
-    }
-  });
-
-  htmx.on('htmx:responseError', (evt) => {
-    const xhr = evt.detail.xhr;
-    const status = xhr?.status ?? 0;
-    const msg = xhr?.responseText || 'Se produjo un error inesperado';
-    showToast(`Error (${status}): ${msg}`, 'text-bg-danger');
-  });
-
-  function applyMode() {
-    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'default';
-    const imgSel = document.querySelector('select[name="image"]');
-    const dockerfile = document.querySelector('input[name="dockerfile"]');
-    const compose = document.querySelector('input[name="compose"]');
-    const code = document.querySelector('input[name="code"]');
-    const internalPort = document.querySelector('input[name="internal_port"]');
-    const customBlocks = document.querySelectorAll('.custom-block');
-
-    if (mode === 'default') {
-      imgSel.disabled = false;
-      customBlocks.forEach((b) => b.classList.add('opacity-50'));
-      [dockerfile, compose, code].forEach((input) => {
-        if (!input) return;
-        input.disabled = true;
-        input.value = '';
-        input.dispatchEvent(new Event('change'));
-      });
-      if (internalPort) {
-        internalPort.value = '';
-        internalPort.disabled = true;
-      }
-    } else {
-      imgSel.disabled = true;
-      customBlocks.forEach((b) => b.classList.remove('opacity-50'));
-      [dockerfile, compose, code].forEach((input) => {
-        if (input) input.disabled = false;
-      });
-      if (internalPort) {
-        internalPort.disabled = false;
-      }
-    }
-    syncExclusion();
-  }
-
-  function syncExclusion() {
-    const dockerfile = document.querySelector('input[name="dockerfile"]');
-    const compose = document.querySelector('input[name="compose"]');
-    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'default';
-
-    if (mode === 'default') {
-      const codeInput = document.querySelector('input[name="code"]');
-      if (dockerfile) {
-        dockerfile.disabled = true;
-      }
-      if (compose) {
-        compose.disabled = true;
-      }
-      if (codeInput) {
-        codeInput.disabled = true;
-      }
-      return;
-    }
-
-    if (dockerfile.files?.length) {
-      compose.value = '';
-      compose.disabled = true;
-    } else if (compose.files?.length) {
-      dockerfile.value = '';
-      dockerfile.disabled = true;
-    } else {
-      dockerfile.disabled = false;
-      compose.disabled = false;
-    }
-
-  }
-
-  function clearFile(name) {
-    const input = document.querySelector(`input[name="${name}"]`);
-    if (!input) return;
-    const newInput = input.cloneNode(true);
-    newInput.value = '';
-    input.parentNode.replaceChild(newInput, input);
-    newInput.addEventListener('change', syncExclusion);
-    syncExclusion();
-  }
-
-  document.addEventListener('DOMContentLoaded', () => {
-    applyMode();
-    document.querySelectorAll('input[name="mode"]').forEach((radio) => {
-      radio.addEventListener('change', applyMode);
-    });
-    ['dockerfile', 'compose', 'code'].forEach((name) => {
-      const input = document.querySelector(`input[name="${name}"]`);
-      if (input) input.addEventListener('change', syncExclusion);
-    });
-    const popoverTriggerList = Array.from(document.querySelectorAll('[data-bs-toggle="popover"]'));
-    popoverTriggerList.forEach((el) => new bootstrap.Popover(el));
-  });
-</script>
+{# 5. Scripts #}
+{% include "containers/_partials/panels/_scripts.html" %}
 {% endblock %}

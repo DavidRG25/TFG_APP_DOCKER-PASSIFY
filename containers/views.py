@@ -64,6 +64,16 @@ def _sync_service(service: Service):
         if service.status in {"stopping", "pending", "deleting"}:
             return
         
+        # Si el servicio está stopped/error y el contenedor NO está running, sincronizar a stopped
+        # Esto evita marcar como error al reiniciar PaaSify con contenedores detenidos
+        # Docker puede reportar: exited, stopped, created, paused, dead
+        if service.status in {"stopped", "error"} and docker_status in {"exited", "stopped"}:
+            if service.status == "error":
+                # Recuperar de error si solo está detenido
+                service.status = "stopped"
+                service.save(update_fields=["status"])
+            return  # Todo OK
+        
         # Si el servicio cree que está running pero Docker dice que no
         if service.status == "running" and docker_status not in {"running"}:
             # Solo marcar error si está definitivamente muerto
@@ -207,7 +217,12 @@ class ServiceViewSet(viewsets.ModelViewSet):
             except ValueError:
                 return DRF_Response({"error": "Puerto invalido."}, status=400)
 
-        service = serializer.save(owner=request.user, status="creating")
+        project_id = request.data.get("project")
+        project = None
+        if project_id:
+            project = get_object_or_404(UserProject, pk=project_id, user_profile__user=request.user)
+
+        service = serializer.save(owner=request.user, status="creating", project=project)
 
         self._attach_uploaded_files(service, request, mode)
 
@@ -514,6 +529,7 @@ def student_panel(request):
 
     services = Service.objects.filter(owner=request.user).exclude(status="removed")
     images = AllowedImage.objects.all()
+    user_projects = UserProject.objects.filter(user_profile__user=request.user)
     host = request.get_host().split(":")[0]
 
     running_count = services.filter(status="running").count()
@@ -528,6 +544,7 @@ def student_panel(request):
         {
             "services": services,
             "images": images,
+            "user_projects": user_projects,
             "current_subject": None,
             "available_subjects": available_subjects,
             "host": host,
@@ -538,6 +555,7 @@ def student_panel(request):
                 "stopped": stopped_count,
                 "error": error_count,
                 "subjects": subjects_count,
+                "projects": user_projects.count(),
             },
         },
     )
@@ -577,12 +595,38 @@ def student_services_in_subject(request, subject_id):
         .filter(owner=request.user, subject=subject)
         .exclude(status="removed")
     )
+    
+    # Calcular estadísticas locales para esta asignatura
+    running_count = services.filter(status="running").count()
+    stopped_count = services.filter(status="stopped").count()
+    error_count = services.filter(status="error").count()
+    total_services = services.count()
+    
+    # Necesario para el selector de asignaturas en el filtro
+    available_subjects = Subject.objects.filter(students=request.user).distinct()
+    user_projects = UserProject.objects.filter(user_profile__user=request.user, subject=subject)
+
     images = AllowedImage.objects.all()
     host = request.get_host().split(":")[0]
     return render(
         request,
         "containers/student_panel.html",
-        {"services": services, "images": images, "current_subject": subject, "host": host},
+        {
+            "services": services, 
+            "images": images, 
+            "user_projects": user_projects,
+            "current_subject": subject, 
+            "host": host,
+            "available_subjects": available_subjects,
+            "stats": {
+                "total": total_services,
+                "running": running_count,
+                "stopped": stopped_count,
+                "error": error_count,
+                "subjects": 1, # Solo 1 asignatura seleccionada
+                "projects": user_projects.count(),
+            },
+        },
     )
 
 
