@@ -7,6 +7,7 @@ from docker.errors import APIError
 from .docker_client import get_docker_client
 from .forms import AllowedImageForm
 from .models import AllowedImage, Service
+from paasify.models.ProjectModel import UserProject
 
 
 # Acción: Probar imagen (pull & run) y MOSTRAR LOG en una página
@@ -321,6 +322,7 @@ class AllowedImageAdmin(admin.ModelAdmin):
 class ServiceAdmin(admin.ModelAdmin):
     list_display = (
         'name',
+        'get_project_name',    # Nuevo: Proyecto
         'owner',
         'image',
         'get_image_type',      # Nuevo
@@ -329,7 +331,7 @@ class ServiceAdmin(admin.ModelAdmin):
         'get_volume_info',     # Nuevo
         'created_at',
     )
-    search_fields = ('name', 'owner__username', 'image')
+    search_fields = ('name', 'owner__username', 'image', 'project__place')
     list_filter = ('status', 'created_at')
     readonly_fields = (
         'logs',
@@ -344,7 +346,7 @@ class ServiceAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Información Básica', {
-            'fields': ('name', 'owner', 'get_image_display', 'image', 'subject')
+            'fields': ('name', 'owner', 'project', 'get_image_display', 'image', 'subject')
         }),
         ('Configuración de Red', {
             'fields': ('assigned_port', 'internal_port', 'get_port_info'),
@@ -408,6 +410,14 @@ class ServiceAdmin(admin.ModelAdmin):
         except AllowedImage.DoesNotExist:
             return "❓ Desconocido"
     get_image_type.short_description = 'Tipo'
+
+    def get_project_name(self, obj):
+        """Muestra el nombre del proyecto asociado"""
+        if obj.project:
+            return obj.project.place
+        return "-"
+    get_project_name.short_description = "Proyecto"
+    get_project_name.admin_order_field = 'project__place'
     
     def get_image_display(self, obj):
         """Muestra el tipo de imagen de forma clara en Información Básica"""
@@ -594,4 +604,11 @@ class ServiceAdmin(admin.ModelAdmin):
                 '</div>'
             )
     get_image_options.short_description = 'Opciones de Imagen'
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        if obj and 'project' in form.base_fields:
+            # Filtrar proyectos para mostrar solo los del dueño del servicio
+            form.base_fields['project'].queryset = UserProject.objects.filter(user_profile__user=obj.owner)
+        return form
 

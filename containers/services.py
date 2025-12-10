@@ -274,6 +274,8 @@ def _ensure_compose_ports(data: dict, previous_map: dict[str, dict[tuple[int, st
             prev_map = previous_map.get(svc_name, {})
             prev_host = prev_map.get((container_port, protocol.lower()))
             
+            # IMPORTANTE: Siempre usar puertos del rango 40000-50000 para compose
+            # Ignorar puertos especificados fuera del rango
             if host_port is not None and host_port != "":
                 try:
                     host_port_int = int(str(host_port).strip())
@@ -281,10 +283,20 @@ def _ensure_compose_ports(data: dict, previous_map: dict[str, dict[tuple[int, st
                     raise RuntimeError(
                         f"El puerto declarado '{host_port}' en el servicio '{svc_name}' no es válido."
                     )
-                if prev_host != host_port_int:
-                    _reserve_specific_port(host_port_int)
-                    reserved_now.append(host_port_int)
-                final_host = host_port_int
+                # Verificar si está en el rango permitido
+                if PORT_RANGE_START <= host_port_int <= PORT_RANGE_END:
+                    # Puerto válido, usarlo
+                    if prev_host != host_port_int:
+                        _reserve_specific_port(host_port_int)
+                        reserved_now.append(host_port_int)
+                    final_host = host_port_int
+                else:
+                    # Puerto fuera del rango, asignar uno aleatorio
+                    if prev_host and PORT_RANGE_START <= prev_host <= PORT_RANGE_END:
+                        final_host = prev_host
+                    else:
+                        final_host = _reserve_random_port()
+                        reserved_now.append(final_host)
             else:
                 if prev_host and PortReservation.objects.filter(port=prev_host).exists():
                     final_host = prev_host

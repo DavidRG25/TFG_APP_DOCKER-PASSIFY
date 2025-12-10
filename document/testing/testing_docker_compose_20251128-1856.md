@@ -42,13 +42,13 @@
 1. Crear servicio con imagen `nginx:latest`
 2. Hacer clic en "Iniciar"
 3. **Verificar**:
-   - [ ] Contenedor inicia
-   - [ ] Nombre descriptivo
-   - [ ] Terminal funciona
-   - [ ] Acceder funciona
+   - [SI] Contenedor inicia
+   - [SI] Nombre descriptivo
+   - [SI] Terminal funciona
+   - [SI] Acceder funciona
 4. Detener y eliminar
 5. **Verificar**:
-   - [ ] Limpieza completa (NO debe eliminar imagen de catálogo)
+   - [SI] Limpieza completa (NO debe eliminar imagen de catálogo)
 
 **Resultado Esperado**: ✅ Funciona, imagen de catálogo NO se elimina
 
@@ -73,37 +73,37 @@ services:
 **Pasos**:
 1. Subir `docker-compose.yml` + código ZIP con Dockerfile
 2. **ANTES de crear**:
-   - [ ] Sistema detecta 2 contenedores
-   - [ ] Muestra 2 campos de puerto personalizado
-   - [ ] Muestra 2 campos de puerto interno
+   - [NO-IMPLEMENTADO] Sistema detecta 2 contenedores
+   - [NO-IMPLEMENTADO] Muestra 2 campos de puerto personalizado
+   - [NO-IMPLEMENTADO] Muestra 2 campos de puerto interno
 3. Crear servicio
 4. Hacer clic en "Iniciar servicio"
 5. **Verificar**:
-   - [ ] Ambos contenedores inician
-   - [ ] NO aparece contenedor "principal"
-   - [ ] Aparecen 2 tarjetas: "web" y "redis"
-   - [ ] Nombres descriptivos en Docker Desktop
-   - [ ] Botón "Compose" muestra YAML
+   - [SI] Ambos contenedores inician
+   - [SI] NO aparece contenedor "principal"
+   - [SI] Aparecen 2 tarjetas: "web" y "redis"
+   - [SI] Nombres descriptivos en Docker Desktop
+   - [SI] Botón "Compose" muestra YAML
 6. **Por cada contenedor**:
-   - [ ] Botón "Iniciar" funciona
-   - [ ] Botón "Detener" funciona
-   - [ ] Botón "Logs" muestra logs específicos
-   - [ ] Botón "Terminal" abre shell del contenedor
-   - [ ] Botón "Acceder" abre puerto correcto
+   - [SI] Botón "Iniciar" funciona
+   - [SI] Botón "Detener" funciona
+   - [SI] Botón "Logs" muestra logs específicos
+   - [SI] Botón "Terminal" abre shell del contenedor
+   - [SI] Botón "Acceder" abre puerto correcto
 7. Hacer clic en "Detener servicio"
 8. **Verificar**:
-   - [ ] AMBOS contenedores se detienen simultáneamente
-   - [ ] Estado actualiza correctamente
+   - [SI] AMBOS contenedores se detienen simultáneamente
+   - [SI] Estado actualiza correctamente
 9. Hacer clic en "Iniciar servicio"
 10. **Verificar**:
-    - [ ] AMBOS contenedores inician
-    - [ ] Estado actualiza rápidamente
+    - [SI] AMBOS contenedores inician
+    - [SI] Estado actualiza rápidamente
 11. Hacer clic en "Eliminar"
 12. **Verificar**:
-    - [ ] Ambos contenedores eliminados
-    - [ ] Imagen web eliminada
-    - [ ] Volúmenes eliminados
-    - [ ] Workspace limpiado
+    - [SI] Ambos contenedores eliminados
+    - [SI] Imagen web eliminada
+    - [SI] Volúmenes eliminados
+    - [SI] Workspace limpiado
 
 **Resultado Esperado**: ✅ Multicontenedor funciona perfectamente
 
