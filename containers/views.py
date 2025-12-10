@@ -26,15 +26,28 @@ from paasify.roles import (
 )
 
 from .docker_client import get_docker_client
-from .models import AllowedImage, Service
+from .models import AllowedImage, Service, ServiceContainer
 from .serializers import AllowedImageSerializer, ServiceSerializer
-from .services import remove_container, run_container, stop_container
+from .services import (
+    remove_container, 
+    run_container, 
+    stop_container,
+    start_service_container_record,
+    stop_service_container_record,
+    fetch_container_logs,
+)
 
 
 # ----------------------------- helpers -----------------------------
 
 def _sync_service(service: Service):
-    """Si el container_id ya no existe en Docker, marcamos el servicio como 'removed'."""
+    """
+    Sincroniza el estado del servicio con Docker.
+    
+    Mejorado para manejar estados transitorios correctamente:
+    - No marca error si el servicio está en "stopping", "pending", "deleting"
+    - Solo marca error si el contenedor está definitivamente muerto (exited, dead)
+    """
     if not service.container_id:
         return
 
@@ -46,17 +59,50 @@ def _sync_service(service: Service):
         container = docker_client.containers.get(service.container_id)
         container.reload()
         docker_status = (container.status or "").lower()
-        if docker_status not in {"running"} and service.status in {"running", "pending"}:
-            try:
-                log_tail = container.logs(tail=200).decode(errors="replace")
-            except Exception:
-                log_tail = "(logs no disponibles)"
-            service.status = "error"
-            service.logs = (service.logs or "") + f"\n[Docker] {log_tail}".strip()
-            service.save(update_fields=["status", "logs"])
+        
+        # Estados transitorios: no hacer nada, dejar que el proceso termine
+        if service.status in {"stopping", "pending", "deleting"}:
+            return
+        
+        # Si el servicio está stopped/error y el contenedor NO está running, sincronizar a stopped
+        # Esto evita marcar como error al reiniciar PaaSify con contenedores detenidos
+        # Docker puede reportar: exited, stopped, created, paused, dead
+        if service.status in {"stopped", "error"} and docker_status in {"exited", "stopped"}:
+            if service.status == "error":
+                # Recuperar de error si solo está detenido
+                service.status = "stopped"
+                service.save(update_fields=["status"])
+            return  # Todo OK
+        
+        # Si el servicio cree que está running pero Docker dice que no
+        if service.status == "running" and docker_status not in {"running"}:
+            # Solo marcar error si está definitivamente muerto
+            if docker_status in {"exited", "dead"}:
+                try:
+                    log_tail = container.logs(tail=200).decode(errors="replace")
+                except Exception:
+                    log_tail = "(logs no disponibles)"
+                service.status = "error"
+                service.logs = (service.logs or "") + f"\n[Docker] Contenedor en estado '{docker_status}'. Logs:\n{log_tail}".strip()
+                service.save(update_fields=["status", "logs"])
+            # Si está en otro estado (created, restarting), dar tiempo
+            elif docker_status in {"created", "restarting"}:
+                pass  # Esperar, puede estar arrancando
+            else:
+                # Estado desconocido, asumir stopped
+                service.status = "stopped"
+                service.save(update_fields=["status"])
+        
+        # Si el servicio cree que está stopped pero Docker dice running
+        elif service.status == "stopped" and docker_status == "running":
+            service.status = "running"
+            service.save(update_fields=["status"])
+            
     except NotFound:
-        service.status = "removed"
-        service.save()
+        # Solo marcar como removed si no está en proceso de eliminación
+        if service.status != "deleting":
+            service.status = "removed"
+            service.save()
     except DockerException:
         # Si no podemos verificar el contenedor, conservamos el estado actual.
         return
@@ -89,6 +135,7 @@ def user_is_admin(user) -> bool:
 # ------------------------------ API --------------------------------
 
 class ServiceViewSet(viewsets.ModelViewSet):
+    CODE_MAX = 1024 * 1024  # 1 MB max para mostrar código
     serializer_class = ServiceSerializer
     permission_classes = [IsAuthenticated]
 
@@ -170,7 +217,12 @@ class ServiceViewSet(viewsets.ModelViewSet):
             except ValueError:
                 return DRF_Response({"error": "Puerto invalido."}, status=400)
 
-        service = serializer.save(owner=request.user, status="creating")
+        project_id = request.data.get("project")
+        project = None
+        if project_id:
+            project = get_object_or_404(UserProject, pk=project_id, user_profile__user=request.user)
+
+        service = serializer.save(owner=request.user, status="creating", project=project)
 
         self._attach_uploaded_files(service, request, mode)
 
@@ -306,21 +358,42 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=["get"])
     def logs(self, request, pk=None):
+        """
+        Obtiene logs del servicio o de un contenedor específico.
+        
+        MODO SIMPLE: Muestra logs de service.container_id (comportamiento anterior)
+        MODO COMPOSE: Si se pasa ?container=<id>, muestra logs de ese contenedor
+        """
         service = self.get_object()
-        log_content = service.logs or "(sin logs)"
-        if service.container_id:
-            docker_client = get_docker_client()
-            if docker_client:
-                try:
-                    container = docker_client.containers.get(service.container_id)
-                    log_content = container.logs(tail=200).decode(errors="replace")
-                except Exception as e:
-                    log_content = f"(error leyendo logs: {e})"
+        container_id_param = request.query_params.get("container")
+        
+        # Determinar de dónde obtener los logs
+        if container_id_param:
+            # Modo compose: logs de contenedor específico
+            try:
+                container_record = ServiceContainer.objects.get(pk=container_id_param, service=service)
+                log_content = fetch_container_logs(container_record)
+                title = f"Logs de {service.name} - {container_record.name}"
+            except ServiceContainer.DoesNotExist:
+                log_content = "(contenedor no encontrado)"
+                title = f"Logs de {service.name}"
+        else:
+            # Modo simple: logs del servicio (comportamiento anterior)
+            log_content = service.logs or "(sin logs)"
+            if service.container_id:
+                docker_client = get_docker_client()
+                if docker_client:
+                    try:
+                        container = docker_client.containers.get(service.container_id)
+                        log_content = container.logs(tail=200).decode(errors="replace")
+                    except Exception as e:
+                        log_content = f"(error leyendo logs: {e})"
+            title = f"Logs de {service.name}"
         
         if self._is_htmx(request):
             html = f"""
                 <div class="modal-header">
-                    <h5 class="modal-title">Logs de {service.name}</h5>
+                    <h5 class="modal-title">{title}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
                 <div class="modal-body">
@@ -328,29 +401,110 @@ class ServiceViewSet(viewsets.ModelViewSet):
                 </div>
             """
             return HttpResponse(html)
-        
+
         return HttpResponse(log_content, content_type="text/plain")
 
     # ---- ver Dockerfile/compose subidos ----
     CODE_MAX = 256 * 1024
 
-    def _serve_code(self, filefield, language):
-        if not filefield:
-            return HttpResponse("(archivo no disponible)", status=404)
-        if filefield.size > self.CODE_MAX:
+    def _serve_code(self, service, filename, language):
+        """
+        Lee y muestra el contenido de un archivo del workspace del servicio.
+        Busca en media/services/<id>/<filename>
+        """
+        from pathlib import Path
+        from django.conf import settings
+        
+        # Construir la ruta esperada
+        workspace = Path(settings.MEDIA_ROOT) / "services" / str(service.pk)
+        file_path = workspace / filename
+        
+        if not file_path.exists():
+            return HttpResponse(f"(archivo {filename} no disponible)", status=404)
+        
+        if file_path.stat().st_size > self.CODE_MAX:
             return HttpResponse("(archivo demasiado grande)", status=413)
-        with filefield.open("rb"):
-            code = filefield.read().decode(errors="replace")
+        
+        try:
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                code = f.read()
+        except Exception as e:
+            return HttpResponse(f"(error leyendo archivo: {e})", status=500)
+        
         html = f'<code class="language-{language}">{escape(code)}</code>'
         return HttpResponse(html)
 
     @action(detail=True, methods=["get"])
     def dockerfile(self, request, pk=None):
-        return self._serve_code(self.get_object().dockerfile, "dockerfile")
+        service = self.get_object()
+        return self._serve_code(service, "Dockerfile", "dockerfile")
 
     @action(detail=True, methods=["get"])
     def compose(self, request, pk=None):
-        return self._serve_code(self.get_object().compose, "yaml")
+        service = self.get_object()
+        return self._serve_code(service, "docker-compose.yml", "yaml")
+
+    # ---- Endpoints para ServiceContainer (docker-compose multi-contenedor) ----
+    
+    def _get_service_container(self, service: Service, container_pk: str) -> ServiceContainer:
+        """Helper para obtener un ServiceContainer validando permisos"""
+        try:
+            return ServiceContainer.objects.get(pk=container_pk, service=service)
+        except ServiceContainer.DoesNotExist:
+            raise Http404("Contenedor no encontrado")
+    
+    @action(detail=True, methods=["post"], url_path="containers/(?P<container_pk>\\d+)/start")
+    def start_container(self, request, pk=None, container_pk=None):
+        """Inicia un contenedor específico de un servicio compose"""
+        service = self.get_object()
+        container = self._get_service_container(service, container_pk)
+        
+        try:
+            start_service_container_record(container)
+        except Exception as exc:
+            if self._is_htmx(request):
+                return self._htmx_response(
+                    request,
+                    status=500,
+                    message=str(exc),
+                    level="text-bg-danger",
+                )
+            return DRF_Response({"status": "error", "message": str(exc)}, status=500)
+        
+        if self._is_htmx(request):
+            return self._htmx_response(
+                request,
+                message=f"Contenedor {container.name} iniciado.",
+                level="text-bg-success",
+            )
+        return DRF_Response({"status": "started", "message": f"Contenedor {container.name} iniciado."})
+    
+    @action(detail=True, methods=["post"], url_path="containers/(?P<container_pk>\\d+)/stop")
+    def stop_container_action(self, request, pk=None, container_pk=None):
+        """Detiene un contenedor específico de un servicio compose"""
+        service = self.get_object()
+        container = self._get_service_container(service, container_pk)
+        
+        try:
+            stop_service_container_record(container)
+        except Exception as exc:
+            if self._is_htmx(request):
+                return self._htmx_response(
+                    request,
+                    status=500,
+                    message=str(exc),
+                    level="text-bg-danger",
+                )
+            return DRF_Response({"status": "error", "message": str(exc)}, status=500)
+        
+        if self._is_htmx(request):
+            return self._htmx_response(
+                request,
+                message=f"Contenedor {container.name} detenido.",
+                level="text-bg-warning",
+            )
+        return DRF_Response({"status": "stopped", "message": f"Contenedor {container.name} detenido."})
+
 
 
 class AllowedImageViewSet(viewsets.ReadOnlyModelViewSet):
@@ -375,6 +529,7 @@ def student_panel(request):
 
     services = Service.objects.filter(owner=request.user).exclude(status="removed")
     images = AllowedImage.objects.all()
+    user_projects = UserProject.objects.filter(user_profile__user=request.user)
     host = request.get_host().split(":")[0]
 
     running_count = services.filter(status="running").count()
@@ -389,6 +544,7 @@ def student_panel(request):
         {
             "services": services,
             "images": images,
+            "user_projects": user_projects,
             "current_subject": None,
             "available_subjects": available_subjects,
             "host": host,
@@ -399,6 +555,7 @@ def student_panel(request):
                 "stopped": stopped_count,
                 "error": error_count,
                 "subjects": subjects_count,
+                "projects": user_projects.count(),
             },
         },
     )
@@ -438,12 +595,38 @@ def student_services_in_subject(request, subject_id):
         .filter(owner=request.user, subject=subject)
         .exclude(status="removed")
     )
+    
+    # Calcular estadísticas locales para esta asignatura
+    running_count = services.filter(status="running").count()
+    stopped_count = services.filter(status="stopped").count()
+    error_count = services.filter(status="error").count()
+    total_services = services.count()
+    
+    # Necesario para el selector de asignaturas en el filtro
+    available_subjects = Subject.objects.filter(students=request.user).distinct()
+    user_projects = UserProject.objects.filter(user_profile__user=request.user, subject=subject)
+
     images = AllowedImage.objects.all()
     host = request.get_host().split(":")[0]
     return render(
         request,
         "containers/student_panel.html",
-        {"services": services, "images": images, "current_subject": subject, "host": host},
+        {
+            "services": services, 
+            "images": images, 
+            "user_projects": user_projects,
+            "current_subject": subject, 
+            "host": host,
+            "available_subjects": available_subjects,
+            "stats": {
+                "total": total_services,
+                "running": running_count,
+                "stopped": stopped_count,
+                "error": error_count,
+                "subjects": 1, # Solo 1 asignatura seleccionada
+                "projects": user_projects.count(),
+            },
+        },
     )
 
 

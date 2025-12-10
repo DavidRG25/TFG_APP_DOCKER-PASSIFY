@@ -1,0 +1,16 @@
+{# Partial: Filtros de asignatura #}
+<div class="mb-4">
+  <h5 class="text-dark mb-3"><i class="fas fa-filter me-2"></i>Mis asignaturas</h5>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{% url 'containers:student_panel' %}" 
+       class="btn btn-sm {% if not current_subject %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
+       Todas
+    </a>
+    {% for sub in available_subjects %}
+    <a href="{% url 'containers:student_services_in_subject' sub.id %}" 
+       class="btn btn-sm {% if current_subject.id == sub.id %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
+       {{ sub.name }}
+    </a>
+    {% endfor %}
+  </div>
+</div>

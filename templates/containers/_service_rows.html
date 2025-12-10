@@ -1,131 +1,60 @@
-﻿{% for s in services %}
+﻿{# Template refactorizado: Filas de servicios #}
+{% for s in services %}
 <tr id="service-{{ s.id }}">
+  <td class="ps-4">
+    <div class="fw-bold text-primary">{{ s.project.place|default:"General" }}</div>
+  </td>
   <td>
     <div class="fw-semibold">{{ s.name }}</div>
     {% if s.subject %}
-      <small class="text-muted">Asignatura: {{ s.subject.name }}</small>
+    <small class="text-muted">Asignatura: {{ s.subject.name }}</small>
     {% endif %}
   </td>
 
   <td>{{ s.image }}</td>
 
   <td>
+    {% if s.has_compose %}
+    {# Modo compose: mostrar puertos de cada contenedor #}
+    {% for c in s.containers.all %}
+    {% if c.name != "principal" %}
+    <div class="small mb-1">
+      <strong>{{ c.name }}:</strong>
+      {% if c.assigned_ports %}
+      {% for p in c.assigned_ports %}
+      {{ p.external|default:"-" }} → {{ p.internal|default:"-" }}
+      {% if not forloop.last %}<br>{% endif %}
+      {% endfor %}
+      {% else %}
+      -
+      {% endif %}
+    </div>
+    {% endif %}
+    {% empty %}
+    <small class="text-muted">-</small>
+    {% endfor %}
+    {% else %}
+    {# Modo simple: mostrar puerto único #}
     <div>{{ s.assigned_port|default:"-" }}</div>
     <small class="text-muted d-block">Interno: {{ s.internal_port|default:80 }}</small>
+    {% endif %}
   </td>
 
   <td>
-    <span
-      class="badge text-uppercase fw-semibold px-3 py-2
-        {% if s.status == 'running' %} bg-success text-white
-        {% elif s.status == 'stopped' %} bg-secondary text-white
-        {% elif s.status == 'error' %} bg-danger text-white
-        {% else %} bg-warning text-dark
-        {% endif %}">
-      {{ s.status|default:'unknown'|title }}
-    </span>
+    {% include "containers/_partials/services/_status.html" with service=s %}
   </td>
 
-  <td class="d-flex flex-wrap gap-1">
-
-    <button
-      class="btn btn-sm btn-success"
-      {% if s.status == "running" %}disabled{% endif %}
-      hx-post="{% url 'service-start' s.id %}"
-      hx-target="#service-{{ s.id }}"
-      hx-swap="none"
-      title="Iniciar">
-      Iniciar
-    </button>
-
-    <button
-      class="btn btn-sm btn-warning"
-      {% if s.status != "running" %}disabled{% endif %}
-      hx-post="{% url 'service-stop' s.id %}"
-      hx-target="#service-{{ s.id }}"
-      hx-swap="none"
-      title="Detener">
-      Detener
-    </button>
-
-    <button
-      class="btn btn-sm btn-danger"
-      hx-post="{% url 'service-remove' s.id %}"
-      hx-target="#service-{{ s.id }}"
-      hx-swap="none"
-      hx-confirm="Eliminar definitivamente?"
-      title="Eliminar">
-      Eliminar
-    </button>
-
-    <button
-      class="btn btn-sm btn-secondary"
-      hx-get="{% url 'service-logs' s.id %}"
-      hx-target="#genericModalContent"
-      hx-swap="innerHTML"
-      data-bs-toggle="modal"
-      data-bs-target="#genericModal"
-      title="Ver logs">
-      Logs
-    </button>
-
-    {% if s.dockerfile %}
-    <button
-      class="btn btn-sm btn-info"
-      hx-get="{% url 'service-dockerfile' s.id %}"
-      hx-target="#code-body"
-      hx-swap="innerHTML"
-      data-bs-toggle="modal"
-      data-bs-target="#codeModal"
-      title="Ver Dockerfile">
-      Dockerfile
-    </button>
-    {% endif %}
-
-    {% if s.compose %}
-    <button
-      class="btn btn-sm btn-info"
-      hx-get="{% url 'service-compose' s.id %}"
-      hx-target="#code-body"
-      hx-swap="innerHTML"
-      data-bs-toggle="modal"
-      data-bs-target="#codeModal"
-      title="Ver docker-compose">
-      Compose
-    </button>
-    {% endif %}
-
-    {% if s.container_id and s.status == 'running' %}
-    {% if host %}
-    <a
-      href="http://{{ host }}:{{ s.assigned_port }}"
-      class="btn btn-sm btn-outline-primary"
-      target="_blank"
-      rel="noopener"
-      title="Abrir en navegador">
-      Acceder
-    </a>
-    {% endif %}
-    <a
-      href="{% url 'containers:terminal_view' s.id %}"
-      class="btn btn-sm btn-dark"
-      title="Abrir terminal interactiva">
-      Terminal
-    </a>
+  <td>
+    {% if s.has_compose %}
+    {% include "containers/_partials/services/_compose.html" with service=s host=host %}
     {% else %}
-    <button
-      class="btn btn-sm btn-dark"
-      disabled
-      title="Terminal disponible solo cuando el servicio esta en ejecucion">
-      Terminal
-    </button>
+    {% include "containers/_partials/services/_simple.html" with service=s host=host %}
     {% endif %}
-
   </td>
 </tr>
 {% empty %}
 <tr>
-  <td colspan="5" class="text-center text-muted">
+  <td colspan="6" class="text-center text-muted py-4">
     Aun no tienes servicios.
   </td>
 </tr>

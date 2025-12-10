@@ -1,0 +1,60 @@
+{# Partial: Modo SIMPLE - Contenedor único #}
+<div class="d-flex flex-wrap gap-1">
+    {# 1. BOTONES ESTÁTICOS (siempre visibles) #}
+    <button class="btn btn-sm btn-success" {% if service.status == "running" %}disabled{% endif %}
+        hx-post="{% url 'service-start' service.id %}" hx-swap="none"
+        title="Iniciar">
+        Iniciar
+    </button>
+
+    <button class="btn btn-sm btn-warning" {% if service.status != "running" %}disabled{% endif %}
+        hx-post="{% url 'service-stop' service.id %}" hx-swap="none"
+        title="Detener">
+        Detener
+    </button>
+
+    <button class="btn btn-sm btn-danger" hx-post="{% url 'service-remove' service.id %}"
+        hx-target="#service-{{ service.id }}" hx-swap="outerHTML" hx-confirm="¿Eliminar definitivamente?"
+        title="Eliminar">
+        Eliminar
+    </button>
+
+    <button class="btn btn-sm btn-secondary" hx-get="{% url 'service-logs' service.id %}"
+        hx-target="#genericModalContent" hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#genericModal"
+        title="Ver logs">
+        Logs
+    </button>
+
+    {# 2. BOTONES DE ARCHIVOS (si existen) #}
+    {% if service.dockerfile %}
+    <button class="btn btn-sm btn-info" hx-get="{% url 'service-dockerfile' service.id %}" hx-target="#code-body"
+        hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#codeModal" title="Ver Dockerfile">
+        Dockerfile
+    </button>
+    {% endif %}
+
+    {% if service.compose %}
+    <button class="btn btn-sm btn-info" hx-get="{% url 'service-compose' service.id %}" hx-target="#code-body"
+        hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#codeModal" title="Ver docker-compose">
+        Compose
+    </button>
+    {% endif %}
+
+    {# 3. BOTONES CONDICIONALES (dependen del estado) #}
+    {% if service.container_id and service.status == 'running' %}
+    {% if host and service.assigned_port %}
+    <a href="http://{{ host }}:{{ service.assigned_port }}" class="btn btn-sm btn-outline-primary" target="_blank"
+        rel="noopener" title="Abrir en navegador">
+        Acceder
+    </a>
+    {% endif %}
+    <a href="{% url 'containers:terminal_view' service.id %}" class="btn btn-sm btn-dark"
+        title="Abrir terminal interactiva">
+        Terminal
+    </a>
+    {% else %}
+    <button class="btn btn-sm btn-dark" disabled title="Terminal disponible solo cuando el servicio esta en ejecucion">
+        Terminal
+    </button>
+    {% endif %}
+</div>
