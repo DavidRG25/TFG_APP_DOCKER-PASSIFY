@@ -49,6 +49,48 @@ class UserProjectInlineForProfile(admin.TabularInline):
     fk_name = "user_profile"
     extra = 0  # No crear formularios vacíos automáticamente
     autocomplete_fields = ("subject",)
+    readonly_fields = ('get_services_deployed',)
+    
+    def get_services_deployed(self, obj):
+        """Muestra los servicios desplegados en este proyecto"""
+        if not obj or not obj.pk:
+            return "-"
+        
+        from containers.models import Service
+        from django.utils.html import format_html
+        
+        # Obtener servicios del proyecto (mismo usuario y asignatura)
+        services = Service.objects.filter(
+            owner=obj.user_profile.user,
+            subject=obj.subject
+        ).exclude(status='removed')
+        
+        count = services.count()
+        
+        if count == 0:
+            return format_html('<span style="color: gray;">Sin servicios</span>')
+        
+        # Crear lista de servicios con iconos de estado
+        services_html = []
+        for service in services:
+            if service.status == 'running':
+                icon = '🟢'
+                color = 'green'
+            elif service.status == 'stopped':
+                icon = '🔴'
+                color = 'red'
+            else:
+                icon = '🟡'
+                color = 'orange'
+            
+            services_html.append(
+                f'<span style="color: {color};">{icon} {service.name}</span>'
+            )
+        
+        return format_html('<br>'.join(services_html))
+    
+    get_services_deployed.short_description = 'Servicios Desplegados'
+
 
 
 #  Subject (Asignaturas)
