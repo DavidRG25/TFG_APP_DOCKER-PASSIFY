@@ -142,6 +142,45 @@ def _compose_cmd() -> list[str]:
     raise RuntimeError("No se encontró 'docker compose' (v2) ni 'docker-compose' (v1).")
 
 
+def _get_compose_project_name(service) -> str:
+    """
+    Genera un nombre de proyecto descriptivo para Docker Compose.
+    Formato: usuario_proyecto_servicio (o svc{id} como fallback)
+    
+    Reglas de Docker:
+    - Solo letras minúsculas, números, guiones y guiones bajos
+    - No puede empezar con guión
+    - No puede tener guiones consecutivos o al final
+    """
+    try:
+        # Intentar construir nombre descriptivo
+        username = service.owner.username if service.owner else "user"
+        project_name = service.project.place if service.project else "project"
+        service_name = service.name or f"svc{service.id}"
+        
+        # Sanitizar cada parte
+        def sanitize(text):
+            # Convertir a minúsculas
+            text = text.lower()
+            # Reemplazar espacios y caracteres especiales por guión bajo
+            text = re.sub(r'[^a-z0-9_-]', '_', text)
+            # Eliminar guiones/guiones bajos al inicio y final
+            text = text.strip('_-')
+            # Reemplazar múltiples guiones/guiones bajos consecutivos por uno solo
+            text = re.sub(r'[-_]+', '_', text)
+            return text or "unnamed"
+        
+        username = sanitize(username)
+        project_name = sanitize(project_name)
+        service_name = sanitize(service_name)
+        
+        # Formato: usuario_proyecto_servicio
+        return f"{username}_{project_name}_{service_name}"
+    except Exception:
+        # Fallback al formato antiguo si algo falla
+        return f"svc{service.id}"
+
+
 def _extract_container_port_info(container):
     """
     Extrae información de puertos de un contenedor Docker.
@@ -520,14 +559,14 @@ def _extract_rar_with_tool(tmp_path: str, target_dir: str) -> None:
     extract_cmd = [UNRAR_TOOL, "x", tmp_path, f"-o{target_dir}", "-y"]
 
     try:
-        proc_test = subprocess.run(test_cmd, capture_output=True, text=True, check=True)
+        proc_test = subprocess.run(test_cmd, capture_output=True, text=True, check=True, encoding='utf-8', errors='replace')
     except subprocess.CalledProcessError as exc:
         raise RuntimeError("El archivo RAR esta incompleto o dañado. Intentalo de nuevo.") from exc
     if proc_test.stdout:
         _ = proc_test.stdout  # silencio lint
 
     try:
-        subprocess.run(extract_cmd, capture_output=True, text=True, check=True)
+        subprocess.run(extract_cmd, capture_output=True, text=True, check=True, encoding='utf-8', errors='replace')
     except subprocess.CalledProcessError as exc:
         raise RuntimeError("El archivo RAR esta incompleto o dañado. Intentalo de nuevo.") from exc
 
@@ -606,7 +645,7 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool):
             yaml.dump(data, fh)
         
         # Ejecutar docker compose desde workspace
-        project = f"svc{service.id}"
+        project = _get_compose_project_name(service)
         cmd = _compose_cmd() + ["-p", project, "-f", str(compose_path), "up", "--build", "-d"]
         
         _append_log(service, f"Ejecutando: {' '.join(cmd)}")
@@ -754,6 +793,8 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
                     check=True,
                     capture_output=True,
                     text=True,
+                    encoding='utf-8',
+                    errors='replace'
                 )
                 build_out = (proc.stdout or "") + "\n" + (proc.stderr or "")
             except subprocess.CalledProcessError as e:
@@ -922,7 +963,7 @@ def stop_container(service: Service):
                 service.save(update_fields=["status"])
                 raise RuntimeError("No se encontró docker-compose.yml")
             
-            project = f"svc{service.id}"
+            project = _get_compose_project_name(service)
             cmd = _compose_cmd() + ["-p", project, "-f", str(compose_path), "stop"]
             
             subprocess.run(
@@ -1006,7 +1047,7 @@ def remove_container(service: Service):
             compose_path = workspace / "docker-compose.yml"
             
             if compose_path.exists():
-                project = f"svc{service.id}"
+                project = _get_compose_project_name(service)
                 cmd = _compose_cmd() + [
                     "-p", project,
                     "-f", str(compose_path),

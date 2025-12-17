@@ -259,17 +259,22 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
     def _validation_error_response(self, exc: ValidationError):
         """Devuelve un fragmento HTML con errores de validación para HTMX."""
+        
+        # Construir mensaje de error simple
         if isinstance(exc.detail, dict):
-            items = []
+            errors = []
             for field, messages in exc.detail.items():
                 text = ", ".join(messages) if isinstance(messages, (list, tuple)) else str(messages)
-                items.append(f"<li><strong>{field}:</strong> {text}</li>")
-            html = "<div class='alert alert-danger'><ul class='mb-0'>" + "".join(items) + "</ul></div>"
+                errors.append(f"{field}: {text}")
+            error_message = "\\n".join(errors)
         else:
-            html = f"<div class='alert alert-danger'>{exc.detail}</div>"
-        response = DRF_Response(html, status=400)
-        response["HX-Retarget"] = "#form-errors"
-        response["HX-Reswap"] = "innerHTML"
+            error_message = str(exc.detail)
+        
+        # Usar HX-Trigger para disparar evento que muestre alert
+        response = DRF_Response("", status=400)
+        response["HX-Trigger"] = json.dumps({
+            "showValidationError": error_message
+        })
         return response
 
     def _attach_uploaded_files(self, service: Service, request, mode: str):

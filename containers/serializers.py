@@ -107,6 +107,63 @@ class ServiceSerializer(serializers.ModelSerializer):
             return f"{name}:{tag}"
         return value
 
+    def validate_compose(self, value):
+        """
+        Validar docker-compose.yml:
+        - Máximo 5 contenedores permitidos
+        - Al menos 1 servicio definido
+        - Sintaxis YAML válida
+        """
+        if not value:
+            return value
+        
+        import yaml
+        
+        try:
+            # Leer contenido del archivo
+            content = value.read()
+            value.seek(0)  # Reset file pointer para uso posterior
+            
+            # Parsear YAML
+            compose_data = yaml.safe_load(content)
+            
+            if not compose_data or not isinstance(compose_data, dict):
+                raise serializers.ValidationError(
+                    "El archivo docker-compose.yml no tiene un formato válido."
+                )
+            
+            # Obtener servicios
+            services = compose_data.get('services', {})
+            
+            if not isinstance(services, dict):
+                raise serializers.ValidationError(
+                    "La sección 'services' debe ser un diccionario."
+                )
+            
+            num_services = len(services)
+            
+            # Validar mínimo
+            if num_services == 0:
+                raise serializers.ValidationError(
+                    "El docker-compose debe tener al menos 1 servicio definido."
+                )
+            
+            # Validar máximo
+            MAX_CONTAINERS = 5
+            if num_services > MAX_CONTAINERS:
+                service_names = ', '.join(services.keys())
+                raise serializers.ValidationError(
+                    f"Máximo {MAX_CONTAINERS} contenedores permitidos. "
+                    f"Tu docker-compose tiene {num_services} servicios: {service_names}"
+                )
+            
+        except yaml.YAMLError as e:
+            raise serializers.ValidationError(
+                f"Error al parsear docker-compose.yml: {str(e)}"
+            )
+        
+        return value
+
     def validate(self, attrs):
         """
         Reglas de modo y subject.
