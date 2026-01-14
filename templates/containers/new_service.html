@@ -1,0 +1,459 @@
+{% extends "base.html" %} {% load static %} {% block body %}
+<div
+  class="container-fluid py-4"
+  style="background-color: #f8f9fc; min-height: 100vh"
+>
+  {# Breadcrumbs #}
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item">
+        <a href="{% url 'containers:student_panel' %}"
+          ><i class="fas fa-home me-1"></i>Inicio</a
+        >
+      </li>
+      <li class="breadcrumb-item">
+        <a href="{% url 'containers:student_panel' %}">Servicios</a>
+      </li>
+      <li class="breadcrumb-item active" aria-current="page">Nuevo Servicio</li>
+    </ol>
+  </nav>
+
+  {# Header #}
+  <div
+    class="rounded-3 p-4 mb-4 shadow-sm"
+    style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%)"
+  >
+    <h1 class="h3 mb-1 text-white fw-bold">
+      <i class="fas fa-plus-circle me-2"></i>Crear Nuevo Servicio
+    </h1>
+    <p class="text-white-50 mb-0">
+      Despliega un nuevo contenedor Docker desde una imagen o código
+      personalizado.
+    </p>
+  </div>
+
+  {# Layout de 2 columnas #}
+  <div class="row g-4">
+    {# Columna izquierda: Formulario #}
+    <div class="col-lg-8">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+          <form
+            id="newServiceForm"
+            method="POST"
+            enctype="multipart/form-data"
+            hx-post="/api/containers/"
+            hx-target="#form-feedback"
+            hx-swap="innerHTML"
+          >
+            {% csrf_token %} {# Contenedor de feedback #}
+            <div id="form-feedback" class="mb-3"></div>
+
+            {# Sección 1: Información Básica #}
+            <div class="mb-4">
+              <h5 class="fw-bold text-primary mb-3">
+                <i class="fas fa-info-circle me-2"></i>Información Básica
+              </h5>
+
+              {# Nombre del servicio #}
+              <div class="mb-3">
+                <label for="service-name" class="form-label fw-semibold">
+                  Nombre del servicio <span class="text-danger">*</span>
+                </label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="service-name"
+                  name="name"
+                  placeholder="ej: mi-nginx, api-backend"
+                  required
+                  pattern="[a-z0-9-]+"
+                  title="Solo letras minúsculas, números y guiones"
+                />
+                <small class="text-muted"
+                  >Solo letras minúsculas, números y guiones. Sin
+                  espacios.</small
+                >
+              </div>
+
+              {# Asignatura #} {% if not current_subject %}
+              <div class="mb-3">
+                <label for="service-subject" class="form-label fw-semibold">
+                  Asignatura <span class="text-danger">*</span>
+                </label>
+                {% if available_subjects %}
+                <select
+                  class="form-select"
+                  id="service-subject"
+                  name="subject"
+                  required
+                >
+                  <option value="">Selecciona una asignatura</option>
+                  {% for subject in available_subjects %}
+                  <option value="{{ subject.id }}">{{ subject.name }}</option>
+                  {% endfor %}
+                </select>
+                {% else %}
+                <div class="alert alert-warning mb-0">
+                  <i class="fas fa-exclamation-triangle me-2"></i>No tienes
+                  asignaturas disponibles todavía.
+                </div>
+                {% endif %}
+              </div>
+              {% endif %} {# Proyecto #}
+              <div class="mb-3">
+                <label for="service-project" class="form-label fw-semibold">
+                  Proyecto <span class="text-danger">*</span>
+                </label>
+                {% if user_projects %}
+                <select
+                  class="form-select"
+                  id="service-project"
+                  name="project"
+                  required
+                >
+                  <option value="" disabled selected>
+                    -- Selecciona un proyecto --
+                  </option>
+                  {% for p in user_projects %}
+                  <option value="{{ p.id }}">
+                    {{ p.place }} ({{ p.subject.name }})
+                  </option>
+                  {% endfor %}
+                </select>
+                {% else %}
+                <div class="alert alert-warning mb-0">
+                  <i class="fas fa-exclamation-triangle me-2"></i>No tienes
+                  proyectos asignados. Pide a tu profesor que te asigne uno.
+                </div>
+                {% endif %}
+              </div>
+            </div>
+
+            {# Sección 2: Tipo de Despliegue #}
+            <div class="mb-4">
+              <h5 class="fw-bold text-primary mb-3">
+                <i class="fas fa-cogs me-2"></i>Tipo de Despliegue
+              </h5>
+
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <div
+                    class="form-check p-3 border rounded"
+                    style="cursor: pointer"
+                  >
+                    <input
+                      class="form-check-input"
+                      type="radio"
+                      name="mode"
+                      id="mode_default"
+                      value="default"
+                      checked
+                    />
+                    <label
+                      class="form-check-label w-100"
+                      for="mode_default"
+                      style="cursor: pointer"
+                    >
+                      <div class="d-flex align-items-center">
+                        <i class="fas fa-box fa-2x text-primary me-3"></i>
+                        <div>
+                          <div class="fw-bold">Imagen por defecto</div>
+                          <small class="text-muted"
+                            >Usa una imagen del catálogo</small
+                          >
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div
+                    class="form-check p-3 border rounded"
+                    style="cursor: pointer"
+                  >
+                    <input
+                      class="form-check-input"
+                      type="radio"
+                      name="mode"
+                      id="mode_custom"
+                      value="custom"
+                    />
+                    <label
+                      class="form-check-label w-100"
+                      for="mode_custom"
+                      style="cursor: pointer"
+                    >
+                      <div class="d-flex align-items-center">
+                        <i class="fas fa-code fa-2x text-success me-3"></i>
+                        <div>
+                          <div class="fw-bold">Configuración personalizada</div>
+                          <small class="text-muted"
+                            >Dockerfile o docker-compose</small
+                          >
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {# Sección 3: Configuración (depende del modo) #}
+            <div class="mb-4">
+              <h5 class="fw-bold text-primary mb-3">
+                <i class="fas fa-sliders-h me-2"></i>Configuración
+              </h5>
+
+              {# Imagen (solo modo default) #}
+              <div class="mb-3" id="block-default-image">
+                <label for="service-image" class="form-label fw-semibold">
+                  Imagen Docker <span class="text-danger">*</span>
+                </label>
+                <select
+                  class="form-select"
+                  id="service-image"
+                  name="image"
+                  required
+                >
+                  {% for img in images %}
+                  <option value="{{ img.name }}:{{ img.tag }}">
+                    {{ img.name }}:{{ img.tag }} - {{ img.description }}
+                  </option>
+                  {% endfor %}
+                </select>
+                <small class="text-muted"
+                  >En modo personalizado este selector queda
+                  deshabilitado.</small
+                >
+              </div>
+
+              {# Puerto personalizado #}
+              <div class="mb-3">
+                <label for="service-port" class="form-label fw-semibold">
+                  Puerto personalizado (opcional)
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
+                    data-bs-toggle="popover"
+                    data-bs-trigger="focus"
+                    data-bs-html="true"
+                    data-bs-title="Puerto personalizado"
+                    data-bs-content="Debe estar entre 40000 y 50000. Si no lo indicas se asigna uno libre."
+                  >
+                    <i class="bi bi-info-circle"></i>
+                  </button>
+                </label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="service-port"
+                  name="custom_port"
+                  min="40000"
+                  max="50000"
+                  placeholder="Ej: 49123"
+                />
+                <small class="text-muted"
+                  >Debe estar entre 40000 y 50000.</small
+                >
+              </div>
+
+              {# Puerto interno (solo modo custom) #}
+              <div class="mb-3 custom-block" id="block-internal-port">
+                <label
+                  for="service-internal-port"
+                  class="form-label fw-semibold"
+                >
+                  Puerto interno del contenedor (opcional)
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
+                    data-bs-toggle="popover"
+                    data-bs-trigger="focus"
+                    data-bs-html="true"
+                    data-bs-title="Puerto interno"
+                    data-bs-content="Puerto dentro del contenedor que escucha tu aplicación. Ejemplos: Flask 5000, Django 8000, Node.js 3000."
+                  >
+                    <i class="bi bi-info-circle"></i>
+                  </button>
+                </label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="service-internal-port"
+                  name="internal_port"
+                  min="1"
+                  max="65535"
+                  placeholder="Ej: 5000"
+                />
+                <small class="text-muted"
+                  >Ejemplos: Flask 5000, Django 8000, Node 3000. Por defecto
+                  80.</small
+                >
+              </div>
+
+              {# Dockerfile (solo modo custom) #}
+              <div class="mb-3 custom-block" id="block-dockerfile">
+                <label for="service-dockerfile" class="form-label fw-semibold">
+                  Dockerfile (opcional, exclusivo con compose)
+                </label>
+                <div class="input-group">
+                  <input
+                    type="file"
+                    class="form-control"
+                    id="service-dockerfile"
+                    name="dockerfile"
+                    accept="*/*"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    onclick="clearFile('dockerfile')"
+                  >
+                    <i class="fas fa-times"></i> Limpiar
+                  </button>
+                </div>
+              </div>
+
+              {# Docker Compose (solo modo custom) #}
+              <div class="mb-3 custom-block" id="block-compose">
+                <label for="service-compose" class="form-label fw-semibold">
+                  docker-compose.yml (opcional, exclusivo con Dockerfile)
+                </label>
+                <div class="input-group">
+                  <input
+                    type="file"
+                    class="form-control"
+                    id="service-compose"
+                    name="compose"
+                    accept=".yml,.yaml"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    onclick="clearFile('compose')"
+                  >
+                    <i class="fas fa-times"></i> Limpiar
+                  </button>
+                </div>
+              </div>
+
+              {# Código fuente (solo modo custom) #}
+              <div class="mb-3 custom-block" id="block-code">
+                <label for="service-code" class="form-label fw-semibold">
+                  Código fuente (.zip obligatorio en modo personalizado)
+                </label>
+                <div class="input-group">
+                  <input
+                    type="file"
+                    class="form-control"
+                    id="service-code"
+                    name="code"
+                    accept=".zip,.rar"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary"
+                    onclick="clearFile('code')"
+                  >
+                    <i class="fas fa-times"></i> Limpiar
+                  </button>
+                </div>
+                <small class="text-muted"
+                  >Sube un ZIP que contenga el Dockerfile o docker-compose.yml y
+                  tu código fuente.</small
+                >
+              </div>
+            </div>
+
+            {# Botones de acción #}
+            <div class="d-flex gap-2 justify-content-end">
+              <a
+                href="{% url 'containers:student_panel' %}"
+                class="btn btn-outline-secondary"
+              >
+                <i class="fas fa-times me-2"></i>Cancelar
+              </a>
+              <button type="submit" class="btn btn-primary">
+                <i class="fas fa-rocket me-2"></i>Crear Servicio
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    {# Columna derecha: Ayuda contextual #}
+    <div class="col-lg-4">
+      {# Card de consejos #}
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body">
+          <h5 class="fw-bold text-success mb-3">
+            <i class="fas fa-lightbulb me-2"></i>Consejos
+          </h5>
+          <ul class="list-unstyled mb-0">
+            <li class="mb-2">
+              <i class="fas fa-check-circle text-success me-2"></i>Usa nombres
+              cortos y descriptivos
+            </li>
+            <li class="mb-2">
+              <i class="fas fa-check-circle text-success me-2"></i>Sin espacios
+              ni caracteres especiales
+            </li>
+            <li class="mb-2">
+              <i class="fas fa-check-circle text-success me-2"></i>Verifica que
+              el puerto esté libre
+            </li>
+            <li class="mb-2">
+              <i class="fas fa-check-circle text-success me-2"></i>El ZIP debe
+              contener Dockerfile o docker-compose.yml
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      {# Card de ejemplos #}
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <h5 class="fw-bold text-info mb-3">
+            <i class="fas fa-book me-2"></i>Ejemplos
+          </h5>
+
+          <div class="mb-3">
+            <h6 class="fw-semibold">Despliegue simple (Nginx)</h6>
+            <pre class="bg-light p-2 rounded"><code>Nombre: mi-nginx
+Modo: Default
+Imagen: nginx:latest</code></pre>
+          </div>
+
+          <div class="mb-3">
+            <h6 class="fw-semibold">Aplicación Node.js</h6>
+            <pre class="bg-light p-2 rounded"><code>Nombre: api-backend
+Modo: Custom
+Dockerfile: ✓
+Código: app.zip
+Puerto interno: 3000</code></pre>
+          </div>
+
+          <div>
+            <h6 class="fw-semibold">Docker Compose</h6>
+            <pre class="bg-light p-2 rounded"><code>Nombre: mi-stack
+Modo: Custom
+Compose: docker-compose.yml
+Código: proyecto.zip</code></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Contenedor de toasts #}
+<div
+  id="toast-container"
+  class="position-fixed top-0 end-0 p-3"
+  style="z-index: 9999"
+></div>
+
+{% endblock %} {% block extrascripts %} {# Reutilizar los scripts del modal #}
+{% include "containers/_partials/panels/_scripts.html" %} {% endblock %}

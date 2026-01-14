@@ -10,9 +10,9 @@
         <h1 class="h3 mb-1 text-white fw-bold">Mis servicios</h1>
         <p class="text-white-50 mb-0">Gestiona tus contenedores y despliegues activos.</p>
       </div>
-      <button class="btn btn-light shadow-sm" data-bs-toggle="modal" data-bs-target="#newServiceModal">
+      <a href="{% url 'containers:new_service' %}" class="btn btn-light shadow-sm">
         <i class="fas fa-plus me-2"></i>Nuevo servicio
-      </button>
+      </a>
     </div>
   </div>
 
