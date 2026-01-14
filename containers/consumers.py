@@ -119,6 +119,40 @@ class TerminalConsumer(WebsocketConsumer):
                 return
             data = bytes_data if bytes_data is not None else (text_data or "")
             if isinstance(data, str):
+                # SEGURIDAD CRÍTICA: Filtrar comandos peligrosos
+                data_lower = data.lower().strip()
+                
+                # Lista de patrones peligrosos
+                DANGEROUS_PATTERNS = [
+                    'rm -rf /',
+                    'rm -rf /*',
+                    'rm -rf ~',
+                    'dd if=/dev/zero',
+                    'dd if=/dev/random',
+                    'mkfs.',
+                    'fork()',
+                    ':(){ :|:& };:',  # Fork bomb
+                    'wget http',
+                    'curl http',
+                    'nc -l',  # Netcat listener
+                    'ncat -l',
+                    '/dev/tcp/',
+                ]
+                
+                # Detectar comandos peligrosos
+                for pattern in DANGEROUS_PATTERNS:
+                    if pattern in data_lower:
+                        warning_msg = (
+                            f"\r\n[SEGURIDAD] Comando bloqueado: '{pattern}' no permitido.\r\n"
+                            f"Este comando ha sido registrado.\r\n"
+                        )
+                        self.send(text_data=warning_msg)
+                        logger.warning(
+                            f"SEGURIDAD: Comando peligroso bloqueado en terminal. "
+                            f"Usuario: {self.scope.get('user')}, Patrón: {pattern}"
+                        )
+                        return
+                
                 data = data.encode("utf-8", errors="ignore")
             send_fn = getattr(sock, "sendall", None) or getattr(sock, "send", None)
             if send_fn:

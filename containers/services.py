@@ -817,19 +817,11 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
         except DockerException:
             image_cmd = None
 
-        # --------- Variables y volúmenes ---------
-        volume_name = service.volume_name or f"svc_{service.id}_{slug}_data"
-        try:
-            docker_client.volumes.create(name=volume_name)
-        except APIError as e:
-            if e.response.status_code != 409:  # 409 es 'conflicto', el volumen ya existe (OK)
-                raise RuntimeError(f"No se pudo crear el volumen '{volume_name}': {e}")
-        service.volume_name = volume_name
-        volumes = {volume_name: {"bind": "/data", "mode": "rw"}}
-
-        user_vols = service.volumes or {}
-        if isinstance(user_vols, dict):
-            volumes.update(user_vols)
+        # --------- Variables (volúmenes DESHABILITADOS por seguridad) ---------
+        # SEGURIDAD CRÍTICA: Los volúmenes están completamente deshabilitados en contenedores simples
+        # para prevenir escalada de privilegios mediante bind mounts.
+        # Solo se permiten volúmenes nombrados en Docker Compose con validación estricta.
+        volumes = None  # NO crear volúmenes automáticamente
 
         env_vars_raw = service.env_vars or {}
         if not isinstance(env_vars_raw, dict):

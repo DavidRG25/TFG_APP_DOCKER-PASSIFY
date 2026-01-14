@@ -806,13 +806,15 @@ def edit_service(request, pk):
 
         try:
             env_vars = _parse_optional_json(request.POST.get("env_vars", ""), "Variables de entorno")
-            volumes = _parse_optional_json(request.POST.get("volumes", ""), "Volumenes")
+            # SEGURIDAD CRÍTICA: Volúmenes deshabilitados completamente
+            # volumes = _parse_optional_json(request.POST.get("volumes", ""), "Volumenes")
         except ValueError as exc:
             return HttpResponse(str(exc), status=400)
 
         service.env_vars = env_vars or None
-        service.volumes = volumes or None
-        service.save(update_fields=["env_vars", "volumes", "updated_at"])
+        # SEGURIDAD: No permitir modificación de volúmenes
+        # service.volumes = volumes or None
+        service.save(update_fields=["env_vars", "updated_at"])
 
         try:
             remove_container(service)

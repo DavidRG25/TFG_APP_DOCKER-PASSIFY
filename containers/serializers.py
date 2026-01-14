@@ -89,9 +89,14 @@ class ServiceSerializer(serializers.ModelSerializer):
         return value
 
     def validate_volumes(self, value):
-        if value is not None and not isinstance(value, dict):
-            raise serializers.ValidationError(_("Debe ser un objeto JSON (dict)."))
-        return value
+        # SEGURIDAD CRÍTICA: Rechazar completamente el campo volumes
+        # Los volúmenes solo se permiten en Docker Compose con validación estricta
+        if value is not None:
+            raise serializers.ValidationError(
+                "Por razones de seguridad, no se permiten volúmenes en contenedores simples. "
+                "Los volúmenes solo están disponibles en Docker Compose con validación estricta."
+            )
+        return None
 
     def validate_image(self, value: str) -> str:
         """
@@ -156,6 +161,130 @@ class ServiceSerializer(serializers.ModelSerializer):
                     f"Máximo {MAX_CONTAINERS} contenedores permitidos. "
                     f"Tu docker-compose tiene {num_services} servicios: {service_names}"
                 )
+            
+            # SEGURIDAD CRÍTICA: Validar volúmenes para prevenir bind mounts
+            for service_name, service_config in services.items():
+                if not isinstance(service_config, dict):
+                    continue
+                
+                volumes_list = service_config.get('volumes', [])
+                if not volumes_list:
+                    continue
+                
+                # Validar cada volumen
+                for volume in volumes_list:
+                    if isinstance(volume, str):
+                        # Detectar bind mounts (rutas absolutas o relativas)
+                        if volume.startswith('/') or volume.startswith('./') or volume.startswith('../'):
+                            raise serializers.ValidationError(
+                                f"SEGURIDAD: Bind mounts no permitidos en servicio '{service_name}'. "
+                                f"Volumen rechazado: '{volume}'. "
+                                f"Solo se permiten volúmenes nombrados (ej: 'mi_volumen:/path')."
+                            )
+                        
+                        # Detectar bind mounts con : (ej: /host/path:/container/path)
+                        if ':' in volume:
+                            parts = volume.split(':')
+                            host_part = parts[0]
+                            # Si la parte del host es una ruta (empieza con / o .), es bind mount
+                            if host_part.startswith('/') or host_part.startswith('.'):
+                                raise serializers.ValidationError(
+                                    f"SEGURIDAD: Bind mounts no permitidos en servicio '{service_name}'. "
+                                    f"Volumen rechazado: '{volume}'. "
+                                    f"Solo se permiten volúmenes nombrados (ej: 'mi_volumen:/path')."
+                                )
+                    elif isinstance(volume, dict):
+                        # Formato largo de volúmenes
+                        volume_type = volume.get('type', 'volume')
+                        source = volume.get('source', '')
+                        
+                        # Rechazar bind mounts explícitos
+                        if volume_type == 'bind':
+                            raise serializers.ValidationError(
+                                f"SEGURIDAD: Bind mounts no permitidos en servicio '{service_name}'. "
+                                f"Solo se permiten volúmenes nombrados (type: volume)."
+                            )
+                        
+                        # Validar que source no sea una ruta
+                        if source and (source.startswith('/') or source.startswith('.')):
+                            raise serializers.ValidationError(
+                                f"SEGURIDAD: Rutas de host no permitidas en servicio '{service_name}'. "
+                                f"Source rechazado: '{source}'. "
+                                f"Solo se permiten nombres de volúmenes."
+                            )
+            
+            # SEGURIDAD CRÍTICA: Validar configuraciones peligrosas
+            DANGEROUS_CONFIGS = {
+                'privileged': 'Modo privilegiado no permitido (escalada de privilegios)',
+                'network_mode': 'Network mode host no permitido (acceso a red del host)',
+                'pid': 'PID mode host no permitido (acceso a procesos del host)',
+                'ipc': 'IPC mode host no permitido (acceso a IPC del host)',
+            }
+            
+            for service_name, service_config in services.items():
+                if not isinstance(service_config, dict):
+                    continue
+                
+                # Validar privileged
+                if service_config.get('privileged', False):
+                    raise serializers.ValidationError(
+                        f"SEGURIDAD: Servicio '{service_name}' usa 'privileged: true'. "
+                        f"{DANGEROUS_CONFIGS['privileged']}"
+                    )
+                
+                # Validar network_mode
+                network_mode = service_config.get('network_mode', '')
+                if network_mode == 'host':
+                    raise serializers.ValidationError(
+                        f"SEGURIDAD: Servicio '{service_name}' usa 'network_mode: host'. "
+                        f"{DANGEROUS_CONFIGS['network_mode']}"
+                    )
+                
+                # Validar pid
+                pid_mode = service_config.get('pid', '')
+                if pid_mode == 'host':
+                    raise serializers.ValidationError(
+                        f"SEGURIDAD: Servicio '{service_name}' usa 'pid: host'. "
+                        f"{DANGEROUS_CONFIGS['pid']}"
+                    )
+                
+                # Validar ipc
+                ipc_mode = service_config.get('ipc', '')
+                if ipc_mode == 'host':
+                    raise serializers.ValidationError(
+                        f"SEGURIDAD: Servicio '{service_name}' usa 'ipc: host'. "
+                        f"{DANGEROUS_CONFIGS['ipc']}"
+                    )
+                
+                # Validar cap_add (capabilities peligrosas)
+                DANGEROUS_CAPS = [
+                    'SYS_ADMIN',      # Administración del sistema
+                    'SYS_MODULE',     # Cargar módulos del kernel
+                    'SYS_RAWIO',      # Acceso directo a I/O
+                    'SYS_PTRACE',     # Debugging de procesos
+                    'SYS_BOOT',       # Reiniciar sistema
+                    'NET_ADMIN',      # Administración de red
+                    'DAC_OVERRIDE',   # Bypass de permisos
+                    'DAC_READ_SEARCH',# Bypass de lectura
+                ]
+                
+                cap_add = service_config.get('cap_add', [])
+                if cap_add:
+                    if isinstance(cap_add, list):
+                        for cap in cap_add:
+                            cap_upper = str(cap).upper()
+                            if cap_upper in DANGEROUS_CAPS:
+                                raise serializers.ValidationError(
+                                    f"SEGURIDAD: Servicio '{service_name}' intenta añadir capability '{cap}'. "
+                                    f"Capabilities peligrosas no permitidas: {', '.join(DANGEROUS_CAPS)}"
+                                )
+                
+                # Validar devices (acceso a dispositivos del host)
+                if 'devices' in service_config:
+                    raise serializers.ValidationError(
+                        f"SEGURIDAD: Servicio '{service_name}' intenta montar dispositivos del host. "
+                        f"Acceso a dispositivos no permitido."
+                    )
             
         except yaml.YAMLError as e:
             raise serializers.ValidationError(
