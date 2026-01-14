@@ -14,4 +14,10 @@ urlpatterns = [
     path("table-fragment/", views.service_table, name="service_table"),
     path("terminal/<int:pk>/", views.terminal_view, name="terminal_view"),
     path("edit/<int:pk>/", views.edit_service, name="edit_service"),
+    
+    # Nueva página dedicada para crear servicio
+    path("new/", views.new_service_page, name="new_service"),
+    
+    # Gestión de tokens API
+    path("api-token/", views.manage_api_token, name="api_token"),
 ]

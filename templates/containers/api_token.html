@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block body %}
+<div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh;">
+  {# Breadcrumbs #}
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'containers:student_panel' %}"><i class="fas fa-home me-1"></i>Inicio</a></li>
+      <li class="breadcrumb-item active" aria-current="page">API Token</li>
+    </ol>
+  </nav>
+
+  {# Header #}
+  <div class="rounded-3 p-4 mb-4 shadow-sm" style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+    <h1 class="h3 mb-1 text-white fw-bold"><i class="fas fa-key me-2"></i>Token de API</h1>
+    <p class="text-white-50 mb-0">Usa este token para acceder a la API REST y automatizar tus despliegues.</p>
+  </div>
+
+  {# Mensaje de feedback #}
+  {% if message %}
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    <i class="fas fa-check-circle me-2"></i>{{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endif %}
+
+  {# Token Card #}
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body p-4">
+      <h5 class="fw-bold text-primary mb-3"><i class="fas fa-key me-2"></i>Tu Bearer Token</h5>
+      
+      <div class="input-group mb-3">
+        <input type="text" class="form-control font-monospace" id="api-token" value="{{ token }}" readonly>
+        <button class="btn btn-outline-primary" type="button" onclick="copyToken()">
+          <i class="fas fa-copy me-2"></i>Copiar
+        </button>
+      </div>
+
+      <div class="alert alert-warning mb-0">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <strong>¡Importante!</strong> Mantén tu token seguro. No lo compartas públicamente ni lo subas a repositorios.
+      </div>
+
+      <form method="POST" class="mt-3">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-danger btn-sm" 
+                onclick="return confirm('¿Estás seguro? Esto invalidará el token actual.')">
+          <i class="fas fa-sync-alt me-2"></i>Regenerar Token
+        </button>
+      </form>
+    </div>
+  </div>
+
+  {# Documentación de la API #}
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-4">
+      <h5 class="fw-bold text-primary mb-4"><i class="fas fa-book me-2"></i>Documentación de la API</h5>
+
+      {# Información básica #}
+      <div class="mb-4">
+        <h6 class="fw-semibold">Información Básica</h6>
+        <table class="table table-sm">
+          <tr>
+            <td class="fw-semibold">Base URL:</td>
+            <td><code>{{ request.scheme }}://{{ request.get_host }}/api/</code></td>
+          </tr>
+          <tr>
+            <td class="fw-semibold">Autenticación:</td>
+            <td><code>Authorization: Bearer {{ token }}</code></td>
+          </tr>
+          <tr>
+            <td class="fw-semibold">Content-Type:</td>
+            <td><code>application/json</code></td>
+          </tr>
+        </table>
+      </div>
+
+      {# Endpoints #}
+      <div class="accordion" id="apiDocsAccordion">
+        {# Crear Servicio #}
+        <div class="accordion-item">
+          <h2 class="accordion-header">
+            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#createService">
+              <span class="badge bg-success me-2">POST</span> Crear Servicio
+            </button>
+          </h2>
+          <div id="createService" class="accordion-collapse collapse show" data-bs-parent="#apiDocsAccordion">
+            <div class="accordion-body">
+              <p><strong>Endpoint:</strong> <code>POST /api/containers/</code></p>
+              
+              <p><strong>Ejemplo:</strong></p>
+              <pre class="bg-light p-3 rounded"><code>curl --request POST \
+  {{ request.scheme }}://{{ request.get_host }}/api/containers/ \
+  --header 'Authorization: Bearer {{ token }}' \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "name": "mi-nginx",
+    "image": "nginx:latest",
+    "mode": "default",
+    "project": 1,
+    "subject": 1
+  }'</code></pre>
+              
+              <button class="btn btn-sm btn-outline-primary" onclick="copyExample('createServiceExample')">
+                <i class="fas fa-copy me-1"></i>Copiar comando
+              </button>
+              
+              <p class="mt-3"><strong>Respuesta esperada:</strong></p>
+              <pre class="bg-light p-3 rounded"><code>{
+  "id": 42,
+  "name": "mi-nginx",
+  "image": "nginx:latest",
+  "status": "creating",
+  "assigned_port": 45001,
+  "created_at": "2025-01-14T22:00:00Z"
+}</code></pre>
+            </div>
+          </div>
+        </div>
+
+        {# Listar Servicios #}
+        <div class="accordion-item">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#listServices">
+              <span class="badge bg-primary me-2">GET</span> Listar Servicios
+            </button>
+          </h2>
+          <div id="listServices" class="accordion-collapse collapse" data-bs-parent="#apiDocsAccordion">
+            <div class="accordion-body">
+              <p><strong>Endpoint:</strong> <code>GET /api/containers/</code></p>
+              
+              <p><strong>Ejemplo:</strong></p>
+              <pre class="bg-light p-3 rounded"><code>curl --request GET \
+  {{ request.scheme }}://{{ request.get_host }}/api/containers/ \
+  --header 'Authorization: Bearer {{ token }}'</code></pre>
+              
+              <button class="btn btn-sm btn-outline-primary" onclick="copyExample('listServicesExample')">
+                <i class="fas fa-copy me-1"></i>Copiar comando
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {# Iniciar Servicio #}
+        <div class="accordion-item">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#startService">
+              <span class="badge bg-success me-2">POST</span> Iniciar Servicio
+            </button>
+          </h2>
+          <div id="startService" class="accordion-collapse collapse" data-bs-parent="#apiDocsAccordion">
+            <div class="accordion-body">
+              <p><strong>Endpoint:</strong> <code>POST /api/containers/{id}/start/</code></p>
+              
+              <p><strong>Ejemplo:</strong></p>
+              <pre class="bg-light p-3 rounded"><code>curl --request POST \
+  {{ request.scheme }}://{{ request.get_host }}/api/containers/42/start/ \
+  --header 'Authorization: Bearer {{ token }}'</code></pre>
+              
+              <button class="btn btn-sm btn-outline-primary" onclick="copyExample('startServiceExample')">
+                <i class="fas fa-copy me-1"></i>Copiar comando
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {# Detener Servicio #}
+        <div class="accordion-item">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#stopService">
+              <span class="badge bg-warning me-2">POST</span> Detener Servicio
+            </button>
+          </h2>
+          <div id="stopService" class="accordion-collapse collapse" data-bs-parent="#apiDocsAccordion">
+            <div class="accordion-body">
+              <p><strong>Endpoint:</strong> <code>POST /api/containers/{id}/stop/</code></p>
+              
+              <p><strong>Ejemplo:</strong></p>
+              <pre class="bg-light p-3 rounded"><code>curl --request POST \
+  {{ request.scheme }}://{{ request.get_host }}/api/containers/42/stop/ \
+  --header 'Authorization: Bearer {{ token }}'</code></pre>
+              
+              <button class="btn btn-sm btn-outline-primary" onclick="copyExample('stopServiceExample')">
+                <i class="fas fa-copy me-1"></i>Copiar comando
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {# Eliminar Servicio #}
+        <div class="accordion-item">
+          <h2 class="accordion-header">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#deleteService">
+              <span class="badge bg-danger me-2">POST</span> Eliminar Servicio
+            </button>
+          </h2>
+          <div id="deleteService" class="accordion-collapse collapse" data-bs-parent="#apiDocsAccordion">
+            <div class="accordion-body">
+              <p><strong>Endpoint:</strong> <code>POST /api/containers/{id}/remove/</code></p>
+              
+              <p><strong>Ejemplo:</strong></p>
+              <pre class="bg-light p-3 rounded"><code>curl --request POST \
+  {{ request.scheme }}://{{ request.get_host }}/api/containers/42/remove/ \
+  --header 'Authorization: Bearer {{ token }}'</code></pre>
+              
+              <button class="btn btn-sm btn-outline-primary" onclick="copyExample('deleteServiceExample')">
+                <i class="fas fa-copy me-1"></i>Copiar comando
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# Ejemplo de CI/CD #}
+      <div class="mt-4">
+        <h6 class="fw-semibold">Ejemplo de Integración con GitHub Actions</h6>
+        <pre class="bg-light p-3 rounded"><code># .github/workflows/deploy.yml
+name: Deploy to PaaSify
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Deploy to PaaSify
+        run: |
+          curl --request POST \
+            {{ request.scheme }}://{{ request.get_host }}/api/containers/ \
+            --header 'Authorization: Bearer ${{ '{{' }} secrets.PAASIFY_TOKEN {{ '}}' }}' \
+            --header 'Content-Type: application/json' \
+            --data '{
+              "name": "my-app",
+              "image": "nginx:latest",
+              "mode": "default",
+              "project": 1,
+              "subject": 1
+            }'</code></pre>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Toast container #}
+<div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index: 9999;"></div>
+
+{% endblock %}
+
+{% block extrascripts %}
+<script>
+function copyToken() {
+  const tokenInput = document.getElementById('api-token');
+  tokenInput.select();
+  tokenInput.setSelectionRange(0, 99999); // Para móviles
+  
+  navigator.clipboard.writeText(tokenInput.value).then(() => {
+    showToast('Token copiado al portapapeles', 'success');
+  }).catch(() => {
+    document.execCommand('copy');
+    showToast('Token copiado al portapapeles', 'success');
+  });
+}
+
+function copyExample(id) {
+  const codeBlock = event.target.closest('.accordion-body').querySelector('pre code');
+  const text = codeBlock.textContent;
+  
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('Comando copiado al portapapeles', 'success');
+  }).catch(() => {
+    showToast('Error al copiar', 'danger');
+  });
+}
+
+function showToast(message, type = 'success') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast align-items-center text-bg-${type} border-0 show`;
+  toast.setAttribute('role', 'alert');
+  toast.innerHTML = `
+    <div class="d-flex">
+      <div class="toast-body">${message}</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  `;
+  container.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.remove();
+  }, 3000);
+}
+</script>
+{% endblock %}

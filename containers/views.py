@@ -832,3 +832,55 @@ def subjects_list(request):
     else:
         subjects = Subject.objects.filter(students=request.user)
     return render(request, "containers/subjects.html", {"subjects": subjects})
+
+
+@login_required
+def new_service_page(request):
+    """
+    Página dedicada para crear nuevo servicio.
+    Proporciona mejor UX que el modal con más espacio y ayuda contextual.
+    """
+    # Obtener datos necesarios para el formulario
+    images = AllowedImage.objects.all().order_by('name')
+    subjects = Subject.objects.filter(students=request.user)
+    user_projects = UserProject.objects.filter(
+        user_profile__user=request.user
+    ).select_related('subject')
+    
+    # Obtener host para preview
+    host = request.get_host().split(':')[0]
+    
+    context = {
+        'images': images,
+        'available_subjects': subjects,
+        'user_projects': user_projects,
+        'host': host,
+    }
+    
+    return render(request, 'containers/new_service.html', context)
+
+
+@login_required
+def manage_api_token(request):
+    """
+    Gestionar token API del usuario.
+    Permite generar, regenerar y visualizar el Bearer Token para acceso a la API.
+    """
+    from rest_framework.authtoken.models import Token
+    
+    if request.method == "POST":
+        # Regenerar token
+        Token.objects.filter(user=request.user).delete()
+        token = Token.objects.create(user=request.user)
+        message = "Token regenerado exitosamente"
+    else:
+        # Obtener o crear token
+        token, created = Token.objects.get_or_create(user=request.user)
+        message = "Token creado exitosamente" if created else None
+    
+    context = {
+        'token': token.key,
+        'message': message,
+    }
+    
+    return render(request, 'containers/api_token.html', context)
