@@ -865,24 +865,31 @@ def new_service_page(request):
 @login_required
 def manage_api_token(request):
     """
-    Gestionar token API del usuario.
+    Gestionar token API del usuario con caducidad de 30 días.
     Permite generar, regenerar y visualizar el Bearer Token para acceso a la API.
     """
-    from rest_framework.authtoken.models import Token
+    from paasify.models.TokenModel import ExpiringToken
+    from django.contrib import messages
     
     if request.method == "POST":
-        # Regenerar token
-        Token.objects.filter(user=request.user).delete()
-        token = Token.objects.create(user=request.user)
-        message = "Token regenerado exitosamente"
+        # Regenerar token (eliminar el anterior y crear uno nuevo)
+        ExpiringToken.objects.filter(user=request.user).delete()
+        token = ExpiringToken.objects.create(user=request.user)
+        messages.success(request, 'Token regenerado exitosamente. Válido por 30 días.')
     else:
         # Obtener o crear token
-        token, created = Token.objects.get_or_create(user=request.user)
-        message = "Token creado exitosamente" if created else None
+        token, created = ExpiringToken.objects.get_or_create(user=request.user)
+        if created:
+            messages.success(request, 'Token creado exitosamente. Válido por 30 días.')
+        elif token.is_expired():
+            messages.warning(request, 'Tu token ha expirado. Por favor, regenera un nuevo token.')
     
     context = {
         'token': token.key,
-        'message': message,
+        'created': token.created,
+        'expires_at': token.expires_at,
+        'days_remaining': token.days_until_expiration(),
+        'is_expired': token.is_expired(),
     }
     
     return render(request, 'containers/api_token.html', context)

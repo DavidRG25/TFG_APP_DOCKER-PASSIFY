@@ -1,17 +1,17 @@
 """
-Middleware para autenticacion mediante Bearer Token JWT.
-Valida tokens generados desde el perfil del usuario y asigna request.user.
+Middleware para autenticacion mediante Bearer Token (DRF) con expiración.
+Valida tokens DRF con caducidad de 30 días generados desde el perfil del usuario.
 """
 from django.http import JsonResponse
-
-from paasify.models.StudentModel import UserProfile
 
 
 class TokenAuthMiddleware:
     """
     Intercepta peticiones API con Authorization: Bearer TOKEN.
+    - Valida tokens DRF con expiración (paasify.models.ExpiringToken)
+    - Verifica que el token no haya expirado
     - Si el token es valido, autentica al usuario y desactiva CSRF para la request.
-    - Si el token es invalido/expirado, devuelve 401 JSON.
+    - Si el token es invalido o expirado, devuelve 401 JSON.
     - Si no hay header Bearer, deja fluir la request sin modificar request.user.
     """
 
@@ -21,13 +21,25 @@ class TokenAuthMiddleware:
     def __call__(self, request):
         auth_header = request.META.get("HTTP_AUTHORIZATION", "")
         if request.path.startswith("/api/") and auth_header.startswith("Bearer "):
-            token = auth_header.replace("Bearer ", "", 1).strip()
+            token_key = auth_header.replace("Bearer ", "", 1).strip()
+            
+            # Validar token con expiración
             try:
-                user = UserProfile.get_user_from_token(token)
-            except Exception:
-                user = None
-
-            if not user:
+                from paasify.models.TokenModel import ExpiringToken
+                token = ExpiringToken.objects.select_related('user').get(key=token_key)
+                
+                # Verificar si el token ha expirado
+                if token.is_expired():
+                    return JsonResponse(
+                        {
+                            "detail": "Token expirado. Por favor, regenera tu token desde tu perfil.",
+                            "code": "token_expired",
+                        },
+                        status=401,
+                    )
+                
+                user = token.user
+            except ExpiringToken.DoesNotExist:
                 return JsonResponse(
                     {
                         "detail": "Token invalido o expirado.",
@@ -35,7 +47,17 @@ class TokenAuthMiddleware:
                     },
                     status=401,
                 )
+            except Exception as e:
+                return JsonResponse(
+                    {
+                        "detail": f"Error al validar token: {str(e)}",
+                        "code": "token_error",
+                    },
+                    status=401,
+                )
 
+            # Autenticar usuario
             request.user = user
             request._dont_enforce_csrf_checks = True
+        
         return self.get_response(request)

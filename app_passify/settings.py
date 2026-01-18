@@ -62,7 +62,7 @@ INSTALLED_APPS = [
     'colorfield',
     'rest_framework',
     'rest_framework_simplejwt',
-    'rest_framework.authtoken',  # Añadido para gestión de tokens
+    # 'rest_framework.authtoken',  # DESHABILITADO: Ahora usamos ExpiringToken (paasify.models.TokenModel)
     'drf_spectacular',
     'channels',
 ]
@@ -184,7 +184,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.TokenAuthentication',  # Añadido para Bearer Tokens
+        # 'rest_framework.authentication.TokenAuthentication',  # DESHABILITADO: Usamos middleware personalizado
     ),
 }
 
