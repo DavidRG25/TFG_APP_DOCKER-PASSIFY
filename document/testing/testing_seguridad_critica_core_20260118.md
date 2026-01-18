@@ -1,20 +1,24 @@
-# Plan de Testing - Seguridad Crítica
+# Plan de Testing - Seguridad Crítica (Core)
 
-**Fecha**: 14/01/2026 22:40  
-**Tipo**: Testing de Seguridad  
-**Estado**: PENDIENTE (0% ejecutado)
-
----
-
-## 🧪 PLAN DE TESTING DE SEGURIDAD
-
-### **IMPORTANTE:**
-
-Estos tests deben ejecutarse en un entorno de desarrollo/staging. **NO ejecutar en producción**.
+**Fecha**: 18/01/2026  
+**Tipo**: Testing de Seguridad - Parte 1 (Core)  
+**Estado**: EN PROGRESO
 
 ---
 
-## 📋 TESTING MEJORA 1: VOLÚMENES DOCKER
+## 📋 **ALCANCE DE ESTE DOCUMENTO**
+
+Este documento cubre los tests de seguridad que **NO requieren API**:
+
+- ✅ Volúmenes Docker
+- ✅ Configuraciones Peligrosas en Compose
+- ✅ Terminal Web
+
+**Tests de API (Tokens JWT)** → Ver: `testing_seguridad_critica_api_20260118.md`
+
+---
+
+## 🧪 TESTING MEJORA 1: VOLÚMENES DOCKER
 
 ### **Test 1.1: Contenedores Simples - Sin Volúmenes**
 
@@ -26,9 +30,9 @@ Estos tests deben ejecutarse en un entorno de desarrollo/staging. **NO ejecutar 
 2. Iniciar el servicio
 3. Ejecutar: `docker inspect <container_id> | grep -A 10 "Mounts"`
 4. **Verificar**:
-   - [ ] NO hay volúmenes montados
-   - [ ] Sección "Mounts" está vacía o solo tiene volúmenes anónimos de Docker
-   - [ ] NO hay bind mounts
+   - [SI] NO hay volúmenes montados
+   - [SI] Sección "Mounts" está vacía o solo tiene volúmenes anónimos de Docker
+   - [SI] NO hay bind mounts
 
 **Resultado Esperado**: ✅ Sin volúmenes
 
@@ -42,10 +46,11 @@ Estos tests deben ejecutarse en un entorno de desarrollo/staging. **NO ejecutar 
 
 1. Obtener token API
 2. Ejecutar curl:
+
    ```bash
    curl --request POST \
      http://localhost:8000/api/containers/ \
-     --header 'Authorization: Bearer TOKEN' \
+     --header 'Authorization: Bearer 94d46052f03f7dc061ee500780c99bc1330b7b51' \
      --header 'Content-Type: application/json' \
      --data '{
        "name": "test-volumes",
@@ -53,11 +58,13 @@ Estos tests deben ejecutarse en un entorno de desarrollo/staging. **NO ejecutar 
        "mode": "default",
        "volumes": {"/host/path": "/container/path"}
      }'
+
    ```
+
 3. **Verificar**:
-   - [ ] Status code: 400 Bad Request
-   - [ ] Mensaje: "Por razones de seguridad, no se permiten volúmenes en contenedores simples"
-   - [ ] Servicio NO se crea
+   - [SI] Status code: 400 Bad Request
+   - [SI] Mensaje: "Por razones de seguridad, no se permiten volúmenes en contenedores simples"
+   - [SI] Servicio NO se crea
 
 **Resultado Esperado**: ✅ Campo volumes rechazado
 
@@ -82,10 +89,10 @@ Estos tests deben ejecutarse en un entorno de desarrollo/staging. **NO ejecutar 
 
 1. Intentar crear servicio con este compose
 2. **Verificar**:
-   - [ ] Validación falla
-   - [ ] Mensaje: "SEGURIDAD: Bind mounts no permitidos"
-   - [ ] Indica el volumen rechazado: `/host/data:/app/data`
-   - [ ] Servicio NO se crea
+   - [SI] Validación falla
+   - [SI] Mensaje: "SEGURIDAD: Bind mounts no permitidos"
+   - [SI] Indica el volumen rechazado: `/host/data:/app/data`
+   - [SI] Servicio NO se crea
 
 **Resultado Esperado**: ✅ Bind mount rechazado
 
@@ -111,9 +118,9 @@ Estos tests deben ejecutarse en un entorno de desarrollo/staging. **NO ejecutar 
 
 1. Intentar crear servicio
 2. **Verificar**:
-   - [ ] Validación falla
-   - [ ] Mensaje indica bind mount no permitido
-   - [ ] Rechaza `./data:/app/data`
+   - [SI] Validación falla
+   - [SI] Mensaje indica bind mount no permitido
+   - [SI] Rechaza `./data:/app/data`
 
 **Resultado Esperado**: ✅ Bind mounts relativos rechazados
 
@@ -140,9 +147,9 @@ Estos tests deben ejecutarse en un entorno de desarrollo/staging. **NO ejecutar 
 
 1. Intentar crear servicio
 2. **Verificar**:
-   - [ ] Validación falla
-   - [ ] Mensaje: "Bind mounts no permitidos"
-   - [ ] Indica que solo se permite `type: volume`
+   - [SI] Validación falla
+   - [SI] Mensaje: "Bind mounts no permitidos"
+   - [SI] Indica que solo se permite `type: volume`
 
 **Resultado Esperado**: ✅ Type bind rechazado
 
@@ -173,13 +180,13 @@ Estos tests deben ejecutarse en un entorno de desarrollo/staging. **NO ejecutar 
 
 1. Crear servicio con este compose
 2. **Verificar**:
-   - [ ] Validación pasa ✅
-   - [ ] Servicio se crea correctamente
-   - [ ] Volúmenes nombrados se crean en Docker
+   - [Si] Validación pasa ✅
+   - [Si] Servicio se crea correctamente
+   - [Si] Volúmenes nombrados se crean en Docker
 3. Ejecutar: `docker volume ls | grep mi_volumen`
 4. **Verificar**:
-   - [ ] Volúmenes existen
-   - [ ] Son volúmenes de Docker (no bind mounts)
+   - [Si] Volúmenes existen
+   - [Si] Son volúmenes de Docker (no bind mounts)
 
 **Resultado Esperado**: ✅ Volúmenes nombrados permitidos
 
@@ -376,100 +383,6 @@ Estos tests deben ejecutarse en un entorno de desarrollo/staging. **NO ejecutar 
 
 ---
 
-## 📋 TESTING MEJORA 3: TOKENS JWT REVOCABLES
-
-### **Test 3.1: Token Válido**
-
-**Objetivo**: Verificar que token válido funciona
-
-**Pasos**:
-
-1. Acceder a `/paasify/containers/api-token/`
-2. Copiar token
-3. Ejecutar curl:
-   ```bash
-   curl --request GET \
-     http://localhost:8000/api/containers/ \
-     --header 'Authorization: Bearer TOKEN'
-   ```
-4. **Verificar**:
-   - [ ] Status code: 200 OK
-   - [ ] Devuelve lista de servicios
-   - [ ] Usuario autenticado correctamente
-
-**Resultado Esperado**: ✅ Token válido funciona
-
----
-
-### **Test 3.2: Regenerar Token Invalida Anterior**
-
-**Objetivo**: Verificar que regenerar token invalida el anterior inmediatamente
-
-**Pasos**:
-
-1. Obtener token actual (TOKEN_1)
-2. Probar TOKEN_1 con API (debe funcionar)
-3. Regenerar token (obtener TOKEN_2)
-4. Intentar usar TOKEN_1 nuevamente:
-   ```bash
-   curl --request GET \
-     http://localhost:8000/api/containers/ \
-     --header 'Authorization: Bearer TOKEN_1'
-   ```
-5. **Verificar**:
-   - [ ] Status code: 401 Unauthorized
-   - [ ] Mensaje: "Token inválido o expirado"
-   - [ ] TOKEN_1 ya no funciona
-6. Probar TOKEN_2:
-   ```bash
-   curl --request GET \
-     http://localhost:8000/api/containers/ \
-     --header 'Authorization: Bearer TOKEN_2'
-   ```
-7. **Verificar**:
-   - [ ] Status code: 200 OK
-   - [ ] TOKEN_2 funciona correctamente
-
-**Resultado Esperado**: ✅ Token antiguo invalidado inmediatamente
-
----
-
-### **Test 3.3: Token Modificado**
-
-**Objetivo**: Verificar que token modificado es rechazado
-
-**Pasos**:
-
-1. Obtener token válido
-2. Modificar algunos caracteres del token
-3. Intentar usar token modificado
-4. **Verificar**:
-   - [ ] Status code: 401 Unauthorized
-   - [ ] Token modificado rechazado
-
-**Resultado Esperado**: ✅ Token modificado rechazado
-
----
-
-### **Test 3.4: Sin Token**
-
-**Objetivo**: Verificar que requests sin token son rechazados
-
-**Pasos**:
-
-1. Ejecutar curl sin header Authorization:
-   ```bash
-   curl --request GET \
-     http://localhost:8000/api/containers/
-   ```
-2. **Verificar**:
-   - [ ] Status code: 401 Unauthorized
-   - [ ] Mensaje de error apropiado
-
-**Resultado Esperado**: ✅ Sin token rechazado
-
----
-
 ## 📋 TESTING MEJORA 4: TERMINAL WEB
 
 ### **Test 4.1: Comando Normal (PERMITIDO)**
@@ -600,21 +513,19 @@ Estos tests deben ejecutarse en un entorno de desarrollo/staging. **NO ejecutar 
 
 ## 📊 RESUMEN DE TESTING
 
-### **Total de Tests Definidos**: 27
+### **Total de Tests en este documento**: 20
 
 **Por Mejora:**
 
 - Mejora 1 (Volúmenes): 6 tests
 - Mejora 2 (Compose): 7 tests
-- Mejora 3 (Tokens): 4 tests
 - Mejora 4 (Terminal): 7 tests
-- Integración: 3 tests
 
 **Estado:**
 
-- Tests ejecutados: 0/27
-- Tests pasados: 0/27
-- Tests fallidos: 0/27
+- Tests ejecutados: 0/20
+- Tests pasados: 0/20
+- Tests fallidos: 0/20
 
 ---
 
@@ -624,7 +535,6 @@ Estos tests deben ejecutarse en un entorno de desarrollo/staging. **NO ejecutar 
 
 - [ ] Todos los tests de volúmenes pasados
 - [ ] Todos los tests de compose pasados
-- [ ] Todos los tests de tokens pasados
 - [ ] Todos los tests de terminal pasados
 - [ ] Sin vulnerabilidades detectadas
 
@@ -635,23 +545,16 @@ Estos tests deben ejecutarse en un entorno de desarrollo/staging. **NO ejecutar 
 - [ ] Performance aceptable
 - [ ] Logging funcional
 
-### **Producción:**
-
-- [ ] Sistema listo para producción
-- [ ] Documentación completa
-- [ ] Tests de penetración pasados
-
 ---
 
 ## 🚀 PRÓXIMOS PASOS
 
-1. **Ejecutar todos los tests** (en rama dev2)
+1. **Completar estos 20 tests**
 2. **Documentar resultados**
-3. **Corregir bugs** si se encuentran
-4. **Penetration testing** profesional
-5. **Merge a develop** cuando todo pase
+3. **Continuar con tests de API** (ver `testing_seguridad_critica_api_20260118.md`)
+4. **Merge a develop** cuando todo pase
 
 ---
 
-**Última actualización**: 2026-01-14 22:40  
-**Próximo paso**: Ejecutar tests en rama dev2
+**Última actualización**: 2026-01-18 21:17  
+**Próximo paso**: Ejecutar Test 1.1

@@ -1068,6 +1068,22 @@ def remove_container(service: Service):
             # Eliminar registros de ServiceContainer
             service.containers.all().delete()
             
+            # Limpiar volúmenes huérfanos (anónimos no eliminados por --volumes)
+            try:
+                prune_cmd = ["docker", "volume", "prune", "-f"]
+                subprocess.run(
+                    prune_cmd,
+                    check=False,  # No fallar si no hay volúmenes que limpiar
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace'
+                )
+                _append_log(service, "Volúmenes huérfanos limpiados")
+            except Exception as e:
+                # No es crítico si falla
+                _append_log(service, f"Advertencia al limpiar volúmenes: {str(e)}")
+            
         except subprocess.CalledProcessError as e:
             error_msg = (e.stderr or e.stdout or str(e)).strip()
             _append_log(service, f"Error al eliminar compose: {error_msg}")
