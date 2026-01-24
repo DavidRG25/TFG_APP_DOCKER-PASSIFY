@@ -135,34 +135,34 @@
 
 **Seguridad:**
 
-- [ ] Auditoría de penetración pasada
-- [ ] Tokens revocables funcionando correctamente
-- [ ] Volúmenes completamente restringidos (solo nombrados en Compose)
-- [ ] Compose validado y configuraciones peligrosas bloqueadas
-- [ ] Terminal con restricciones de comandos activas
-- [ ] Red Docker aislada por usuario
-- [ ] Todos los tests de seguridad pasando
-- [ ] Documentación de seguridad actualizada
+- [x] Auditoría de penetración pasada (Validación interna 24/01/2026)
+- [x] Tokens revocables funcionando correctamente
+- [x] Volúmenes completamente restringidos (solo nombrados en Compose)
+- [x] Compose validado y configuraciones peligrosas bloqueadas
+- [x] Terminal con restricciones de comandos activas
+- [x] Red Docker aislada por usuario
+- [x] Todos los tests de seguridad pasando
+- [x] Documentación de seguridad actualizada
 
 **Validación de Volúmenes:**
 
-- [ ] Contenedores simples NO tienen volúmenes
-- [ ] Compose solo acepta volúmenes nombrados
-- [ ] Bind mounts completamente bloqueados
-- [ ] Tests confirman rechazo de montajes de host
+- [x] Contenedores simples NO tienen volúmenes
+- [x] Compose solo acepta volúmenes nombrados
+- [x] Bind mounts completamente bloqueados
+- [x] Tests confirman rechazo de montajes de host
 
 **Tokens:**
 
-- [ ] Regenerar token invalida inmediatamente el anterior
-- [ ] Tokens robados pueden ser revocados manualmente
-- [ ] Middleware consulta BD en cada request
+- [x] Regenerar token invalida inmediatamente el anterior
+- [x] Tokens robados pueden ser revocados manualmente
+- [x] Middleware consulta BD en cada request
 
 **Terminal:**
 
-- [ ] Comandos peligrosos bloqueados
-- [ ] Rate limiting funcional
-- [ ] Auditoría de comandos activa
-- [ ] Alertas de seguridad configuradas
+- [x] Comandos peligrosos bloqueados
+- [x] Rate limiting funcional
+- [x] Auditoría de comandos activa
+- [x] Alertas de seguridad configuradas
 
 ---
 

