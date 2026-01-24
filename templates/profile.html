@@ -375,8 +375,8 @@
       .then((data) => {
         if (data.success) {
           document.getElementById("full-token").value = data.token;
-          const expiry = new Date();
-          expiry.setDate(expiry.getDate() + 365);
+          // Usar expires_at del servidor
+          const expiry = new Date(data.expires_at);
           document.getElementById("token-expiry").textContent =
             expiry.toLocaleDateString();
 
@@ -416,8 +416,8 @@
       .then((data) => {
         if (data.success) {
           document.getElementById("full-token").value = data.token;
-          const expiry = new Date();
-          expiry.setDate(expiry.getDate() + 365);
+          // Usar expires_at del servidor
+          const expiry = new Date(data.expires_at);
           document.getElementById("token-expiry").textContent =
             expiry.toLocaleDateString();
 

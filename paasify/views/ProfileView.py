@@ -84,30 +84,30 @@ def change_password_view(request):
 @login_required
 def generate_token_view(request):
     """
-    Genera un nuevo token JWT para el usuario.
+    Genera un nuevo token de API con expiración de 30 días.
     Retorna el token completo en JSON.
     """
     if request.method == 'POST':
         user = request.user
         
-        # Verificar que el usuario tenga UserProfile
-        try:
-            profile = user.user_profile
-        except UserProfile.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'error': 'No tienes un perfil asociado. Contacta al administrador.'
-            }, status=400)
+        # Importar ExpiringToken
+        from paasify.models.TokenModel import ExpiringToken
         
-        # Generar token
+        # Generar token (eliminar el anterior si existe y crear uno nuevo)
         try:
-            token = profile.generate_token(expiration_days=365)
+            # Eliminar token anterior si existe
+            ExpiringToken.objects.filter(user=user).delete()
+            
+            # Crear nuevo token
+            token = ExpiringToken.objects.create(user=user)
+            
             return JsonResponse({
                 'success': True,
-                'token': token,
-                'masked_token': profile.get_masked_token(),
-                'created_at': profile.token_created_at.isoformat() if profile.token_created_at else None,
-                'message': 'Token generado exitosamente. Copialo ahora, no podras verlo completo despues.'
+                'token': token.key,
+                'created_at': token.created.isoformat(),
+                'expires_at': token.expires_at.isoformat(),
+                'days_remaining': token.days_until_expiration(),
+                'message': 'Token generado exitosamente. Válido por 30 días. Cópialo ahora, no podrás verlo completo después.'
             })
         except Exception as e:
             return JsonResponse({

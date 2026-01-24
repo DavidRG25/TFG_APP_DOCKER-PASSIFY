@@ -27,6 +27,7 @@ class TerminalConsumer(WebsocketConsumer):
         user = self.scope.get("user")
         self._reader_thread = None
         self.sock = None
+        self.command_buffer = ""  # Buffer para acumular comandos
 
         from .views import user_is_admin, user_is_teacher
         try:
@@ -119,41 +120,58 @@ class TerminalConsumer(WebsocketConsumer):
                 return
             data = bytes_data if bytes_data is not None else (text_data or "")
             if isinstance(data, str):
-                # SEGURIDAD CRÍTICA: Filtrar comandos peligrosos
-                data_lower = data.lower().strip()
+                # Si llega un Enter, analizamos lo acumulado ANTES de enviarlo
+                if '\r' in data or '\n' in data:
+                    import re
+                    # Limpiamos caracteres de control comunes en terminales para el regex
+                    clean_command = re.sub(r'\x1b\[[0-9;]*[a-zA-Z]', '', self.command_buffer)
+                    command_lower = clean_command.lower().strip()
+                    
+                    DANGEROUS_PATTERNS = [
+                        (r'rm\s+-rf\s+/', 'rm -rf / (borrado raíz)'),
+                        (r'rm\s+-rf\s+/\*', 'rm -rf /* (borrado contenido)'),
+                        (r'rm\s+-rf\s+~', 'rm -rf ~ (borrado home)'),
+                        (r'rm\s+-r?f?\s+/', 'rm -rf / (variante)'),
+                        (r'dd\s+if=/dev/(zero|random)', 'dd destructivo'),
+                        (r'mkfs\.' , 'formateo de disco'),
+                        (r'fork\(\)', 'fork bomb'),
+                        (r':\(\)\{.*:\|:.*\}', 'fork bomb bash'),
+                        (r'wget\s+https?://', 'descarga externa (wget)'),
+                        (r'curl\s+https?://', 'descarga externa (curl)'),
+                        (r'nc\s+-l', 'netcat listener'),
+                        (r'ncat\s+-l', 'ncat listener'),
+                        (r'/dev/tcp/', 'conexión TCP directa'),
+                        (r'>\s*/dev/sd[a-z]', 'escritura directa a disco'),
+                        (r'chmod\s+777\s+/', 'permisos peligrosos en raíz'),
+                    ]
+                    
+                    for pattern, description in DANGEROUS_PATTERNS:
+                        if re.search(pattern, command_lower):
+                            # 1. Avisar al usuario en rojo
+                            self.send(text_data=f"\r\n\033[1;31m[BLOQUEADO] Comando peligroso detectado: {description}\033[0m\r\n")
+                            # 2. Loggear en el servidor
+                            logger.warning(f"SEGURIDAD: Bloqueado '{description}' de Usuario: {self.scope.get('user')}")
+                            # 3. CANCELAR el comando en el contenedor enviando CTRL+C (\x03)
+                            # Esto limpia la línea del shell del contenedor sin ejecutar el Enter que está llegando
+                            send_fn = getattr(sock, "sendall", None) or getattr(sock, "send", None)
+                            if send_fn:
+                                send_fn(b"\x03")
+                            # 4. Limpiar buffer y SALIR sin enviar el Enter (\r)
+                            self.command_buffer = ""
+                            return
+
+                    # Si es seguro, limpiamos buffer para el siguiente
+                    self.command_buffer = ""
                 
-                # Lista de patrones peligrosos
-                DANGEROUS_PATTERNS = [
-                    'rm -rf /',
-                    'rm -rf /*',
-                    'rm -rf ~',
-                    'dd if=/dev/zero',
-                    'dd if=/dev/random',
-                    'mkfs.',
-                    'fork()',
-                    ':(){ :|:& };:',  # Fork bomb
-                    'wget http',
-                    'curl http',
-                    'nc -l',  # Netcat listener
-                    'ncat -l',
-                    '/dev/tcp/',
-                ]
-                
-                # Detectar comandos peligrosos
-                for pattern in DANGEROUS_PATTERNS:
-                    if pattern in data_lower:
-                        warning_msg = (
-                            f"\r\n[SEGURIDAD] Comando bloqueado: '{pattern}' no permitido.\r\n"
-                            f"Este comando ha sido registrado.\r\n"
-                        )
-                        self.send(text_data=warning_msg)
-                        logger.warning(
-                            f"SEGURIDAD: Comando peligroso bloqueado en terminal. "
-                            f"Usuario: {self.scope.get('user')}, Patrón: {pattern}"
-                        )
-                        return
-                
+                # Manejo de Backspace para el buffer local
+                elif data == '\x7f' or data == '\x08':
+                    self.command_buffer = self.command_buffer[:-1]
+                else:
+                    self.command_buffer += data
+
                 data = data.encode("utf-8", errors="ignore")
+            
+            # Enviar datos al contenedor (incluye el Enter si pasó el filtro anterior)
             send_fn = getattr(sock, "sendall", None) or getattr(sock, "send", None)
             if send_fn:
                 send_fn(data)
