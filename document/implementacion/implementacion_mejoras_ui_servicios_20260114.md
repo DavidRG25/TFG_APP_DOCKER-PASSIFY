@@ -164,14 +164,12 @@ Applying authtoken.0004_alter_tokenproxy_options... OK
 ### **Documentos Creados:**
 
 1. **Plan Actualizado:**
-
    - `document/plan/plan_mejoras_ui_servicios_20251210_0230.md`
    - Todas las tareas marcadas como completadas
    - Sección de testing removida (movida a documento separado)
    - Estado actualizado a "EN PROGRESO (50%)"
 
 2. **Documento de Testing:**
-
    - `document/testing/testing_mejoras_ui_servicios_20260114.md`
    - 17 tests definidos y documentados
    - Criterios de aceptación claros
@@ -333,7 +331,88 @@ Los siguientes endpoints ya existían en `ServiceViewSet` y ahora también funci
 
 ---
 
-**Estado Final:** IMPLEMENTACIÓN COMPLETADA (3/4 fases)  
-**Última actualización:** 14/01/2026 22:22  
+## 🔄 MEJORAS POSTERIORES (30/01/2026)
+
+### **Mejora 1: Redirección Automática después de Crear Servicio**
+
+**Problema detectado:**
+
+- El formulario de "Nuevo Servicio" no redirigía al panel principal después de crear un servicio exitosamente
+- El usuario se quedaba en la página del formulario sin feedback claro
+
+**Solución implementada:**
+
+**Archivo modificado:** `templates/containers/new_service.html` (líneas 48-70)
+
+**Cambios:**
+
+- Añadido `hx-on::after-request` al formulario
+- **En caso de éxito (status < 400):**
+  - Muestra toast verde: "✅ Servicio creado exitosamente. Redirigiendo..."
+  - Espera 1.5 segundos
+  - Redirige automáticamente a `/paasify/containers/` (panel principal)
+- **En caso de error (status >= 400):**
+  - Muestra toast rojo con mensaje de error
+  - Muestra alerta roja en el formulario con detalles del error
+  - NO redirige, permite al usuario corregir
+
+**Código añadido:**
+
+```html
+hx-on::after-request=" if(event.detail.successful) { showToast('✅ Servicio
+creado exitosamente. Redirigiendo...', 'text-bg-success'); setTimeout(() => {
+window.location.href = '{% url 'containers:student_panel' %}'; }, 1500); } else
+{ const xhr = event.detail.xhr; let errorMsg = 'Error al crear el servicio'; try
+{ const response = JSON.parse(xhr.responseText); errorMsg = response.detail ||
+response.error || JSON.stringify(response); } catch(e) { errorMsg =
+xhr.responseText || errorMsg; } showToast('❌ ' + errorMsg, 'text-bg-danger');
+document.getElementById('form-feedback').innerHTML = `
+<div class="alert alert-danger alert-dismissible fade show">
+  <i class="fas fa-exclamation-triangle me-2"></i>
+  <strong>Error:</strong> ${errorMsg}
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+`; } "
+```
+
+**Beneficios:**
+
+- ✅ UX mejorada: Usuario ve inmediatamente que el servicio se creó
+- ✅ Feedback claro: Toast de éxito antes de redirigir
+- ✅ Manejo de errores: Mensajes claros sin redirigir
+- ✅ Tiempo suficiente: 1.5 segundos para leer el mensaje
+
+---
+
+### **Mejora 2: Test de Redirección Añadido**
+
+**Archivo modificado:** `document/testing/testing_mejoras_ui_servicios_20260114.md`
+
+**Test añadido:** Test 3.5 - Redirección después de crear servicio
+
+**Cubre:**
+
+- ✅ Verificación de toast de éxito
+- ✅ Verificación de redirección automática
+- ✅ Verificación de que el servicio aparece en el panel
+- ✅ Verificación de manejo de errores (sin redirección)
+
+**Total de tests:** 18 → 19
+
+---
+
+### **Resumen de Archivos Modificados (30/01/2026):**
+
+1. `templates/containers/new_service.html` (+22 líneas)
+   - Añadido manejo de redirección y errores
+
+2. `document/testing/testing_mejoras_ui_servicios_20260114.md` (+36 líneas)
+   - Añadido Test 3.5
+   - Actualizado total de tests a 19
+
+---
+
+**Estado Final:** IMPLEMENTACIÓN COMPLETADA (3/4 fases) + MEJORAS UX  
+**Última actualización:** 30/01/2026 22:43  
 **Desarrollador:** Claude Sonnet 4.5  
-**Rama:** dev2
+**Rama:** develop
