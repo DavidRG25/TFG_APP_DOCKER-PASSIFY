@@ -1,9 +1,9 @@
 # Plan de Mejoras UI - Servicios y API
 
 **Fecha creación**: 2025-12-09  
-**Última actualización**: 2026-01-14  
+**Última actualización**: 2026-01-30  
 **Prioridad**: MEDIA  
-**Estado**: EN PROGRESO (50% completado)
+**Estado**: EN PROGRESO (60% completado - 3/5 fases)
 
 ---
 
@@ -156,7 +156,287 @@ Crear una página dedicada con documentación completa de la API y ejemplos de c
 
 ---
 
-## 📋 FASE 4: Testing y Documentación 🔄 PENDIENTE
+## 📋 FASE 4: Página Dedicada Documentación API 🔄 PENDIENTE
+
+### **Objetivo:**
+
+Crear una página dedicada y completa de documentación de la API REST, estilo Swagger/Postman, con todos los endpoints, ejemplos interactivos y casos de uso.
+
+**⚡ CONCEPTO CLAVE:** Esta página debe ser el **equivalente en comandos curl** de todo lo que se puede hacer en la UI de "Nuevo Servicio". Es decir:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  UI: Nuevo Servicio          ←→   API Docs: Comandos curl    │
+├──────────────────────────────────────────────────────────────┤
+│  Formulario web              ←→   POST /api/containers/      │
+│  Click en "Crear"            ←→   curl con JSON              │
+│  Seleccionar imagen          ←→   "image": "nginx"           │
+│  Configurar puertos          ←→   "custom_port": 45000       │
+│  Subir Dockerfile            ←→   "dockerfile": "..."        │
+│  Subir docker-compose        ←→   "compose": "..."           │
+│  Variables de entorno        ←→   "environment": {...}       │
+│  Asignar a proyecto          ←→   "project_id": 123          │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Resultado:** El usuario puede automatizar **TODO** lo que hace manualmente en la UI.
+
+### **Tareas:**
+
+#### **4.1 Crear página dedicada de API** 🔄
+
+- [ ] Nueva ruta `/paasify/api/docs/` o `/paasify/containers/api-docs/`
+- [ ] Template `api_documentation.html` dedicado
+- [ ] Vista `api_documentation_view` en `containers/views.py`
+- [ ] Añadir enlace en navbar principal
+
+**Ubicación sugerida**: Navbar → "API" o "Documentación API"
+
+#### **4.2 Diseño de la página** 🔄
+
+**Layout:**
+
+```
+┌─────────────────────────────────────────────────┐
+│ 📚 Documentación API REST                       │
+├─────────────────────────────────────────────────┤
+│ Sidebar (izq)         │ Contenido principal     │
+│ ─────────────────     │ ─────────────────────── │
+│ • Introducción        │ [Sección activa]        │
+│ • Autenticación       │                         │
+│ • Endpoints:          │ Título                  │
+│   - Servicios         │ Descripción             │
+│   - Proyectos         │                         │
+│   - Usuarios          │ Ejemplo curl:           │
+│ • Ejemplos CI/CD      │ [código copiable]       │
+│ • Códigos de error    │                         │
+│ • Rate limiting       │ Respuesta:              │
+│                       │ [JSON formateado]       │
+└───────────────────────┴─────────────────────────┘
+```
+
+**Características:**
+
+- [ ] Sidebar fijo con navegación por secciones
+- [ ] Scroll suave entre secciones
+- [ ] Sintaxis highlighting para código (Prism.js o highlight.js)
+- [ ] Botones "Copiar" en todos los ejemplos
+- [ ] Tema oscuro/claro (opcional)
+
+#### **4.3 Secciones de contenido** 🔄
+
+##### **4.3.1 Introducción**
+
+- [ ] Qué es la API de PaaSify
+- [ ] Casos de uso (CI/CD, automatización, integración)
+- [ ] Requisitos previos
+- [ ] URL base de la API
+
+##### **4.3.2 Autenticación**
+
+- [ ] Cómo obtener un token API
+- [ ] Cómo usar el token en requests
+- [ ] Ejemplo de autenticación
+- [ ] Renovación de tokens
+- [ ] Seguridad y mejores prácticas
+
+##### **4.3.3 Endpoints - Servicios/Contenedores**
+
+Para cada endpoint:
+
+- [ ] **GET /api/containers/** - Listar servicios
+  - Descripción
+  - Parámetros (query params, filtros)
+  - Ejemplo curl
+  - Respuesta de ejemplo (JSON)
+  - Códigos de estado
+
+- [ ] **POST /api/containers/** - Crear servicio
+  - Descripción: "Equivalente a crear un servicio desde la UI de 'Nuevo Servicio'"
+  - Body parameters (JSON schema)
+  - **Ejemplos por modo de creación:**
+
+    **Modo 1: Imagen del catálogo** (equivalente a seleccionar del dropdown)
+
+    ```bash
+    curl -X POST http://localhost:8000/api/containers/ \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "mi-nginx",
+        "image": "nginx:latest",
+        "mode": "default",
+        "custom_port": 45000
+      }'
+    ```
+
+    **Modo 2: Dockerfile personalizado** (equivalente a subir Dockerfile)
+
+    ```bash
+    curl -X POST http://localhost:8000/api/containers/ \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "mi-app-python",
+        "mode": "custom",
+        "dockerfile": "FROM python:3.11\nWORKDIR /app\nCOPY . .\nCMD python app.py",
+        "custom_port": 45001
+      }'
+    ```
+
+    **Modo 3: Docker Compose** (equivalente a subir docker-compose.yml)
+
+    ```bash
+    curl -X POST http://localhost:8000/api/containers/ \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "mi-stack-completo",
+        "mode": "compose",
+        "compose": "services:\n  web:\n    image: nginx\n    ports:\n      - 8080:80\n  redis:\n    image: redis:7"
+      }'
+    ```
+
+    **Modo 4: Con variables de entorno** (equivalente a añadir ENV vars en UI)
+
+    ```bash
+    curl -X POST http://localhost:8000/api/containers/ \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "mi-app-node",
+        "image": "node:18",
+        "mode": "default",
+        "environment": {
+          "NODE_ENV": "production",
+          "PORT": "3000",
+          "DATABASE_URL": "postgres://..."
+        }
+      }'
+    ```
+
+    **Modo 5: Asignar a proyecto y asignatura** (equivalente a seleccionar en dropdowns)
+
+    ```bash
+    curl -X POST http://localhost:8000/api/containers/ \
+      -H "Authorization: Bearer YOUR_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "name": "practica-final",
+        "image": "nginx:latest",
+        "mode": "default",
+        "project_id": 123,
+        "subject_id": 456
+      }'
+    ```
+
+  - Respuesta de ejemplo (JSON)
+  - Validaciones y errores comunes
+  - Códigos de estado (201 Created, 400 Bad Request, 401 Unauthorized)
+
+- [ ] **GET /api/containers/{id}/** - Detalle de servicio
+  - Descripción
+  - Path parameters
+  - Ejemplo curl
+  - Respuesta de ejemplo
+
+- [ ] **POST /api/containers/{id}/start/** - Iniciar servicio
+  - Descripción
+  - Ejemplo curl
+  - Respuesta de ejemplo
+
+- [ ] **POST /api/containers/{id}/stop/** - Detener servicio
+  - Descripción
+  - Ejemplo curl
+  - Respuesta de ejemplo
+
+- [ ] **POST /api/containers/{id}/restart/** - Reiniciar servicio
+  - Descripción
+  - Ejemplo curl
+  - Respuesta de ejemplo
+
+- [ ] **DELETE /api/containers/{id}/** - Eliminar servicio
+  - Descripción
+  - Ejemplo curl
+  - Respuesta de ejemplo
+
+##### **4.3.4 Endpoints - Proyectos** (si aplica)
+
+- [ ] **GET /api/projects/** - Listar proyectos
+- [ ] **POST /api/projects/** - Crear proyecto
+- [ ] **GET /api/projects/{id}/** - Detalle de proyecto
+- [ ] **DELETE /api/projects/{id}/** - Eliminar proyecto
+
+##### **4.3.5 Ejemplos de Integración CI/CD**
+
+- [ ] **GitHub Actions**
+  - Workflow completo de ejemplo
+  - Despliegue automático en push
+  - Variables de entorno
+
+- [ ] **GitLab CI**
+  - Pipeline de ejemplo
+  - Despliegue automático
+
+- [ ] **Jenkins**
+  - Jenkinsfile de ejemplo
+
+- [ ] **Script Bash**
+  - Script de despliegue simple
+
+##### **4.3.6 Códigos de Error**
+
+- [ ] Tabla de códigos HTTP
+- [ ] Errores comunes y soluciones
+- [ ] Formato de respuestas de error
+
+##### **4.3.7 Rate Limiting** (si aplica)
+
+- [ ] Límites de requests
+- [ ] Headers de rate limit
+- [ ] Qué hacer si se excede el límite
+
+#### **4.4 Funcionalidades interactivas** 🔄
+
+- [ ] **Botón "Copiar" en todos los ejemplos**
+  - Feedback visual al copiar
+  - Icono cambia a ✓ por 2 segundos
+
+- [ ] **Token del usuario insertado automáticamente**
+  - Reemplazar `YOUR_TOKEN_HERE` con token real
+  - Opción para mostrar/ocultar token
+
+- [ ] **URL correcta en ejemplos**
+  - Detectar URL actual (localhost, producción)
+  - Reemplazar automáticamente en ejemplos
+
+- [ ] **Try it out** (opcional, avanzado)
+  - Formulario para probar endpoints desde la UI
+  - Ejecutar request y mostrar respuesta
+  - Similar a Swagger UI
+
+#### **4.5 Diseño visual** 🔄
+
+- [ ] **Estilo moderno y profesional**
+  - Inspiración: Stripe API Docs, Twilio Docs
+  - Colores consistentes con PaaSify
+  - Tipografía legible (monospace para código)
+
+- [ ] **Responsive**
+  - Sidebar colapsable en móvil
+  - Código con scroll horizontal si es necesario
+
+- [ ] **Accesibilidad**
+  - Contraste adecuado
+  - Navegación por teclado
+  - ARIA labels
+
+**Tiempo estimado**: 6-8 horas  
+**Estado**: 🔄 PENDIENTE
+
+---
+
+## 📋 FASE 5: Testing y Documentación 🔄 PENDIENTE
 
 ### **Objetivo:**
 
@@ -164,25 +444,26 @@ Validar que todas las funcionalidades implementadas funcionan correctamente.
 
 ### **Tareas:**
 
-#### **4.1 Testing de funcionalidades** 🔄
+#### **5.1 Testing de funcionalidades** 🔄
 
 - [ ] Ejecutar tests de página "Nuevo Servicio" (Tests 1-7)
 - [ ] Ejecutar tests de sistema de tokens (Tests 8-10)
 - [ ] Ejecutar tests de API con tokens (Tests 11-16)
 - [ ] Ejecutar test de seguridad (Test 17)
+- [ ] Probar página de documentación API (navegación, copiar, ejemplos)
 
 **Documento de testing**: `document/testing/testing_mejoras_ui_servicios_20260114.md`  
 **Total de tests definidos**: 17  
 **Tests ejecutados**: 0/17
 
-#### **4.2 Documentación de usuario** 🔄
+#### **5.2 Documentación de usuario** 🔄
 
 - [ ] Actualizar README con información sobre nueva página
 - [ ] Actualizar README con información sobre API
-- [ ] Crear guía de usuario para API (opcional, ya hay documentación en la UI)
+- [ ] Enlace a documentación API desde README
 - [ ] Ejemplos de integración con CI/CD (ya incluidos en la UI)
 
-#### **4.3 Ajustes según resultados de testing** 🔄
+#### **5.3 Ajustes según resultados de testing** 🔄
 
 - [ ] Corregir bugs encontrados durante testing
 - [ ] Mejorar UX según feedback
@@ -198,21 +479,6 @@ Validar que todas las funcionalidades implementadas funcionan correctamente.
 ### **Fases Completadas:**
 
 1. ✅ **Página dedicada "Nuevo Servicio"** (4-6h estimado, 2h real)
-2. ✅ **Sistema de API REST con Tokens** (6-8h estimado, 2h real)
-3. ✅ **Página de documentación API** (4-5h estimado, incluido en fase 2)
-4. 🔄 **Testing y documentación** (3-4h estimado, pendiente)
-
-### **Tiempo Total:**
-
-- **Estimado**: 17-23 horas
-- **Real hasta ahora**: ~4 horas
-- **Pendiente**: ~4-6 horas (testing y ajustes)
-
-### **Progreso**: 50% completado (3/4 fases implementadas, falta testing)
-
----
-
-## 📝 ARCHIVOS CREADOS/MODIFICADOS
 
 ### **Archivos Creados:**
 
@@ -269,20 +535,16 @@ Validar que todas las funcionalidades implementadas funcionan correctamente.
 1. **Ejecutar testing manual** (Tests 1-17)
    - Documento: `document/testing/testing_mejoras_ui_servicios_20260114.md`
 2. **Marcar tests como pasados/fallidos**
-
    - Actualizar documento de testing con resultados
 
 3. **Corregir bugs encontrados** (si los hay)
-
    - Ajustar código según resultados de testing
 
 4. **Actualizar README** (opcional)
-
    - Añadir sección sobre nueva página de servicio
    - Añadir sección sobre API REST
 
 5. **Mover a completado**
-
    - Mover documento de testing a `testing/completado/` cuando esté 100%
    - Actualizar este plan con estado COMPLETADO
 

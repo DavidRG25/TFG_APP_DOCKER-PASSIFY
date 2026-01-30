@@ -45,6 +45,31 @@
             hx-post="/api/containers/"
             hx-target="#form-feedback"
             hx-swap="innerHTML"
+            hx-on::after-request="
+              if(event.detail.successful) {
+                showToast('✅ Servicio creado exitosamente. Redirigiendo...', 'text-bg-success');
+                setTimeout(() => {
+                  window.location.href = '{% url 'containers:student_panel' %}';
+                }, 1500);
+              } else {
+                const xhr = event.detail.xhr;
+                let errorMsg = 'Error al crear el servicio';
+                try {
+                  const response = JSON.parse(xhr.responseText);
+                  errorMsg = response.detail || response.error || JSON.stringify(response);
+                } catch(e) {
+                  errorMsg = xhr.responseText || errorMsg;
+                }
+                showToast('❌ ' + errorMsg, 'text-bg-danger');
+                document.getElementById('form-feedback').innerHTML = `
+                  <div class='alert alert-danger alert-dismissible fade show'>
+                    <i class='fas fa-exclamation-triangle me-2'></i>
+                    <strong>Error:</strong> ${errorMsg}
+                    <button type='button' class='btn-close' data-bs-dismiss='alert'></button>
+                  </div>
+                `;
+              }
+            "
           >
             {% csrf_token %} {# Contenedor de feedback #}
             <div id="form-feedback" class="mb-3"></div>

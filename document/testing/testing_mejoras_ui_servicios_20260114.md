@@ -98,6 +98,42 @@
 
 ---
 
+### **Test 3.5: Redirección después de crear servicio**
+
+**Objetivo**: Verificar que después de crear un servicio se redirige correctamente al panel principal
+
+**Pasos**:
+
+1. Acceder a `/paasify/containers/new/`
+2. Completar formulario con datos válidos:
+   - Nombre: "test-redirect"
+   - Proyecto: Seleccionar proyecto
+   - Modo: Default
+   - Imagen: nginx:latest
+3. Hacer clic en "Crear Servicio"
+4. **Verificar inmediatamente**:
+   - [ ] Aparece toast verde: "✅ Servicio creado exitosamente. Redirigiendo..."
+   - [ ] Toast permanece visible ~1.5 segundos
+5. **Verificar después de 1.5 segundos**:
+   - [ ] Redirige automáticamente a `/paasify/containers/` (panel principal)
+   - [ ] URL cambia correctamente
+6. **Verificar en panel principal**:
+   - [ ] Servicio "test-redirect" aparece en la tabla
+   - [ ] Estado es "creating" o "running"
+   - [ ] Todos los datos son correctos
+7. **Probar con error** (puerto inválido):
+   - Volver a `/paasify/containers/new/`
+   - Intentar crear servicio con puerto 30000 (fuera de rango)
+   - **Verificar**:
+     - [ ] NO redirige
+     - [ ] Aparece toast rojo con mensaje de error
+     - [ ] Aparece alerta roja en el formulario con detalles del error
+     - [ ] Usuario puede corregir y volver a intentar
+
+**Resultado Esperado**: ✅ Redirección automática funciona correctamente en éxito, y muestra errores claros en fallo
+
+---
+
 ### **Test 4: Modo Custom - Dockerfile**
 
 **Objetivo**: Verificar creación de servicio con Dockerfile personalizado
@@ -239,14 +275,12 @@
 **Pasos**:
 
 1. **Desktop (1920x1080)**:
-
    - [ ] Layout de 2 columnas se muestra correctamente
    - [ ] Formulario ocupa ~66% del ancho
    - [ ] Ayuda ocupa ~33% del ancho
    - [ ] Todo es legible y espaciado
 
 2. **Tablet (768x1024)**:
-
    - [ ] Columnas se mantienen lado a lado
    - [ ] Formulario se adapta correctamente
    - [ ] Ayuda sigue visible
@@ -565,6 +599,188 @@
 
 ---
 
+### **Test 18: Página Dedicada de Documentación API**
+
+**Objetivo**: Verificar que la nueva página de documentación API es completa, funcional y fácil de usar
+
+**Pasos**:
+
+1. Acceder a `/paasify/api/docs/` o `/paasify/containers/api-docs/`
+2. **Verificar estructura básica**:
+   - [ ] Página carga correctamente
+   - [ ] Se muestra breadcrumb: Inicio > Documentación API
+   - [ ] Header con título "Documentación API REST"
+   - [ ] Layout con sidebar izquierdo + contenido principal derecho
+
+3. **Verificar sidebar de navegación**:
+   - [ ] Sidebar es fijo (no se mueve al hacer scroll)
+   - [ ] Se muestran todas las secciones:
+     - Introducción
+     - Autenticación
+     - Endpoints: Servicios
+     - Endpoints: Proyectos
+     - Ejemplos CI/CD
+     - Códigos de error
+     - Rate limiting (si aplica)
+   - [ ] Click en sección hace scroll suave al contenido
+
+4. **Verificar Sección: Introducción**:
+   - [ ] Explica qué es la API de PaaSify
+   - [ ] Menciona casos de uso (CI/CD, automatización)
+   - [ ] Muestra URL base de la API
+   - [ ] Menciona requisitos previos
+
+5. **Verificar Sección: Autenticación**:
+   - [ ] Explica cómo obtener un token
+   - [ ] Enlace a `/paasify/containers/api-token/`
+   - [ ] Muestra formato de header: `Authorization: Bearer TOKEN`
+   - [ ] Ejemplo de autenticación funcional
+   - [ ] Menciona seguridad y mejores prácticas
+
+6. **Verificar Sección: POST /api/containers/ (Crear Servicio)**:
+   - [ ] Badge verde "POST" visible
+   - [ ] Descripción clara: "Equivalente a crear desde UI"
+   - [ ] Muestra tabla de parámetros (name, image, mode, etc.)
+   - [ ] **5 ejemplos de modos de creación**:
+
+     **Ejemplo 1: Imagen del catálogo**
+     - [ ] Código curl completo
+     - [ ] Parámetros: name, image, mode: "default"
+     - [ ] Botón "Copiar" funciona
+     - [ ] Token del usuario insertado automáticamente
+     - [ ] URL correcta (localhost o producción)
+
+     **Ejemplo 2: Dockerfile personalizado**
+     - [ ] Código curl con mode: "custom"
+     - [ ] Muestra campo "dockerfile" con contenido
+     - [ ] Botón "Copiar" funciona
+
+     **Ejemplo 3: Docker Compose**
+     - [ ] Código curl con mode: "compose"
+     - [ ] Muestra campo "compose" con YAML
+     - [ ] Botón "Copiar" funciona
+
+     **Ejemplo 4: Con variables de entorno**
+     - [ ] Muestra objeto "environment" con múltiples vars
+     - [ ] Ejemplo realista (NODE_ENV, DATABASE_URL, etc.)
+
+     **Ejemplo 5: Asignar a proyecto/asignatura**
+     - [ ] Muestra campos project_id y subject_id
+     - [ ] Explica cómo obtener los IDs
+
+   - [ ] Muestra respuesta de ejemplo (JSON formateado)
+   - [ ] Lista códigos de estado (201, 400, 401)
+   - [ ] Menciona validaciones y errores comunes
+
+7. **Verificar otros endpoints de Servicios**:
+   - [ ] GET /api/containers/ - Listar servicios
+   - [ ] GET /api/containers/{id}/ - Detalle
+   - [ ] POST /api/containers/{id}/start/ - Iniciar
+   - [ ] POST /api/containers/{id}/stop/ - Detener
+   - [ ] POST /api/containers/{id}/restart/ - Reiniciar
+   - [ ] DELETE /api/containers/{id}/ - Eliminar
+
+   Para cada uno:
+   - [ ] Badge de método correcto (GET azul, POST verde, DELETE rojo)
+   - [ ] Descripción clara
+   - [ ] Ejemplo curl completo
+   - [ ] Respuesta de ejemplo
+   - [ ] Botón "Copiar" funciona
+
+8. **Verificar Sección: Endpoints de Proyectos** (si aplica):
+   - [ ] GET /api/projects/
+   - [ ] POST /api/projects/
+   - [ ] GET /api/projects/{id}/
+   - [ ] DELETE /api/projects/{id}/
+
+9. **Verificar Sección: Ejemplos CI/CD**:
+
+   **GitHub Actions**:
+   - [ ] Workflow YAML completo y válido
+   - [ ] Usa secrets.PAASIFY_TOKEN
+   - [ ] Ejemplo de despliegue automático en push
+   - [ ] Botón "Copiar" funciona
+
+   **GitLab CI**:
+   - [ ] Pipeline YAML completo
+   - [ ] Usa variables de entorno
+   - [ ] Botón "Copiar" funciona
+
+   **Jenkins**:
+   - [ ] Jenkinsfile de ejemplo
+   - [ ] Botón "Copiar" funciona
+
+   **Script Bash**:
+   - [ ] Script simple y funcional
+   - [ ] Comentarios explicativos
+   - [ ] Botón "Copiar" funciona
+
+10. **Verificar Sección: Códigos de Error**:
+    - [ ] Tabla con códigos HTTP (200, 201, 400, 401, 403, 404, 500)
+    - [ ] Descripción de cada código
+    - [ ] Ejemplos de errores comunes
+    - [ ] Soluciones sugeridas
+
+11. **Verificar Sección: Rate Limiting** (si aplica):
+    - [ ] Explica límites de requests
+    - [ ] Muestra headers de rate limit
+    - [ ] Qué hacer si se excede
+
+12. **Verificar funcionalidades interactivas**:
+    - [ ] Todos los botones "Copiar" funcionan
+    - [ ] Feedback visual al copiar (icono cambia a ✓)
+    - [ ] Toast de confirmación aparece
+    - [ ] Token del usuario se inserta automáticamente en ejemplos
+    - [ ] URL se detecta correctamente (localhost vs producción)
+    - [ ] Sintaxis highlighting funciona (código coloreado)
+
+13. **Verificar diseño y UX**:
+    - [ ] Diseño moderno y profesional
+    - [ ] Colores consistentes con PaaSify
+    - [ ] Tipografía legible (monospace para código)
+    - [ ] Espaciado adecuado
+    - [ ] Sin errores visuales
+
+14. **Verificar responsive**:
+
+    **Desktop (1920x1080)**:
+    - [ ] Sidebar fijo a la izquierda (~25% ancho)
+    - [ ] Contenido principal a la derecha (~75% ancho)
+    - [ ] Todo legible y bien espaciado
+
+    **Tablet (768x1024)**:
+    - [ ] Sidebar se mantiene visible
+    - [ ] Contenido se adapta
+
+    **Móvil (375x667)**:
+    - [ ] Sidebar se colapsa (hamburger menu)
+    - [ ] Contenido ocupa todo el ancho
+    - [ ] Código con scroll horizontal si es necesario
+    - [ ] Botones "Copiar" son tocables (min 44x44px)
+
+15. **Verificar accesibilidad**:
+    - [ ] Contraste adecuado (WCAG AA)
+    - [ ] Navegación por teclado funciona
+    - [ ] Tab order lógico
+    - [ ] ARIA labels en elementos interactivos
+    - [ ] Screen reader puede leer el contenido
+
+16. **Verificar performance**:
+    - [ ] Página carga en menos de 2 segundos
+    - [ ] Scroll es suave
+    - [ ] No hay lag al copiar código
+    - [ ] Sintaxis highlighting no afecta performance
+
+17. **Comparar con UI "Nuevo Servicio"**:
+    - [ ] Cada opción de la UI tiene su equivalente en comandos
+    - [ ] Ejemplos cubren todos los modos (default, custom, compose)
+    - [ ] Parámetros coinciden con los del formulario web
+    - [ ] Usuario puede hacer TODO lo de la UI desde comandos
+
+**Resultado Esperado**: ✅ Página de documentación API es completa, funcional y profesional
+
+---
+
 ## 🔧 MEJORAS IMPLEMENTADAS
 
 ### **Mejora 1: Página Dedicada "Nuevo Servicio"** ✅
@@ -637,10 +853,17 @@ Applying authtoken.0004_alter_tokenproxy_options... OK
 
 ### 📋 TESTS PENDIENTES
 
-**Total de tests definidos**: 17  
+**Total de tests definidos**: 19  
 **Tests ejecutados**: 0  
 **Tests pasados**: 0  
 **Tests fallidos**: 0
+
+**Desglose por categoría:**
+
+- Tests 1-7: Página "Nuevo Servicio" y UX (incluye Test 3.5 de redirección)
+- Tests 8-10: Sistema de Tokens
+- Tests 11-17: API REST funcionando
+- Test 18: Página Dedicada Documentación API
 
 ### 🎯 CRITERIOS DE ACEPTACIÓN
 
