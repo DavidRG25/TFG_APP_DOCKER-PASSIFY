@@ -75,27 +75,22 @@ Docker Compose podía incluir configuraciones peligrosas que otorgaban privilegi
 **Configuraciones bloqueadas:**
 
 1. **`privileged: true`**
-
    - Bloquea modo privilegiado
    - Previene escalada de privilegios
 
 2. **`network_mode: host`**
-
    - Bloquea acceso a red del host
    - Previene sniffing de red
 
 3. **`pid: host`**
-
    - Bloquea acceso a procesos del host
    - Previene manipulación de procesos
 
 4. **`ipc: host`**
-
    - Bloquea acceso a IPC del host
    - Previene comunicación inter-proceso maliciosa
 
 5. **`cap_add` con capabilities peligrosas**
-
    - Bloquea: SYS_ADMIN, SYS_MODULE, SYS_RAWIO, SYS_PTRACE, SYS_BOOT, NET_ADMIN, DAC_OVERRIDE, DAC_READ_SEARCH
    - Previene bypass de seguridad del kernel
 
@@ -346,6 +341,5 @@ La terminal web no filtraba comandos peligrosos, permitiendo ejecución de códi
 
 **Estado Final:** IMPLEMENTACIÓN COMPLETADA (4/4 mejoras)  
 **Última actualización:** 14/01/2026 22:40  
-**Desarrollador:** Claude Sonnet 4.5  
 **Rama:** develop  
 **Listo para producción:** ✅ SÍ

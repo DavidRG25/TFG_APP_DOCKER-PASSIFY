@@ -512,10 +512,124 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
 
 
+
+
+
 class AllowedImageViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AllowedImage.objects.all()
     serializer_class = AllowedImageSerializer
     permission_classes = [IsAuthenticated]
+
+
+@login_required
+def verify_dockerhub_image(request):
+    """
+    Verifica si una imagen existe en DockerHub y extrae información útil.
+    Soluciona el problema de CORS al hacer la petición desde el backend.
+    """
+    import requests
+    from django.http import JsonResponse
+    
+    image_name = request.GET.get('image', '').strip()
+    
+    if not image_name:
+        return JsonResponse({
+            'success': False,
+            'error': 'No se especificó ninguna imagen'
+        }, status=400)
+    
+    try:
+        # Parsear nombre de imagen (usuario/imagen:tag o imagen:tag)
+        parts = image_name.split(':')
+        repo = parts[0]
+        tag = parts[1] if len(parts) > 1 else 'latest'
+        
+        # Construir URL de la API de DockerHub
+        if '/' in repo:
+            # Imagen de usuario: usuario/imagen
+            url = f'https://hub.docker.com/v2/repositories/{repo}/tags/{tag}'
+        else:
+            # Imagen oficial: library/imagen
+            url = f'https://hub.docker.com/v2/repositories/library/{repo}/tags/{tag}'
+        
+        # Hacer petición a DockerHub
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Extraer puerto expuesto si existe
+            exposed_port = None
+            try:
+                # Los puertos están en images[0].architecture (normalmente)
+                if 'images' in data and len(data['images']) > 0:
+                    # Buscar en la metadata de la imagen
+                    for img_data in data['images']:
+                        # DockerHub no siempre expone esta info en la API pública
+                        # Intentamos extraerla si está disponible
+                        pass
+                
+                # Puertos comunes por nombre de imagen (fallback)
+                common_ports = {
+                    'nginx': 80,
+                    'apache': 80,
+                    'httpd': 80,
+                    'postgres': 5432,
+                    'postgresql': 5432,
+                    'mysql': 3306,
+                    'mariadb': 3306,
+                    'redis': 6379,
+                    'mongodb': 27017,
+                    'mongo': 27017,
+                    'elasticsearch': 9200,
+                }
+                
+                # Intentar detectar por nombre
+                repo_name = repo.split('/')[-1].lower()
+                for key, port in common_ports.items():
+                    if key in repo_name:
+                        exposed_port = port
+                        break
+                        
+            except Exception:
+                pass
+            
+            return JsonResponse({
+                'success': True,
+                'image': image_name,
+                'last_updated': data.get('last_updated'),
+                'full_size': data.get('full_size'),
+                'exposed_port': exposed_port,
+                'repo': repo,
+                'tag': tag,
+            })
+            
+        elif response.status_code == 404:
+            return JsonResponse({
+                'success': False,
+                'error': 'Imagen no encontrada en DockerHub. Verifica el nombre y el tag.'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error al consultar DockerHub (código {response.status_code})'
+            })
+            
+    except requests.exceptions.Timeout:
+        return JsonResponse({
+            'success': False,
+            'error': 'Timeout al consultar DockerHub. Intenta de nuevo.'
+        })
+    except requests.exceptions.RequestException as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error de conexión: {str(e)}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error inesperado: {str(e)}'
+        })
 
 
 # ------------------------------ HTML -------------------------------
@@ -687,9 +801,23 @@ def terminal_view(request, pk):
         return HttpResponse(f"No se pudo acceder al contenedor: {exc}", status=400)
 
     ws_path = f"/ws/terminal/{service.id}/"
+    
+    # Capturar URL de retorno para volver al contexto correcto
+    return_url = request.GET.get('return_url')
+    if not return_url:
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'subjects/' in referer:
+            # Si viene de una asignatura, volver ahí
+            return_url = referer
+        else:
+            # Por defecto, panel principal
+            from django.urls import reverse
+            return_url = reverse('containers:student_panel')
+    
     return render(request, "containers/terminal.html", {
         "service": service,
         "ws_path": ws_path,
+        "return_url": return_url,
     })
 
 
@@ -852,14 +980,29 @@ def new_service_page(request):
     # Obtener host para preview
     host = request.get_host().split(':')[0]
     
+    # Capturar URL de retorno para redirigir correctamente después de crear servicio
+    # Prioridad: 1) Query param 'return_url', 2) HTTP_REFERER, 3) student_panel por defecto
+    return_url = request.GET.get('return_url')
+    if not return_url:
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'subjects/' in referer:
+            # Si viene de una asignatura, extraer la URL
+            return_url = referer
+        else:
+            # Por defecto, panel principal
+            from django.urls import reverse
+            return_url = reverse('containers:student_panel')
+    
     context = {
         'images': images,
         'available_subjects': subjects,
         'user_projects': user_projects,
         'host': host,
+        'return_url': return_url,  # Pasar URL de retorno al template
     }
     
     return render(request, 'containers/new_service.html', context)
+
 
 
 @login_required

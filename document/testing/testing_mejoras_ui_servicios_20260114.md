@@ -17,18 +17,18 @@
 1. Acceder al panel de servicios (`/paasify/containers/`)
 2. Hacer clic en botón "Nuevo servicio"
 3. **Verificar**:
-   - [ ] Redirige a `/paasify/containers/new/`
-   - [ ] Página carga sin errores
-   - [ ] Se muestran breadcrumbs: Inicio > Servicios > Nuevo Servicio
-   - [ ] Se muestra header con título "Crear Nuevo Servicio"
-   - [ ] Se muestra formulario en columna izquierda
-   - [ ] Se muestra ayuda contextual en columna derecha
+   - [x] Redirige a `/paasify/containers/new/`
+   - [x] Página carga sin errores
+   - [x] Se muestran breadcrumbs: Inicio > Servicios > Nuevo Servicio
+   - [x] Se muestra header con título "Crear Nuevo Servicio"
+   - [x] Se muestra formulario en columna izquierda
+   - [x] Se muestra ayuda contextual en columna derecha
 4. Hacer clic en breadcrumb "Inicio"
 5. **Verificar**:
-   - [ ] Redirige correctamente al panel principal
+   - [x] Redirige correctamente al panel principal
 6. Hacer clic en botón "Cancelar"
 7. **Verificar**:
-   - [ ] Redirige correctamente al panel principal
+   - [x] Redirige correctamente al panel principal
 
 **Resultado Esperado**: ✅ Navegación funciona correctamente
 

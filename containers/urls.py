@@ -18,6 +18,9 @@ urlpatterns = [
     # Nueva página dedicada para crear servicio
     path("new/", views.new_service_page, name="new_service"),
     
+    # Verificar imágenes de DockerHub
+    path("verify-dockerhub/", views.verify_dockerhub_image, name="verify_dockerhub"),
+    
     # Gestión de tokens API
     path("api-token/", views.manage_api_token, name="api_token"),
 ]

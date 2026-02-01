@@ -414,5 +414,4 @@ document.getElementById('form-feedback').innerHTML = `
 
 **Estado Final:** IMPLEMENTACIÓN COMPLETADA (3/4 fases) + MEJORAS UX  
 **Última actualización:** 30/01/2026 22:43  
-**Desarrollador:** Claude Sonnet 4.5  
 **Rama:** develop

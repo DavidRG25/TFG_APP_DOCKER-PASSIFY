@@ -7,12 +7,10 @@
   <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
       <li class="breadcrumb-item">
-        <a href="{% url 'containers:student_panel' %}"
-          ><i class="fas fa-home me-1"></i>Inicio</a
-        >
+        <a href="{{ return_url }}"><i class="fas fa-home me-1"></i>Inicio</a>
       </li>
       <li class="breadcrumb-item">
-        <a href="{% url 'containers:student_panel' %}">Servicios</a>
+        <a href="{{ return_url }}">Servicios</a>
       </li>
       <li class="breadcrumb-item active" aria-current="page">Nuevo Servicio</li>
     </ol>
@@ -20,16 +18,21 @@
 
   {# Header #}
   <div
-    class="rounded-3 p-4 mb-4 shadow-sm"
+    class="rounded-3 p-4 mb-4 shadow-sm d-flex justify-content-between align-items-center"
     style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%)"
   >
-    <h1 class="h3 mb-1 text-white fw-bold">
-      <i class="fas fa-plus-circle me-2"></i>Crear Nuevo Servicio
-    </h1>
-    <p class="text-white-50 mb-0">
-      Despliega un nuevo contenedor Docker desde una imagen o código
-      personalizado.
-    </p>
+    <div>
+      <h1 class="h3 mb-1 text-white fw-bold">
+        <i class="fas fa-plus-circle me-2" style="margin-right: 0.5rem;"></i>Crear Nuevo Servicio
+      </h1>
+      <p class="text-white-50 mb-0">
+        Despliega un nuevo contenedor Docker desde una imagen o código
+        personalizado.
+      </p>
+    </div>
+    <a href="{{ return_url }}" class="btn btn-light shadow-sm">
+      <i class="fas fa-arrow-left me-2" style="margin-right: 0.5rem;"></i>Volver
+    </a>
   </div>
 
   {# Layout de 2 columnas #}
@@ -49,7 +52,7 @@
               if(event.detail.successful) {
                 showToast('✅ Servicio creado exitosamente. Redirigiendo...', 'text-bg-success');
                 setTimeout(() => {
-                  window.location.href = '{% url 'containers:student_panel' %}';
+                  window.location.href = '{{ return_url }}';
                 }, 1500);
               } else {
                 const xhr = event.detail.xhr;
@@ -77,7 +80,11 @@
             {# Sección 1: Información Básica #}
             <div class="mb-4">
               <h5 class="fw-bold text-primary mb-3">
-                <i class="fas fa-info-circle me-2"></i>Información Básica
+                <i
+                  class="fas fa-info-circle me-2"
+                  style="margin-right: 0.5rem"
+                ></i
+                >Información Básica
               </h5>
 
               {# Nombre del servicio #}
@@ -103,17 +110,18 @@
 
               {# Asignatura #} {% if not current_subject %}
               <div class="mb-3">
-                <label for="service-subject" class="form-label fw-semibold">
+                <label for="service-subject" class="form-label fw-semibold d-block mb-2">
                   Asignatura <span class="text-danger">*</span>
                 </label>
                 {% if available_subjects %}
                 <select
-                  class="form-select"
+                  class="form-select form-select-lg"
                   id="service-subject"
                   name="subject"
                   required
+                  style="border: 2px solid #dee2e6; font-size: 1.1rem; padding: 0.75rem 1rem; height: auto;"
                 >
-                  <option value="">Selecciona una asignatura</option>
+                  <option value="">📚 Selecciona una asignatura</option>
                   {% for subject in available_subjects %}
                   <option value="{{ subject.id }}">{{ subject.name }}</option>
                   {% endfor %}
@@ -127,18 +135,19 @@
               </div>
               {% endif %} {# Proyecto #}
               <div class="mb-3">
-                <label for="service-project" class="form-label fw-semibold">
+                <label for="service-project" class="form-label fw-semibold d-block mb-2">
                   Proyecto <span class="text-danger">*</span>
                 </label>
                 {% if user_projects %}
                 <select
-                  class="form-select"
+                  class="form-select form-select-lg"
                   id="service-project"
                   name="project"
                   required
+                  style="border: 2px solid #dee2e6; font-size: 1.1rem; padding: 0.75rem 1rem; height: auto;"
                 >
                   <option value="" disabled selected>
-                    -- Selecciona un proyecto --
+                    📁 Selecciona un proyecto
                   </option>
                   {% for p in user_projects %}
                   <option value="{{ p.id }}">
@@ -158,11 +167,12 @@
             {# Sección 2: Tipo de Despliegue #}
             <div class="mb-4">
               <h5 class="fw-bold text-primary mb-3">
-                <i class="fas fa-cogs me-2"></i>Tipo de Despliegue
+                <i class="fas fa-cogs me-2" style="margin-right: 0.5rem"></i
+                >Tipo de Despliegue
               </h5>
 
               <div class="row g-3">
-                <div class="col-md-6">
+                <div class="col-md-4">
                   <div
                     class="form-check p-3 border rounded"
                     style="cursor: pointer"
@@ -181,7 +191,7 @@
                       style="cursor: pointer"
                     >
                       <div class="d-flex align-items-center">
-                        <i class="fas fa-box fa-2x text-primary me-3"></i>
+                        <i class="fas fa-box fa-2x text-primary me-3" style="margin-right: 1rem;"></i>
                         <div>
                           <div class="fw-bold">Imagen por defecto</div>
                           <small class="text-muted"
@@ -192,7 +202,36 @@
                     </label>
                   </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
+                  <div
+                    class="form-check p-3 border rounded"
+                    style="cursor: pointer"
+                  >
+                    <input
+                      class="form-check-input"
+                      type="radio"
+                      name="mode"
+                      id="mode_dockerhub"
+                      value="dockerhub"
+                    />
+                    <label
+                      class="form-check-label w-100"
+                      for="mode_dockerhub"
+                      style="cursor: pointer"
+                    >
+                      <div class="d-flex align-items-center">
+                        <i class="fab fa-docker fa-2x text-info me-3" style="margin-right: 1rem;"></i>
+                        <div>
+                          <div class="fw-bold">Imagen desde DockerHub</div>
+                          <small class="text-muted"
+                            >Usa una imagen pública de DockerHub</small
+                          >
+                        </div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+                <div class="col-md-4">
                   <div
                     class="form-check p-3 border rounded"
                     style="cursor: pointer"
@@ -210,7 +249,7 @@
                       style="cursor: pointer"
                     >
                       <div class="d-flex align-items-center">
-                        <i class="fas fa-code fa-2x text-success me-3"></i>
+                        <i class="fas fa-code fa-2x text-success me-3" style="margin-right: 1rem;"></i>
                         <div>
                           <div class="fw-bold">Configuración personalizada</div>
                           <small class="text-muted"
@@ -227,30 +266,75 @@
             {# Sección 3: Configuración (depende del modo) #}
             <div class="mb-4">
               <h5 class="fw-bold text-primary mb-3">
-                <i class="fas fa-sliders-h me-2"></i>Configuración
+                <i
+                  class="fas fa-sliders-h me-2"
+                  style="margin-right: 0.5rem"
+                ></i
+                >Configuración
               </h5>
 
               {# Imagen (solo modo default) #}
               <div class="mb-3" id="block-default-image">
-                <label for="service-image" class="form-label fw-semibold">
+                <label for="service-image" class="form-label fw-semibold d-block mb-2">
                   Imagen Docker <span class="text-danger">*</span>
                 </label>
                 <select
-                  class="form-select"
+                  class="form-select form-select-lg"
                   id="service-image"
                   name="image"
                   required
+                  style="border: 2px solid #dee2e6; font-size: 1.1rem; padding: 0.75rem 1rem; height: auto;"
                 >
                   {% for img in images %}
                   <option value="{{ img.name }}:{{ img.tag }}">
-                    {{ img.name }}:{{ img.tag }} - {{ img.description }}
+                    🐳 {{ img.name }}:{{ img.tag }} - {{ img.description }}
                   </option>
-                  {% endfor %}
-                </select>
+                  {% endfor %}\
+</select>
                 <small class="text-muted"
-                  >En modo personalizado este selector queda
-                  deshabilitado.</small
+                  >Selecciona una imagen del catálogo oficial.</small
                 >
+              </div>
+
+              {# Imagen desde DockerHub (solo modo dockerhub) #}
+              <div class="mb-4" id="block-dockerhub-mode" style="display: none;">
+                <label for="service-dockerhub" class="form-label fw-semibold d-block mb-2">
+                  <i class="fab fa-docker me-2" style="margin-right: 0.5rem;"></i>Imagen desde DockerHub (pública) <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                  <input
+                    type="text"
+                    class="form-control form-control-lg"
+                    id="service-dockerhub"
+                    name="dockerhub_image"
+                    placeholder="nginx:latest o usuario/imagen:tag"
+                    style="border: 2px solid #dee2e6; font-family: monospace;"
+                  />
+                  <button
+                    type="button"
+                    class="btn btn-outline-primary"
+                    id="verify-dockerhub-btn"
+                    onclick="verifyDockerHubImage()"
+                  >
+                    <i class="fas fa-check-circle me-1" style="margin-right: 0.3rem;"></i> Verificar
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-outline-danger"
+                    onclick="clearDockerHubField()"
+                  >
+                    <i class="fas fa-times me-1" style="margin-right: 0.3rem;"></i> Limpiar
+                  </button>
+                </div>
+                <div id="dockerhub-feedback" class="mt-2" style="display: none;"></div>
+                <div class="alert alert-warning mt-2 mb-0" style="border-left: 4px solid #ffc107;">
+                  <i class="fas fa-exclamation-triangle me-2"></i>
+                  <strong>Limitación:</strong> Actualmente solo se pueden usar imágenes <strong>públicas</strong> de DockerHub. 
+                  Las imágenes privadas requieren autenticación y no están soportadas en esta versión.
+                </div>
+                <small class="text-muted d-block mt-2">
+                  Ejemplos: <code>nginx:latest</code>, <code>postgres:15</code>, <code>usuario/mi-app:v1.0</code>
+                </small>
               </div>
 
               {# Puerto personalizado #}
@@ -287,7 +371,7 @@
               <div class="mb-3 custom-block" id="block-internal-port">
                 <label
                   for="service-internal-port"
-                  class="form-label fw-semibold"
+                  class="form-label fw-semibold d-block mb-2"
                 >
                   Puerto interno del contenedor (opcional)
                   <button
@@ -304,12 +388,13 @@
                 </label>
                 <input
                   type="number"
-                  class="form-control"
+                  class="form-control form-control-lg"
                   id="service-internal-port"
                   name="internal_port"
                   min="1"
                   max="65535"
                   placeholder="Ej: 5000"
+                  style="border: 2px solid #dee2e6;"
                 />
                 <small class="text-muted"
                   >Ejemplos: Flask 5000, Django 8000, Node 3000. Por defecto
@@ -318,89 +403,110 @@
               </div>
 
               {# Dockerfile (solo modo custom) #}
-              <div class="mb-3 custom-block" id="block-dockerfile">
-                <label for="service-dockerfile" class="form-label fw-semibold">
-                  Dockerfile (opcional, exclusivo con compose)
+              <div class="mb-4 custom-block" id="block-dockerfile">
+                <label for="service-dockerfile" class="form-label fw-semibold d-block mb-2">
+                  <i class="fas fa-file-code me-2" style="margin-right: 0.5rem;"></i>Dockerfile (opcional, exclusivo con compose y DockerHub)
                 </label>
-                <div class="input-group">
-                  <input
-                    type="file"
-                    class="form-control"
-                    id="service-dockerfile"
-                    name="dockerfile"
-                    accept="*/*"
-                  />
-                  <button
-                    type="button"
-                    class="btn btn-outline-secondary"
-                    onclick="clearFile('dockerfile')"
-                  >
-                    <i class="fas fa-times"></i> Limpiar
-                  </button>
+                <div class="card border-2" style="border-color: #dee2e6 !important;">
+                  <div class="card-body p-3">
+                    <div class="input-group">
+                      <input
+                        type="file"
+                        class="form-control form-control-lg"
+                        id="service-dockerfile"
+                        name="dockerfile"
+                        accept="*/*"
+                        style="border: 2px solid #dee2e6;"
+                      />
+                      <button
+                        type="button"
+                        class="btn btn-outline-danger"
+                        onclick="clearFile('dockerfile')"
+                      >
+                        <i class="fas fa-times me-1" style="margin-right: 0.3rem;"></i> Limpiar
+                      </button>
+                    </div>
+                    <small class="text-muted d-block mt-2">
+                      <i class="fas fa-info-circle me-1"></i>
+                      Sube un Dockerfile personalizado para construir tu imagen
+                    </small>
+                  </div>
                 </div>
               </div>
 
               {# Docker Compose (solo modo custom) #}
-              <div class="mb-3 custom-block" id="block-compose">
-                <label for="service-compose" class="form-label fw-semibold">
-                  docker-compose.yml (opcional, exclusivo con Dockerfile)
+              <div class="mb-4 custom-block" id="block-compose">
+                <label for="service-compose" class="form-label fw-semibold d-block mb-2">
+                  <i class="fas fa-layer-group me-2" style="margin-right: 0.5rem;"></i>docker-compose.yml (opcional, exclusivo con Dockerfile y DockerHub)
                 </label>
-                <div class="input-group">
-                  <input
-                    type="file"
-                    class="form-control"
-                    id="service-compose"
-                    name="compose"
-                    accept=".yml,.yaml"
-                  />
-                  <button
-                    type="button"
-                    class="btn btn-outline-secondary"
-                    onclick="clearFile('compose')"
-                  >
-                    <i class="fas fa-times"></i> Limpiar
-                  </button>
+                <div class="card border-2" style="border-color: #dee2e6 !important;">
+                  <div class="card-body p-3">
+                    <div class="input-group">
+                      <input
+                        type="file"
+                        class="form-control form-control-lg"
+                        id="service-compose"
+                        name="compose"
+                        accept=".yml,.yaml"
+                        style="border: 2px solid #dee2e6;"
+                      />
+                      <button
+                        type="button"
+                        class="btn btn-outline-danger"
+                        onclick="clearFile('compose')"
+                      >
+                        <i class="fas fa-times me-1" style="margin-right: 0.3rem;"></i> Limpiar
+                      </button>
+                    </div>
+                    <small class="text-muted d-block mt-2">
+                      <i class="fas fa-info-circle me-1"></i>
+                      Sube un archivo docker-compose.yml para servicios multi-contenedor
+                    </small>
+                  </div>
                 </div>
               </div>
 
               {# Código fuente (solo modo custom) #}
-              <div class="mb-3 custom-block" id="block-code">
-                <label for="service-code" class="form-label fw-semibold">
-                  Código fuente (.zip obligatorio en modo personalizado)
+              <div class="mb-4 custom-block" id="block-code">
+                <label for="service-code" class="form-label fw-semibold d-block mb-2">
+                  <i class="fas fa-file-archive me-2" style="margin-right: 0.5rem;"></i>Código fuente (.zip)
+                  <span class="badge bg-secondary ms-2">Opcional con DockerHub</span>
                 </label>
-                <div class="input-group">
-                  <input
-                    type="file"
-                    class="form-control"
-                    id="service-code"
-                    name="code"
-                    accept=".zip,.rar"
-                  />
-                  <button
-                    type="button"
-                    class="btn btn-outline-secondary"
-                    onclick="clearFile('code')"
-                  >
-                    <i class="fas fa-times"></i> Limpiar
-                  </button>
+                <div class="card border-2" style="border-color: #dee2e6 !important;">
+                  <div class="card-body p-3">
+                    <div class="input-group">
+                      <input
+                        type="file"
+                        class="form-control form-control-lg"
+                        id="service-code"
+                        name="code"
+                        accept=".zip,.rar"
+                        style="border: 2px solid #dee2e6;"
+                      />
+                      <button
+                        type="button"
+                        class="btn btn-outline-danger"
+                        onclick="clearFile('code')"
+                      >
+                        <i class="fas fa-times me-1" style="margin-right: 0.3rem;"></i> Limpiar
+                      </button>
+                    </div>
+                    <small class="text-muted d-block mt-2">
+                      <i class="fas fa-info-circle me-1"></i>
+                      <strong>Obligatorio</strong> si usas Dockerfile o docker-compose. <strong>Opcional</strong> si usas imagen de DockerHub.
+                    </small>
+                  </div>
                 </div>
-                <small class="text-muted"
-                  >Sube un ZIP que contenga el Dockerfile o docker-compose.yml y
-                  tu código fuente.</small
-                >
               </div>
             </div>
 
             {# Botones de acción #}
             <div class="d-flex gap-2 justify-content-end">
-              <a
-                href="{% url 'containers:student_panel' %}"
-                class="btn btn-outline-secondary"
-              >
-                <i class="fas fa-times me-2"></i>Cancelar
+              <a href="{{ return_url }}" class="btn btn-outline-secondary">
+                <i class="fas fa-times me-2" style="margin-right: 0.5rem;"></i>Cancelar
               </a>
               <button type="submit" class="btn btn-primary">
-                <i class="fas fa-rocket me-2"></i>Crear Servicio
+                <i class="fas fa-rocket me-2" style="margin-right: 0.5rem;"></i>Crear Servicio
               </button>
             </div>
           </form>
@@ -414,7 +520,8 @@
       <div class="card border-0 shadow-sm mb-4">
         <div class="card-body">
           <h5 class="fw-bold text-success mb-3">
-            <i class="fas fa-lightbulb me-2"></i>Consejos
+            <i class="fas fa-lightbulb me-2" style="margin-right: 0.5rem"></i
+            >Consejos
           </h5>
           <ul class="list-unstyled mb-0">
             <li class="mb-2">
@@ -441,7 +548,8 @@
       <div class="card border-0 shadow-sm">
         <div class="card-body">
           <h5 class="fw-bold text-info mb-3">
-            <i class="fas fa-book me-2"></i>Ejemplos
+            <i class="fas fa-book me-2" style="margin-right: 0.5rem"></i
+            >Ejemplos
           </h5>
 
           <div class="mb-3">
