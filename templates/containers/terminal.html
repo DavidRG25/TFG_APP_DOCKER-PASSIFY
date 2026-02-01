@@ -10,7 +10,7 @@
 
 <div id="terminal-container" style="height: 500px; width: 100%; background: black;"></div>
 
-<a href="{% url 'containers:student_panel' %}" class="btn btn-secondary mt-3">Volver</a>
+<a href="{{ return_url }}" class="btn btn-secondary mt-3">Volver</a>
 {% endblock %}
 
 {% block extrascripts %}

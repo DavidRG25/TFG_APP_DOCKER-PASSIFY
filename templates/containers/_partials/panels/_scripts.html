@@ -138,29 +138,93 @@
     const compose = document.querySelector('input[name="compose"]');
     const code = document.querySelector('input[name="code"]');
     const internalPort = document.querySelector('input[name="internal_port"]');
+    const customPort = document.querySelector('input[name="custom_port"]');
+    
+    // Obtener los contenedores de los campos
+    const imageContainer = imgSel?.closest('.mb-3');
     const customBlocks = document.querySelectorAll('.custom-block');
+    const dockerhubBlock = document.getElementById('block-dockerhub-mode');
+    const dockerhubInput = document.querySelector('input[name="dockerhub_image"]');
 
     if (mode === 'default') {
+      // Modo default: Mostrar imagen del catálogo
+      if (imageContainer) imageContainer.style.display = 'block';
+      if (dockerhubBlock) dockerhubBlock.style.display = 'none';
       imgSel.disabled = false;
-      customBlocks.forEach((b) => b.classList.add('opacity-50'));
+      if (dockerhubInput) {
+        dockerhubInput.disabled = true;
+        dockerhubInput.value = '';
+      }
+      
+      customBlocks.forEach((b) => {
+        b.style.display = 'none';
+      });
+      
       [dockerfile, compose, code].forEach((input) => {
         if (!input) return;
         input.disabled = true;
         input.value = '';
         input.dispatchEvent(new Event('change'));
       });
+      
+      // IMPORTANTE: Los puertos SIEMPRE deben estar habilitados
       if (internalPort) {
-        internalPort.value = '';
-        internalPort.disabled = true;
+        internalPort.disabled = false;
+      }
+      if (customPort) {
+        customPort.disabled = false;
+      }
+    } else if (mode === 'dockerhub') {
+      // Modo DockerHub: Mostrar solo campo de DockerHub
+      if (imageContainer) imageContainer.style.display = 'none';
+      if (dockerhubBlock) dockerhubBlock.style.display = 'block';
+      imgSel.disabled = true;
+      if (dockerhubInput) {
+        dockerhubInput.disabled = false;
+      }
+      
+      customBlocks.forEach((b) => {
+        b.style.display = 'none';
+      });
+      
+      [dockerfile, compose, code].forEach((input) => {
+        if (!input) return;
+        input.disabled = true;
+        input.value = '';
+        input.dispatchEvent(new Event('change'));
+      });
+      
+      // IMPORTANTE: Los puertos SIEMPRE deben estar habilitados
+      if (internalPort) {
+        internalPort.disabled = false;
+      }
+      if (customPort) {
+        customPort.disabled = false;
       }
     } else {
+      // Modo custom: Mostrar Dockerfile/Compose/Código
+      if (imageContainer) imageContainer.style.display = 'none';
+      if (dockerhubBlock) dockerhubBlock.style.display = 'none';
       imgSel.disabled = true;
-      customBlocks.forEach((b) => b.classList.remove('opacity-50'));
+      if (dockerhubInput) {
+        dockerhubInput.disabled = true;
+        dockerhubInput.value = '';
+      }
+      
+      customBlocks.forEach((b) => {
+        b.style.display = 'block';
+      });
+      
       [dockerfile, compose, code].forEach((input) => {
         if (input) input.disabled = false;
       });
+      
+      // IMPORTANTE: Los puertos SIEMPRE deben estar habilitados
       if (internalPort) {
         internalPort.disabled = false;
+      }
+      if (customPort) {
+        customPort.disabled = false;
       }
     }
     syncExclusion();
@@ -170,32 +234,135 @@
     const dockerfile = document.querySelector('input[name="dockerfile"]');
     const compose = document.querySelector('input[name="compose"]');
     const mode = document.querySelector('input[name="mode"]:checked')?.value || 'default';
+    
+    // Obtener contenedores de los bloques
+    const dockerfileBlock = document.getElementById('block-dockerfile');
+    const composeBlock = document.getElementById('block-compose');
 
-    if (mode === 'default') {
-      const codeInput = document.querySelector('input[name="code"]');
-      if (dockerfile) {
-        dockerfile.disabled = true;
-      }
-      if (compose) {
-        compose.disabled = true;
-      }
-      if (codeInput) {
-        codeInput.disabled = true;
-      }
+    // Solo aplicar exclusión en modo custom
+    if (mode !== 'custom') {
       return;
     }
 
+    // Lógica de exclusión en modo custom - OCULTAR en lugar de deshabilitar
+    // Si hay Dockerfile, ocultar compose
     if (dockerfile.files?.length) {
+      if (composeBlock) composeBlock.style.display = 'none';
       compose.value = '';
-      compose.disabled = true;
-    } else if (compose.files?.length) {
+    } 
+    // Si hay compose, ocultar dockerfile
+    else if (compose.files?.length) {
+      if (dockerfileBlock) dockerfileBlock.style.display = 'none';
       dockerfile.value = '';
-      dockerfile.disabled = true;
-    } else {
-      dockerfile.disabled = false;
-      compose.disabled = false;
+    } 
+    // Si no hay nada, mostrar todo
+    else {
+      if (dockerfileBlock) dockerfileBlock.style.display = 'block';
+      if (composeBlock) composeBlock.style.display = 'block';
     }
 
+  }
+
+  // Función para verificar si una imagen existe en DockerHub
+  async function verifyDockerHubImage() {
+    const input = document.getElementById('service-dockerhub');
+    const feedback = document.getElementById('dockerhub-feedback');
+    const btn = document.getElementById('verify-dockerhub-btn');
+    const imageName = input.value.trim();
+
+    if (!imageName) {
+      feedback.innerHTML = `
+        <div class="alert alert-warning mb-0">
+          <i class="fas fa-exclamation-circle me-2"></i>
+          Por favor, ingresa un nombre de imagen
+        </div>
+      `;
+      feedback.style.display = 'block';
+      return;
+    }
+
+    // Mostrar loading
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Verificando...';
+    feedback.innerHTML = `
+      <div class="alert alert-info mb-0">
+        <i class="fas fa-spinner fa-spin me-2"></i>
+        Consultando DockerHub...
+      </div>
+    `;
+    feedback.style.display = 'block';
+
+    try {
+      // Usar endpoint de Django para evitar CORS
+      const response = await fetch(`/paasify/containers/verify-dockerhub/?image=${encodeURIComponent(imageName)}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        const lastUpdated = data.last_updated ? new Date(data.last_updated).toLocaleDateString('es-ES') : 'Desconocida';
+        const sizeInMB = data.full_size ? (data.full_size / (1024 * 1024)).toFixed(2) : 'Desconocido';
+        
+        let portInfo = '';
+        if (data.exposed_port) {
+          portInfo = `
+            <br>
+            <strong>Puerto detectado:</strong> <code>${data.exposed_port}</code>
+            <button 
+              type="button" 
+              class="btn btn-sm btn-outline-success ms-2"
+              onclick="document.getElementById('service-internal-port').value = '${data.exposed_port}'"
+            >
+              <i class="fas fa-magic me-1"></i> Usar este puerto
+            </button>
+          `;
+        }
+        
+        feedback.innerHTML = `
+          <div class="alert alert-success mb-0">
+            <i class="fas fa-check-circle me-2"></i>
+            <strong>✅ Imagen encontrada en DockerHub</strong>
+            <br>
+            <small class="text-muted">
+              <strong>Nombre:</strong> <code>${imageName}</code><br>
+              <strong>Última actualización:</strong> ${lastUpdated}<br>
+              <strong>Tamaño:</strong> ${sizeInMB} MB
+              ${portInfo}
+            </small>
+          </div>
+        `;
+      } else {
+        feedback.innerHTML = `
+          <div class="alert alert-danger mb-0">
+            <i class="fas fa-times-circle me-2"></i>
+            <strong>❌ ${data.error}</strong>
+          </div>
+        `;
+      }
+    } catch (error) {
+      feedback.innerHTML = `
+        <div class="alert alert-danger mb-0">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          <strong>Error al verificar</strong>
+          <br>
+          <small>${error.message}</small>
+        </div>
+      `;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-check-circle me-1" style="margin-right: 0.3rem;"></i> Verificar';
+    }
+  }
+
+  function clearDockerHubField() {
+    const input = document.getElementById('service-dockerhub');
+    const feedback = document.getElementById('dockerhub-feedback');
+    
+    if (input) {
+      input.value = '';
+    }
+    if (feedback) {
+      feedback.innerHTML = '';
+      feedback.style.display = 'none';
+    }
   }
 
   function clearFile(name) {
