@@ -21,6 +21,9 @@ urlpatterns = [
     # Verificar imágenes de DockerHub
     path("verify-dockerhub/", views.verify_dockerhub_image, name="verify_dockerhub"),
     
+    # Verificar disponibilidad de puertos
+    path("check-port/", views.check_port_availability, name="check_port"),
+    
     # Gestión de tokens API
     path("api-token/", views.manage_api_token, name="api_token"),
 ]
