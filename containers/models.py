@@ -58,6 +58,7 @@ class Service(models.Model):
     image = models.CharField("Imagen", max_length=200, blank=True)
     container_id = models.CharField("ID de contenedor", max_length=100, blank=True, null=True)
     assigned_port = models.PositiveIntegerField("Puerto asignado", null=True, blank=True)
+    assigned_ports = models.JSONField("Puertos asignados (compose)", blank=True, null=True, help_text="Lista de puertos para servicios docker-compose")
     internal_port = models.PositiveIntegerField("Puerto interno", default=80)
     status = models.CharField("Estado", max_length=20, default="stopped")
     logs = models.TextField("Logs", blank=True)

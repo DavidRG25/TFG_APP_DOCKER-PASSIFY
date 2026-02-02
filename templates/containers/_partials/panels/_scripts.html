@@ -5,23 +5,25 @@
     const element = document.querySelector(elementSelector);
     if (!element) return;
     element.select();
-    document.execCommand('copy');
-    showToast('¡Copiado!');
+    document.execCommand("copy");
+    showToast("¡Copiado!");
   }
 
-  htmx.on('htmx:configRequest', (e) => {
-    const token = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
+  htmx.on("htmx:configRequest", (e) => {
+    const token = document.querySelector(
+      'input[name="csrfmiddlewaretoken"]',
+    )?.value;
     if (token) {
-      e.detail.headers['X-CSRFToken'] = token;
+      e.detail.headers["X-CSRFToken"] = token;
     }
   });
 
-  function showToast(message, extraClass = 'text-bg-success') {
-    const box = document.getElementById('toast-container');
+  function showToast(message, extraClass = "text-bg-success") {
+    const box = document.getElementById("toast-container");
     if (!box) return;
-    const el = document.createElement('div');
+    const el = document.createElement("div");
     el.className = `toast align-items-center ${extraClass} border-0 show`;
-    el.role = 'alert';
+    el.role = "alert";
     el.innerHTML = `
       <div class="d-flex">
         <div class="toast-body">${message}</div>
@@ -33,22 +35,22 @@
   }
 
   function resetNewServiceForm() {
-    const form = document.getElementById('newServiceForm');
+    const form = document.getElementById("newServiceForm");
     if (!form) return;
     form.reset();
-    
-    // Limpiar errores (ambos contenedores por si acaso)
-    const errors = document.getElementById('form-errors');
-    if (errors) errors.innerHTML = '';
-    const modalErrors = document.getElementById('modal-form-errors');
-    if (modalErrors) modalErrors.innerHTML = '';
 
-    ['dockerfile', 'compose', 'code'].forEach((name) => {
+    // Limpiar errores (ambos contenedores por si acaso)
+    const errors = document.getElementById("form-errors");
+    if (errors) errors.innerHTML = "";
+    const modalErrors = document.getElementById("modal-form-errors");
+    if (modalErrors) modalErrors.innerHTML = "";
+
+    ["dockerfile", "compose", "code"].forEach((name) => {
       const input = document.querySelector(`input[name="${name}"]`);
       if (input) {
-        input.value = '';
+        input.value = "";
         input.disabled = false;
-        input.dispatchEvent(new Event('change'));
+        input.dispatchEvent(new Event("change"));
       }
     });
     applyMode();
@@ -59,114 +61,137 @@
     });
   }
 
-  document.body.addEventListener('service:modal-close', (evt) => {
-    const modalId = evt.detail?.modalId || 'newServiceModal';
+  document.body.addEventListener("service:modal-close", (evt) => {
+    const modalId = evt.detail?.modalId || "newServiceModal";
     const modalEl = document.getElementById(modalId);
     if (!modalEl) return;
-    (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).hide();
+    (
+      bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)
+    ).hide();
     resetNewServiceForm();
   });
 
-  document.body.addEventListener('service:toast', (evt) => {
+  document.body.addEventListener("service:toast", (evt) => {
     const detail = evt.detail || {};
-    showToast(detail.message || 'Operacion completada', detail.variant || 'text-bg-success');
+    showToast(
+      detail.message || "Operacion completada",
+      detail.variant || "text-bg-success",
+    );
   });
 
   // Listener para errores de validación
-  document.body.addEventListener('showValidationError', (evt) => {
-    
+  document.body.addEventListener("showValidationError", (evt) => {
     // Extraer mensaje (HTMX a veces lo mete en detail.value)
     let message = evt.detail;
-    if (evt.detail && typeof evt.detail === 'object') {
-        message = evt.detail.value || JSON.stringify(evt.detail);
+    if (evt.detail && typeof evt.detail === "object") {
+      message = evt.detail.value || JSON.stringify(evt.detail);
     }
     if (!message) message = "Error desconocido";
 
     // Buscar el contenedor en el modal
-    const errorContainer = document.getElementById('modal-form-errors');
-    
+    const errorContainer = document.getElementById("modal-form-errors");
+
     if (errorContainer) {
-        // Mostrar alerta bonita dentro del modal
-        errorContainer.innerHTML = `
+      // Mostrar alerta bonita dentro del modal
+      errorContainer.innerHTML = `
             <div class="alert alert-danger alert-dismissible fade show mb-2" role="alert">
                 <div class="d-flex align-items-center">
                     <i class="bi bi-exclamation-triangle-fill text-danger fs-4 me-2"></i>
                     <div>
                         <strong>No se pudo crear el servicio:</strong><br>
-                        ${String(message).replace(/\\n/g, '<br>').replace(/\n/g, '<br>')}
+                        ${String(message).replace(/\\n/g, "<br>").replace(/\n/g, "<br>")}
                     </div>
                 </div>
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
         `;
     } else {
-        // Fallback a alert si no existe el contenedor
-        alert('❌ Error de Validación\n\n' + message);
+      // Fallback a alert si no existe el contenedor
+      alert("❌ Error de Validación\n\n" + message);
     }
   });
 
-  const newServiceModal = document.getElementById('newServiceModal');
+  const newServiceModal = document.getElementById("newServiceModal");
   if (newServiceModal) {
-    newServiceModal.addEventListener('hidden.bs.modal', () => {
+    newServiceModal.addEventListener("hidden.bs.modal", () => {
       resetNewServiceForm();
     });
   }
 
-  htmx.on('htmx:afterRequest', (evt) => {
-    if (evt.detail?.requestConfig?.elt?.id === 'newServiceForm') {
+  htmx.on("htmx:afterRequest", (evt) => {
+    if (evt.detail?.requestConfig?.elt?.id === "newServiceForm") {
       const status = evt.detail.xhr?.status || 0;
       if (status < 400) {
         resetNewServiceForm();
         if (newServiceModal) {
-          (bootstrap.Modal.getInstance(newServiceModal) || new bootstrap.Modal(newServiceModal)).hide();
+          (
+            bootstrap.Modal.getInstance(newServiceModal) ||
+            new bootstrap.Modal(newServiceModal)
+          ).hide();
         }
       }
     }
   });
 
-  htmx.on('htmx:responseError', (evt) => {
+  htmx.on("htmx:responseError", (evt) => {
     const xhr = evt.detail.xhr;
     const status = xhr?.status ?? 0;
-    const msg = xhr?.responseText || 'Se produjo un error inesperado';
-    showToast(`Error (${status}): ${msg}`, 'text-bg-danger');
+    const msg = xhr?.responseText || "Se produjo un error inesperado";
+    showToast(`Error (${status}): ${msg}`, "text-bg-danger");
   });
 
   function applyMode() {
-    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'default';
+    const mode =
+      document.querySelector('input[name="mode"]:checked')?.value || "default";
     const imgSel = document.querySelector('select[name="image"]');
     const dockerfile = document.querySelector('input[name="dockerfile"]');
     const compose = document.querySelector('input[name="compose"]');
     const code = document.querySelector('input[name="code"]');
     const internalPort = document.querySelector('input[name="internal_port"]');
     const customPort = document.querySelector('input[name="custom_port"]');
-    
-    // Obtener los contenedores de los campos
-    const imageContainer = imgSel?.closest('.mb-3');
-    const customBlocks = document.querySelectorAll('.custom-block');
-    const dockerhubBlock = document.getElementById('block-dockerhub-mode');
-    const dockerhubInput = document.querySelector('input[name="dockerhub_image"]');
 
-    if (mode === 'default') {
+    // Obtener los contenedores de los campos
+    const imageContainer = imgSel?.closest(".mb-3");
+    const customBlocks = document.querySelectorAll(".custom-block");
+    const dockerhubBlock = document.getElementById("block-dockerhub-mode");
+    const dockerhubInput = document.querySelector(
+      'input[name="dockerhub_image"]',
+    );
+
+    if (mode === "default") {
       // Modo default: Mostrar imagen del catálogo
-      if (imageContainer) imageContainer.style.display = 'block';
-      if (dockerhubBlock) dockerhubBlock.style.display = 'none';
+      if (imageContainer) imageContainer.style.display = "block";
+      if (dockerhubBlock) dockerhubBlock.style.display = "none";
       imgSel.disabled = false;
       if (dockerhubInput) {
         dockerhubInput.disabled = true;
-        dockerhubInput.value = '';
+        dockerhubInput.value = "";
       }
+
+      // Limpiar feedback de DockerHub
+      const dockerhubFeedback = document.getElementById("dockerhub-feedback");
+      if (dockerhubFeedback) {
+        dockerhubFeedback.innerHTML = "";
+        dockerhubFeedback.style.display = "none";
+      }
+
+      // Limpiar puerto personalizado y su feedback
+      clearCustomPort();
       
+      // Limpiar puerto interno
+      if (internalPort) internalPort.value = "";
+
       customBlocks.forEach((b) => {
-        b.style.display = 'none';
+        b.style.display = "none";
       });
-      
+
       [dockerfile, compose, code].forEach((input) => {
         if (!input) return;
         input.disabled = true;
-        input.value = '';
-        input.dispatchEvent(new Event('change'));
+        input.value = "";
+        input.dispatchEvent(new Event("change"));
       });
-      
+
       // IMPORTANTE: Los puertos SIEMPRE deben estar habilitados
       if (internalPort) {
         internalPort.disabled = false;
@@ -174,26 +199,32 @@
       if (customPort) {
         customPort.disabled = false;
       }
-    } else if (mode === 'dockerhub') {
+    } else if (mode === "dockerhub") {
       // Modo DockerHub: Mostrar solo campo de DockerHub
-      if (imageContainer) imageContainer.style.display = 'none';
-      if (dockerhubBlock) dockerhubBlock.style.display = 'block';
+      if (imageContainer) imageContainer.style.display = "none";
+      if (dockerhubBlock) dockerhubBlock.style.display = "block";
       imgSel.disabled = true;
       if (dockerhubInput) {
         dockerhubInput.disabled = false;
       }
+
+      // Limpiar puerto personalizado y su feedback
+      clearCustomPort();
       
+      // Limpiar puerto interno
+      if (internalPort) internalPort.value = "";
+
       customBlocks.forEach((b) => {
-        b.style.display = 'none';
+        b.style.display = "none";
       });
-      
+
       [dockerfile, compose, code].forEach((input) => {
         if (!input) return;
         input.disabled = true;
-        input.value = '';
-        input.dispatchEvent(new Event('change'));
+        input.value = "";
+        input.dispatchEvent(new Event("change"));
       });
-      
+
       // IMPORTANTE: Los puertos SIEMPRE deben estar habilitados
       if (internalPort) {
         internalPort.disabled = false;
@@ -203,22 +234,35 @@
       }
     } else {
       // Modo custom: Mostrar Dockerfile/Compose/Código
-      if (imageContainer) imageContainer.style.display = 'none';
-      if (dockerhubBlock) dockerhubBlock.style.display = 'none';
+      if (imageContainer) imageContainer.style.display = "none";
+      if (dockerhubBlock) dockerhubBlock.style.display = "none";
       imgSel.disabled = true;
       if (dockerhubInput) {
         dockerhubInput.disabled = true;
-        dockerhubInput.value = '';
+        dockerhubInput.value = "";
       }
+
+      // Limpiar feedback de DockerHub
+      const dockerhubFeedback = document.getElementById('dockerhub-feedback');
+      if (dockerhubFeedback) {
+        dockerhubFeedback.innerHTML = '';
+        dockerhubFeedback.style.display = 'none';
+      }
+
+      // Limpiar puerto personalizado y su feedback
+      clearCustomPort();
       
+      // Limpiar puerto interno
+      if (internalPort) internalPort.value = "";
+
       customBlocks.forEach((b) => {
-        b.style.display = 'block';
+        b.style.display = "block";
       });
-      
+
       [dockerfile, compose, code].forEach((input) => {
         if (input) input.disabled = false;
       });
-      
+
       // IMPORTANTE: Los puertos SIEMPRE deben estar habilitados
       if (internalPort) {
         internalPort.disabled = false;
@@ -233,41 +277,41 @@
   function syncExclusion() {
     const dockerfile = document.querySelector('input[name="dockerfile"]');
     const compose = document.querySelector('input[name="compose"]');
-    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'default';
-    
+    const mode =
+      document.querySelector('input[name="mode"]:checked')?.value || "default";
+
     // Obtener contenedores de los bloques
-    const dockerfileBlock = document.getElementById('block-dockerfile');
-    const composeBlock = document.getElementById('block-compose');
+    const dockerfileBlock = document.getElementById("block-dockerfile");
+    const composeBlock = document.getElementById("block-compose");
 
     // Solo aplicar exclusión en modo custom
-    if (mode !== 'custom') {
+    if (mode !== "custom") {
       return;
     }
 
     // Lógica de exclusión en modo custom - OCULTAR en lugar de deshabilitar
     // Si hay Dockerfile, ocultar compose
     if (dockerfile.files?.length) {
-      if (composeBlock) composeBlock.style.display = 'none';
-      compose.value = '';
-    } 
+      if (composeBlock) composeBlock.style.display = "none";
+      compose.value = "";
+    }
     // Si hay compose, ocultar dockerfile
     else if (compose.files?.length) {
-      if (dockerfileBlock) dockerfileBlock.style.display = 'none';
-      dockerfile.value = '';
-    } 
+      if (dockerfileBlock) dockerfileBlock.style.display = "none";
+      dockerfile.value = "";
+    }
     // Si no hay nada, mostrar todo
     else {
-      if (dockerfileBlock) dockerfileBlock.style.display = 'block';
-      if (composeBlock) composeBlock.style.display = 'block';
+      if (dockerfileBlock) dockerfileBlock.style.display = "block";
+      if (composeBlock) composeBlock.style.display = "block";
     }
-
   }
 
   // Función para verificar si una imagen existe en DockerHub
   async function verifyDockerHubImage() {
-    const input = document.getElementById('service-dockerhub');
-    const feedback = document.getElementById('dockerhub-feedback');
-    const btn = document.getElementById('verify-dockerhub-btn');
+    const input = document.getElementById("service-dockerhub");
+    const feedback = document.getElementById("dockerhub-feedback");
+    const btn = document.getElementById("verify-dockerhub-btn");
     const imageName = input.value.trim();
 
     if (!imageName) {
@@ -277,31 +321,38 @@
           Por favor, ingresa un nombre de imagen
         </div>
       `;
-      feedback.style.display = 'block';
+      feedback.style.display = "block";
       return;
     }
 
     // Mostrar loading
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Verificando...';
+    btn.innerHTML =
+      '<i class="fas fa-spinner fa-spin me-1"></i> Verificando...';
     feedback.innerHTML = `
       <div class="alert alert-info mb-0">
         <i class="fas fa-spinner fa-spin me-2"></i>
         Consultando DockerHub...
       </div>
     `;
-    feedback.style.display = 'block';
+    feedback.style.display = "block";
 
     try {
       // Usar endpoint de Django para evitar CORS
-      const response = await fetch(`/paasify/containers/verify-dockerhub/?image=${encodeURIComponent(imageName)}`);
+      const response = await fetch(
+        `/paasify/containers/verify-dockerhub/?image=${encodeURIComponent(imageName)}`,
+      );
       const data = await response.json();
-      
+
       if (data.success) {
-        const lastUpdated = data.last_updated ? new Date(data.last_updated).toLocaleDateString('es-ES') : 'Desconocida';
-        const sizeInMB = data.full_size ? (data.full_size / (1024 * 1024)).toFixed(2) : 'Desconocido';
-        
-        let portInfo = '';
+        const lastUpdated = data.last_updated
+          ? new Date(data.last_updated).toLocaleDateString("es-ES")
+          : "Desconocida";
+        const sizeInMB = data.full_size
+          ? (data.full_size / (1024 * 1024)).toFixed(2)
+          : "Desconocido";
+
+        let portInfo = "";
         if (data.exposed_port) {
           portInfo = `
             <br>
@@ -315,7 +366,7 @@
             </button>
           `;
         }
-        
+
         feedback.innerHTML = `
           <div class="alert alert-success mb-0">
             <i class="fas fa-check-circle me-2"></i>
@@ -348,20 +399,127 @@
       `;
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '<i class="fas fa-check-circle me-1" style="margin-right: 0.3rem;"></i> Verificar';
+      btn.innerHTML =
+        '<i class="fas fa-check-circle me-1" style="margin-right: 0.3rem;"></i> Verificar';
     }
   }
 
   function clearDockerHubField() {
-    const input = document.getElementById('service-dockerhub');
-    const feedback = document.getElementById('dockerhub-feedback');
-    
-    if (input) {
-      input.value = '';
-    }
+    const input = document.getElementById("service-dockerhub");
+    const feedback = document.getElementById("dockerhub-feedback");
+    if (input) input.value = "";
     if (feedback) {
-      feedback.innerHTML = '';
-      feedback.style.display = 'none';
+      feedback.innerHTML = "";
+      feedback.style.display = "none";
+    }
+  }
+
+  async function checkPortAvailability() {
+    const portInput = document.getElementById("service-port");
+    const feedback = document.getElementById("port-availability-feedback");
+    const btn = document.getElementById("check-port-btn");
+
+    if (!portInput || !feedback || !btn) return;
+
+    const port = portInput.value.trim();
+
+    if (!port) {
+      feedback.style.display = "block";
+      feedback.innerHTML = `
+        <div class="alert alert-warning mb-0">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          Por favor, ingresa un puerto
+        </div>
+      `;
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Verificando...';
+
+    try {
+      const response = await fetch(
+        `/paasify/containers/check-port/?port=${encodeURIComponent(port)}`
+      );
+      const data = await response.json();
+
+      feedback.style.display = "block";
+
+      if (data.success && data.available) {
+        // Puerto disponible
+        feedback.innerHTML = `
+          <div class="alert alert-success mb-0">
+            <i class="fas fa-check-circle me-2"></i>
+            <strong>${data.message}</strong>
+          </div>
+        `;
+      } else if (data.success && !data.available) {
+        // Puerto ocupado, mostrar sugerencias
+        let suggestionsHTML = "";
+        if (data.suggestions && data.suggestions.length > 0) {
+          suggestionsHTML = `
+            <div class="mt-2">
+              <strong>Puertos disponibles sugeridos:</strong>
+              <div class="d-flex gap-2 mt-2">
+                ${data.suggestions
+                  .map(
+                    (p) => `
+                  <button 
+                    type="button" 
+                    class="btn btn-sm btn-outline-success"
+                    onclick="document.getElementById('service-port').value = '${p}'; checkPortAvailability();"
+                  >
+                    <i class="fas fa-magic me-1"></i> ${p}
+                  </button>
+                `
+                  )
+                  .join("")}
+              </div>
+            </div>
+          `;
+        }
+
+        feedback.innerHTML = `
+          <div class="alert alert-warning mb-0">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            <strong>${data.message}</strong>
+            ${suggestionsHTML}
+          </div>
+        `;
+      } else {
+        // Error
+        feedback.innerHTML = `
+          <div class="alert alert-danger mb-0">
+            <i class="fas fa-times-circle me-2"></i>
+            <strong>Error:</strong> ${data.error || "Error desconocido"}
+          </div>
+        `;
+      }
+    } catch (error) {
+      feedback.style.display = "block";
+      feedback.innerHTML = `
+        <div class="alert alert-danger mb-0">
+          <i class="fas fa-exclamation-triangle me-2"></i>
+          <strong>Error al verificar</strong>
+          <br>
+          <small>${error.message}</small>
+        </div>
+      `;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML =
+        '<i class="fas fa-search me-1"></i> Verificar disponibilidad';
+    }
+  }
+
+  function clearCustomPort() {
+    const portInput = document.getElementById("service-port");
+    const feedback = document.getElementById("port-availability-feedback");
+    
+    if (portInput) portInput.value = "";
+    if (feedback) {
+      feedback.innerHTML = "";
+      feedback.style.display = "none";
     }
   }
 
@@ -369,32 +527,36 @@
     const input = document.querySelector(`input[name="${name}"]`);
     if (!input) return;
     const newInput = input.cloneNode(true);
-    newInput.value = '';
+    newInput.value = "";
     input.parentNode.replaceChild(newInput, input);
-    newInput.addEventListener('change', syncExclusion);
+    newInput.addEventListener("change", syncExclusion);
     syncExclusion();
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener("DOMContentLoaded", () => {
     applyMode();
     document.querySelectorAll('input[name="mode"]').forEach((radio) => {
-      radio.addEventListener('change', applyMode);
+      radio.addEventListener("change", applyMode);
     });
-    ['dockerfile', 'compose', 'code'].forEach((name) => {
+    ["dockerfile", "compose", "code"].forEach((name) => {
       const input = document.querySelector(`input[name="${name}"]`);
-      if (input) input.addEventListener('change', syncExclusion);
+      if (input) input.addEventListener("change", syncExclusion);
     });
-    const popoverTriggerList = Array.from(document.querySelectorAll('[data-bs-toggle="popover"]'));
+    const popoverTriggerList = Array.from(
+      document.querySelectorAll('[data-bs-toggle="popover"]'),
+    );
     popoverTriggerList.forEach((el) => new bootstrap.Popover(el));
 
     // Función para refrescar la tabla
     function refreshTable() {
-      const tableElement = document.getElementById('service-table');
-      if (tableElement && typeof htmx !== 'undefined') {
-        const url = tableElement.getAttribute('hx-get') || '{% url "containers:service_table" %}';
-        htmx.ajax('GET', url, {
-          target: '#service-table',
-          swap: 'innerHTML'
+      const tableElement = document.getElementById("service-table");
+      if (tableElement && typeof htmx !== "undefined") {
+        const url =
+          tableElement.getAttribute("hx-get") ||
+          '{% url "containers:service_table" %}';
+        htmx.ajax("GET", url, {
+          target: "#service-table",
+          swap: "innerHTML",
         });
       }
     }
@@ -403,31 +565,31 @@
     function updateStatsFromTable() {
       let running = 0;
       let stopped = 0;
-      
+
       // Seleccionar solo las filas directas de la tabla
-      const rows = document.querySelectorAll('#service-table > tr');
-      
-      rows.forEach(row => {
+      const rows = document.querySelectorAll("#service-table > tr");
+
+      rows.forEach((row) => {
         // La columna de estado es la 5ª (índice 4) ahora: Proyecto, Nombre, Imagen, Puerto, Estado, Acciones
-        const statusCell = row.children[4]; 
+        const statusCell = row.children[4];
         if (!statusCell) return;
 
         // Buscar badges solo dentro de la celda de estado
-        const badge = statusCell.querySelector('.badge');
+        const badge = statusCell.querySelector(".badge");
         if (badge) {
           const text = badge.textContent.trim().toLowerCase();
-          if (text.includes('running')) {
+          if (text.includes("running")) {
             running++;
-          } else if (text.includes('stopped') || text.includes('exited')) {
+          } else if (text.includes("stopped") || text.includes("exited")) {
             stopped++;
           }
         }
       });
 
       // Actualizar DOM
-      const statRunning = document.getElementById('stat-running');
-      const statStopped = document.getElementById('stat-stopped');
-      
+      const statRunning = document.getElementById("stat-running");
+      const statStopped = document.getElementById("stat-stopped");
+
       if (statRunning) statRunning.textContent = running;
       if (statStopped) statStopped.textContent = stopped;
     }
@@ -436,17 +598,68 @@
     setInterval(refreshTable, 2000);
 
     // Al terminar cualquier request HTMX (tabla actualizada o acción botón)
-    document.body.addEventListener('htmx:afterOnLoad', (evt) => {
-       // Recalcular estadísticas inmediatamente
-       setTimeout(updateStatsFromTable, 100);
+    document.body.addEventListener("htmx:afterOnLoad", (evt) => {
+      // Recalcular estadísticas inmediatamente
+      setTimeout(updateStatsFromTable, 100);
     });
 
     // Detectar cambios de estado y forzar refresh inmediato de tabla
-    document.body.addEventListener('htmx:afterRequest', (evt) => {
+    document.body.addEventListener("htmx:afterRequest", (evt) => {
       const url = evt.detail.pathInfo.requestPath;
-      if (url.includes('/start/') || url.includes('/stop/') || url.includes('/remove/')) {
+      if (
+        url.includes("/start/") ||
+        url.includes("/stop/") ||
+        url.includes("/remove/")
+      ) {
         setTimeout(refreshTable, 200); // Refresh tabla rápido
       }
     });
+  });
+
+  // Filtrar proyectos por asignatura seleccionada
+  document.addEventListener('DOMContentLoaded', function() {
+    const subjectSelect = document.getElementById('service-subject');
+    const projectSelect = document.getElementById('service-project');
+    
+    if (subjectSelect && projectSelect) {
+      // Guardar todas las opciones de proyecto originales
+      const allProjectOptions = Array.from(projectSelect.options);
+      
+      subjectSelect.addEventListener('change', function() {
+        const selectedSubjectId = this.value;
+        
+        // Limpiar el select de proyectos
+        projectSelect.innerHTML = '';
+        
+        // Añadir opción por defecto
+        const defaultOption = document.createElement('option');
+        defaultOption.value = '';
+        defaultOption.disabled = true;
+        defaultOption.selected = true;
+        defaultOption.textContent = '📁 Selecciona un proyecto';
+        projectSelect.appendChild(defaultOption);
+        
+        // Filtrar y añadir solo los proyectos de la asignatura seleccionada
+        allProjectOptions.forEach(option => {
+          if (option.dataset.subjectId === selectedSubjectId) {
+            projectSelect.appendChild(option.cloneNode(true));
+          }
+        });
+        
+        // Si no hay proyectos para esta asignatura, mostrar mensaje
+        if (projectSelect.options.length === 1) {
+          const noProjectsOption = document.createElement('option');
+          noProjectsOption.value = '';
+          noProjectsOption.disabled = true;
+          noProjectsOption.textContent = '⚠️ No hay proyectos en esta asignatura';
+          projectSelect.appendChild(noProjectsOption);
+        }
+      });
+      
+      // Trigger inicial si hay asignatura pre-seleccionada
+      if (subjectSelect.value) {
+        subjectSelect.dispatchEvent(new Event('change'));
+      }
+    }
   });
 </script>

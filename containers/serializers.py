@@ -385,7 +385,85 @@ class ServiceSerializer(serializers.ModelSerializer):
         Si también los añadiéramos aquí, chocaría y lanzaría:
         TypeError: QuerySet.create() got multiple values for 'owner'
         """
+        # Mapear custom_port a assigned_port (para Dockerfile/DockerHub)
+        custom_port = validated_data.pop('custom_port', None)
+        if custom_port:
+            validated_data['assigned_port'] = custom_port
+        
+        # Si hay docker-compose, extraer todos los puertos
+        compose_file = validated_data.get('compose')
+        if compose_file and not custom_port:
+            ports = self._extract_all_ports_from_compose(compose_file)
+            if ports:
+                validated_data['assigned_ports'] = ports
+                # Por compatibilidad, guardar el primero en assigned_port
+                validated_data['assigned_port'] = ports[0]
+        
         return Service.objects.create(**validated_data)
+    
+    def _extract_all_ports_from_compose(self, compose_file):
+        """
+        Extrae todos los puertos host encontrados en el docker-compose.yml
+        Retorna la lista de puertos (enteros)
+        """
+        import yaml
+        
+        try:
+            # Leer y parsear el compose
+            compose_file.seek(0)
+            content = compose_file.read()
+            compose_file.seek(0)
+            
+            if isinstance(content, bytes):
+                content = content.decode('utf-8')
+            
+            compose_data = yaml.safe_load(content)
+            
+            if not compose_data or 'services' not in compose_data:
+                return []
+            
+            found_ports = []
+            
+            # Buscar puertos en cada servicio
+            for service_name, service_config in compose_data['services'].items():
+                if not isinstance(service_config, dict):
+                    continue
+                
+                ports = service_config.get('ports', [])
+                if not ports:
+                    continue
+                
+                # Obtener puertos de este servicio
+                for port_mapping in ports:
+                    if isinstance(port_mapping, str):
+                        # Formato: "8080:80" o "8080:80/tcp"
+                        parts = port_mapping.split(':')
+                        if len(parts) >= 2:
+                            host_port = parts[0].strip()
+                            # Remover protocolo si existe
+                            host_port = host_port.split('/')[0]
+                            try:
+                                found_ports.append(int(host_port))
+                            except ValueError:
+                                continue
+                    elif isinstance(port_mapping, (int, float)):
+                        # Formato simple: 8080 (se asume 8080:8080)
+                        found_ports.append(int(port_mapping))
+                    elif isinstance(port_mapping, dict):
+                        # Formato largo: {target: 80, published: 8080}
+                        published = port_mapping.get('published')
+                        if published:
+                            try:
+                                found_ports.append(int(published))
+                            except (ValueError, TypeError):
+                                continue
+            
+            # Eliminar duplicados manteniendo orden
+            return list(dict.fromkeys(found_ports))
+            
+        except Exception:
+            # En producción se manejaría con logging.error
+            return []
 
     def update(self, instance, validated_data):
         # Evitar que alguien cambie el owner

@@ -1,9 +1,10 @@
 # containers/views.py
 import json
+from django.db import models
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import FieldError
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils.html import escape
@@ -632,6 +633,110 @@ def verify_dockerhub_image(request):
         })
 
 
+@login_required
+def check_port_availability(request):
+    """
+    Verifica si un puerto está disponible y sugiere alternativas si está ocupado.
+    """
+    import random
+    from .models import Service
+    
+    port = request.GET.get('port', '').strip()
+    
+    if not port:
+        return JsonResponse({
+            'success': False,
+            'error': 'Por favor, ingresa un puerto'
+        })
+    
+    try:
+        port = int(port)
+        
+        # Validar rango
+        if port < 40000 or port > 50000:
+            return JsonResponse({
+                'success': False,
+                'error': 'El puerto debe estar entre 40000 y 50000'
+            })
+        
+        # 1. Puertos en Service (Contenedores simples y lista de puertos de compose)
+        services_with_ports = Service.objects.filter(models.Q(assigned_port__isnull=False) | models.Q(assigned_ports__isnull=False))
+        
+        # 2. Puertos en ServiceContainer (Docker Compose - Ejecutándose)
+        from .models import ServiceContainer, PortReservation
+        compose_running_ports = []
+        for sc in ServiceContainer.objects.filter(assigned_ports__isnull=False):
+            if isinstance(sc.assigned_ports, list):
+                for p_info in sc.assigned_ports:
+                    ext_port = p_info.get('external')
+                    if ext_port:
+                        compose_running_ports.append((f"{sc.service.name} ({sc.name})", int(ext_port)))
+        
+        # 3. Puertos en PortReservation (Reservas activas en Docker)
+        reserved_ports = list(PortReservation.objects.all().values_list('port', flat=True))
+        
+        # Consolidar todos los puertos en uso
+        used_ports_map = {} # port -> owner_name
+        for s in services_with_ports:
+            if s.assigned_port:
+                used_ports_map[int(s.assigned_port)] = s.name
+            if s.assigned_ports: # Lista de puertos del compose
+                for p in s.assigned_ports:
+                    used_ports_map[int(p)] = f"{s.name} (Compose)"
+        
+        for owner, p in compose_running_ports:
+            used_ports_map[int(p)] = owner
+        for p in reserved_ports:
+            if p not in used_ports_map:
+                used_ports_map[int(p)] = "Reserva activa"
+        
+        port_in_use = port in used_ports_map
+        
+        if not port_in_use:
+            return JsonResponse({
+                'success': True,
+                'available': True,
+                'port': port,
+                'message': f'✅ Puerto {port} disponible'
+            })
+        else:
+            # Puerto ocupado, generar 3 sugerencias aleatorias
+            # Usamos los puertos que ya calculamos en used_ports_map
+            all_used_ports = set(used_ports_map.keys())
+            
+            available_ports = [p for p in range(40000, 50001) if p not in all_used_ports]
+            
+            if len(available_ports) == 0:
+                return JsonResponse({
+                    'success': False,
+                    'available': False,
+                    'error': 'No hay puertos disponibles en el rango 40000-50000'
+                })
+            
+            # Seleccionar 3 puertos aleatorios disponibles
+            suggestions = random.sample(available_ports, min(3, len(available_ports)))
+            suggestions.sort()
+            
+            return JsonResponse({
+                'success': True,
+                'available': False,
+                'port': port,
+                'message': f'⚠️ Puerto {port} ya está en uso',
+                'suggestions': suggestions
+            })
+            
+    except ValueError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Puerto inválido'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error al verificar puerto: {str(e)}'
+        })
+
+
 # ------------------------------ HTML -------------------------------
 
 @login_required
@@ -983,11 +1088,18 @@ def new_service_page(request):
     # Capturar URL de retorno para redirigir correctamente después de crear servicio
     # Prioridad: 1) Query param 'return_url', 2) HTTP_REFERER, 3) student_panel por defecto
     return_url = request.GET.get('return_url')
+    selected_subject_id = None
+    
     if not return_url:
         referer = request.META.get('HTTP_REFERER', '')
         if 'subjects/' in referer:
-            # Si viene de una asignatura, extraer la URL
+            # Si viene de una asignatura, extraer la URL y el ID
             return_url = referer
+            # Extraer ID de asignatura de la URL (ej: /subjects/1/)
+            import re
+            match = re.search(r'/subjects/(\d+)/', referer)
+            if match:
+                selected_subject_id = int(match.group(1))
         else:
             # Por defecto, panel principal
             from django.urls import reverse
@@ -999,6 +1111,7 @@ def new_service_page(request):
         'user_projects': user_projects,
         'host': host,
         'return_url': return_url,  # Pasar URL de retorno al template
+        'selected_subject_id': selected_subject_id,  # ID de asignatura pre-seleccionada
     }
     
     return render(request, 'containers/new_service.html', context)
