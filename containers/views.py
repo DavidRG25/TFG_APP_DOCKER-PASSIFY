@@ -208,7 +208,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
             raise
 
         mode = (request.data.get("mode") or "default").lower()
-        if mode not in ("default", "custom"):
+        if mode not in ("default", "custom", "dockerhub"):
             mode = "default"
 
         custom_port = request.data.get("custom_port")
@@ -261,17 +261,26 @@ class ServiceViewSet(viewsets.ModelViewSet):
     def _validation_error_response(self, exc: ValidationError):
         """Devuelve un fragmento HTML con errores de validación para HTMX."""
         
-        # Construir mensaje de error simple
+        # Construir mensaje de error simple y legible
         if isinstance(exc.detail, dict):
             errors = []
             for field, messages in exc.detail.items():
-                text = ", ".join(messages) if isinstance(messages, (list, tuple)) else str(messages)
-                errors.append(f"{field}: {text}")
-            error_message = "\\n".join(errors)
+                # Extraer el mensaje limpio
+                if isinstance(messages, (list, tuple)):
+                    msg_text = ", ".join(str(m) for m in messages)
+                elif isinstance(messages, str):
+                    msg_text = messages
+                else:
+                    msg_text = str(messages)
+                
+                # Formatear el campo de forma legible
+                field_name = field.replace("_", " ").title()
+                errors.append(f"<strong>{field_name}:</strong> {msg_text}")
+            error_message = "<br>".join(errors)
         else:
             error_message = str(exc.detail)
         
-        # Usar HX-Trigger para disparar evento que muestre alert
+        # Usar HX-Trigger para disparar evento que muestre el error
         response = DRF_Response("", status=400)
         response["HX-Trigger"] = json.dumps({
             "showValidationError": error_message

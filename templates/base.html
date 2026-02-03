@@ -366,6 +366,10 @@
 <!-- Contenido principal -->
 <div id="content-wrapper">
     <div id="main-content">
+        <!-- Contenedor para alertas globales y toasts -->
+        <div id="global-alert-container" class="mb-4"></div>
+        <div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index: 9999"></div>
+
         {% block body %}
         <!-- Contenido especifico de cada pagina -->
         {% endblock %}

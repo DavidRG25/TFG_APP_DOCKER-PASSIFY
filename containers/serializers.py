@@ -42,6 +42,7 @@ class ServiceSerializer(serializers.ModelSerializer):
 
     # Extras de entrada
     custom_port = serializers.IntegerField(required=False, write_only=True)
+    mode = serializers.CharField(required=False, write_only=True, default="default")
     env_vars = serializers.JSONField(required=False)
     volumes = serializers.JSONField(required=False)
     internal_port = serializers.IntegerField(required=False, allow_null=True)
@@ -72,6 +73,7 @@ class ServiceSerializer(serializers.ModelSerializer):
             "status",
             "logs",
             "custom_port",
+            "mode",        # Añadido
             "env_vars",
             "volumes",
             "subject",
@@ -300,6 +302,7 @@ class ServiceSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         user = getattr(request, "user", None)
 
+        mode = attrs.get("mode", "default").lower()
         image = attrs.get("image")
         dockerfile = attrs.get("dockerfile")
         compose = attrs.get("compose")
@@ -313,12 +316,15 @@ class ServiceSerializer(serializers.ModelSerializer):
         has_code = bool(attrs.get("code"))
 
         # ---- Reglas de modo ----
-        # Custom: exactamente uno entre dockerfile / compose
-        if has_dockerfile or has_compose:
-            # No permitir imagen en custom
+        if mode == "custom":
+            # Modo Custom: exactamente uno entre dockerfile / compose
             if has_image:
                 raise serializers.ValidationError(
                     {"image": _("No debe indicar imagen cuando usa Dockerfile o docker-compose.")}
+                )
+            if not (has_dockerfile or has_compose):
+                raise serializers.ValidationError(
+                    {"mode": _("El modo 'custom' requiere subir un Dockerfile o un docker-compose.yml.")}
                 )
             if has_dockerfile and has_compose:
                 raise serializers.ValidationError(
@@ -326,20 +332,73 @@ class ServiceSerializer(serializers.ModelSerializer):
                 )
             if not has_code:
                 raise serializers.ValidationError(
-                    {"code": "Debes adjuntar un archivo .zip o .rar con el codigo fuente."}
+                    {"code": "Debes adjuntar un archivo .zip o .rar con el código fuente."}
                 )
+        
+        elif mode == "dockerhub":
+            # Modo DockerHub: permite imágenes externas
+            if not has_image:
+                raise serializers.ValidationError(
+                    {"image": _("Debe indicar el nombre de la imagen de DockerHub.")}
+                )
+            if has_dockerfile or has_compose:
+                raise serializers.ValidationError(
+                    {"mode": _("El modo DockerHub no permite subir Dockerfile o compose.")}
+                )
+            # Validación básica del nombre de imagen (nombre:tag)
+            if ":" not in image:
+                attrs["image"] = f"{image}:latest"
+                image = attrs["image"]
+            
+            # VALIDACIÓN OBLIGATORIA: Verificar que la imagen existe en DockerHub
+            import requests
+            try:
+                parts = image.split(':')
+                repo = parts[0]
+                tag = parts[1] if len(parts) > 1 else 'latest'
+                
+                # Construir URL de la API de DockerHub
+                if '/' in repo:
+                    url = f'https://hub.docker.com/v2/repositories/{repo}/tags/{tag}'
+                else:
+                    url = f'https://hub.docker.com/v2/repositories/library/{repo}/tags/{tag}'
+                
+                response = requests.get(url, timeout=10)
+                
+                if response.status_code == 404:
+                    raise serializers.ValidationError(
+                        {"image": f"La imagen '{image}' no existe en DockerHub. Verifica el nombre y el tag."}
+                    )
+                elif response.status_code != 200:
+                    raise serializers.ValidationError(
+                        {"image": f"Error al verificar la imagen en DockerHub (código {response.status_code}). Intenta de nuevo."}
+                    )
+            except requests.exceptions.Timeout:
+                raise serializers.ValidationError(
+                    {"image": "Timeout al consultar DockerHub. Verifica tu conexión e intenta de nuevo."}
+                )
+            except requests.exceptions.RequestException as e:
+                raise serializers.ValidationError(
+                    {"image": f"Error de conexión al verificar la imagen: {str(e)}"}
+                )
+        
+        
         else:
-            # Catálogo: requiere image
+            # Modo Catálogo (default): requiere imagen del catálogo
             if not has_image:
                 raise serializers.ValidationError(
                     {"image": _("Debe seleccionar una imagen del catálogo o aportar Dockerfile/compose.")}
                 )
+            
             # Validar AllowedImage SOLO en modo catálogo
-            name, tag = image.split(":")
-            if not AllowedImage.objects.filter(name=name, tag=tag).exists():
-                raise serializers.ValidationError(
-                    {"image": _("Imagen no permitida. Seleccione una del catálogo disponible.")}
-                )
+            try:
+                img_name, img_tag = image.split(":")
+                if not AllowedImage.objects.filter(name=img_name, tag=img_tag).exists():
+                    raise serializers.ValidationError(
+                        {"image": _("Imagen no permitida en el catálogo. Use el modo DockerHub para imágenes externas.")}
+                    )
+            except ValueError:
+                raise serializers.ValidationError({"image": "Formato de imagen inválido (nombre:tag)."})
 
         # ---- Subject: si se indica, el usuario debe tener permiso ----
         # - Si el usuario está en el grupo 'teacher/profesor' y es el teacher de la asignatura, OK.
@@ -387,6 +446,7 @@ class ServiceSerializer(serializers.ModelSerializer):
         """
         # Mapear custom_port a assigned_port (para Dockerfile/DockerHub)
         custom_port = validated_data.pop('custom_port', None)
+        validated_data.pop('mode', None)  # Extraer modo antes de crear el objeto
         if custom_port:
             validated_data['assigned_port'] = custom_port
         
