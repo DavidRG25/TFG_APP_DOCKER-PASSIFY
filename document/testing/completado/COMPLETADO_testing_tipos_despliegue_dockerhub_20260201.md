@@ -1,8 +1,9 @@
 # Plan de Testing - Tipos de Despliegue y Verificación DockerHub
 
-**Fecha**: 02/02/2026  
+**Fecha Inicio**: 02/02/2026  
+**Fecha Finalización**: 03/02/2026  
 **Tipo**: Testing de UI - Refactorización Tipos de Despliegue  
-**Estado**: PENDIENTE
+**Estado**: ✅ COMPLETADO
 
 ---
 
@@ -146,10 +147,10 @@ Este documento cubre el testing de las mejoras implementadas en el sistema de cr
 
 **Verificar**:
 
-- [ ] Mensaje de éxito
-- [ ] Muestra información de la imagen
-- [ ] **Puerto detectado: 5432**
-- [ ] Botón "Usar este puerto" funciona
+- [SI] Mensaje de éxito
+- [SI] Muestra información de la imagen
+- [SI] **Puerto detectado: 5432**
+- [SI] Botón "Usar este puerto" funciona
 
 **Resultado Esperado**: ✅ Verificación exitosa para imagen de usuario
 
@@ -168,10 +169,10 @@ Este documento cubre el testing de las mejoras implementadas en el sistema de cr
 
 **Verificar**:
 
-- [ ] Mensaje de error: "❌ Imagen no encontrada en DockerHub"
-- [ ] Mensaje claro indicando verificar nombre y tag
-- [ ] No se muestra información de puerto
-- [ ] Botón vuelve a estado normal
+- [SI] Mensaje de error: "❌ Imagen no encontrada en DockerHub"
+- [SI] Mensaje claro indicando verificar nombre y tag
+- [SI] No se muestra información de puerto
+- [SI] Botón vuelve a estado normal
 
 **Resultado Esperado**: ✅ Error manejado correctamente
 
@@ -189,9 +190,9 @@ Este documento cubre el testing de las mejoras implementadas en el sistema de cr
 
 **Verificar**:
 
-- [ ] Mensaje de advertencia: "Por favor, ingresa un nombre de imagen"
-- [ ] No se hace petición al servidor
-- [ ] Feedback amarillo (warning)
+- [SI] Mensaje de advertencia: "Por favor, ingresa un nombre de imagen"
+- [SI] No se hace petición al servidor
+- [SI] Feedback amarillo (warning)
 
 **Resultado Esperado**: ✅ Validación de campo vacío funciona
 
@@ -218,11 +219,11 @@ Este documento cubre el testing de las mejoras implementadas en el sistema de cr
 
 **Verificar**:
 
-- [ ] nginx → 80
-- [ ] postgres → 5432
-- [ ] mysql → 3306
-- [ ] redis → 6379
-- [ ] mongodb → 27017
+- [SI] nginx → 80
+- [SI] postgres → 5432
+- [SI] mysql → 3306
+- [SI] redis → 6379
+- [SI] mongodb → 27017
 
 **Resultado Esperado**: ✅ Todos los puertos detectados correctamente
 
@@ -240,9 +241,9 @@ Este documento cubre el testing de las mejoras implementadas en el sistema de cr
 
 **Verificar**:
 
-- [ ] Campo "Puerto interno" se rellena con `80`
-- [ ] Valor visible en el input
-- [ ] Campo queda editable por si el usuario quiere cambiarlo
+- [SI] Campo "Puerto interno" se rellena con `80`
+- [SI] Valor visible en el input
+- [SI] Campo queda editable por si el usuario quiere cambiarlo
 
 **Resultado Esperado**: ✅ Auto-completado de puerto funciona
 
@@ -260,11 +261,53 @@ Este documento cubre el testing de las mejoras implementadas en el sistema de cr
 
 **Verificar**:
 
-- [ ] Campo de texto se vacía
-- [ ] Feedback de verificación desaparece
-- [ ] Campo queda limpio para nueva entrada
+- [SI] Campo de texto se vacía
+- [SI] Feedback de verificación desaparece
+- [SI] Campo queda limpio para nueva entrada
 
 **Resultado Esperado**: ✅ Botón limpiar funciona correctamente
+
+---
+
+### **Test 2.8: Creación Completa de Servicio con DockerHub**
+
+**Objetivo**: Verificar el flujo completo de creación de un servicio usando una imagen de DockerHub
+
+**Pasos**:
+
+1. Seleccionar modo "Imagen desde DockerHub"
+2. Escribir `nginx:latest` en el campo
+3. Click en "Verificar" (debe mostrar éxito y puerto 80)
+4. Click en "Usar este puerto" (rellena puerto interno con 80)
+5. Ingresar un puerto personalizado válido (ej: 49123)
+6. Click en "Verificar disponibilidad" del puerto
+7. Rellenar:
+   - **Nombre**: `test-dockerhub-nginx`
+   - **Asignatura**: Seleccionar una disponible
+   - **Proyecto**: Seleccionar uno disponible
+8. Click en "Crear Servicio"
+
+**Verificar**:
+
+- [SI] No aparece error de validación "Debe seleccionar una imagen del catálogo"
+- [SI] El servicio se crea correctamente
+- [SI] Se muestra mensaje de éxito
+- [SI] Redirección al panel de servicios
+- [SI] El servicio aparece en la lista con estado "running" o "creating"
+- [SI] El contenedor Docker se crea con la imagen `nginx:latest`
+- [SI] El puerto asignado es el 49123 (o el que hayas elegido)
+
+**Datos de Prueba**:
+
+```
+Modo: DockerHub
+Imagen: nginx:latest
+Puerto interno: 80
+Puerto personalizado: 49123
+Nombre: test-dockerhub-nginx
+```
+
+**Resultado Esperado**: ✅ Servicio creado exitosamente desde imagen de DockerHub
 
 ---
 
@@ -284,9 +327,9 @@ Este documento cubre el testing de las mejoras implementadas en el sistema de cr
 
 **Verificar**:
 
-- [ ] Al subir Dockerfile → Compose se OCULTA
-- [ ] Al limpiar Dockerfile → Compose REAPARECE
-- [ ] Código fuente siempre visible (opcional)
+- [SI] Al subir Dockerfile → Compose se OCULTA
+- [SI] Al limpiar Dockerfile → Compose REAPARECE
+- [SI] Código fuente siempre visible (opcional)
 
 **Resultado Esperado**: ✅ Exclusión Dockerfile/Compose funciona
 
@@ -306,9 +349,9 @@ Este documento cubre el testing de las mejoras implementadas en el sistema de cr
 
 **Verificar**:
 
-- [ ] Al subir Compose → Dockerfile se OCULTA
-- [ ] Al limpiar Compose → Dockerfile REAPARECE
-- [ ] Código fuente siempre visible (opcional)
+- [SI] Al subir Compose → Dockerfile se OCULTA
+- [SI] Al limpiar Compose → Dockerfile REAPARECE
+- [SI] Código fuente siempre visible (opcional)
 
 **Resultado Esperado**: ✅ Exclusión Compose/Dockerfile funciona
 
@@ -322,13 +365,13 @@ Este documento cubre el testing de las mejoras implementadas en el sistema de cr
 
 **Aspectos a verificar**:
 
-- [ ] Grid de 3 columnas para tipos de despliegue (col-md-4)
-- [ ] Cards con bordes visibles en campos de archivo
-- [ ] Botones con colores apropiados (azul Verificar, rojo Limpiar)
-- [ ] Iconos visibles y bien espaciados
-- [ ] Warnings con borde amarillo destacado
-- [ ] Inputs con tamaño `form-control-lg`
-- [ ] Fuente monospace en campo DockerHub
+- [SI] Grid de 3 columnas para tipos de despliegue (col-md-4)
+- [SI] Cards con bordes visibles en campos de archivo
+- [SI] Botones con colores apropiados (azul Verificar, rojo Limpiar)
+- [SI] Iconos visibles y bien espaciados
+- [SI] Warnings con borde amarillo destacado
+- [SI] Inputs con tamaño `form-control-lg`
+- [SI] Fuente monospace en campo DockerHub
 
 **Resultado Esperado**: ✅ Diseño limpio y profesional
 
@@ -346,10 +389,10 @@ Este documento cubre el testing de las mejoras implementadas en el sistema de cr
 
 **Verificar**:
 
-- [ ] Desktop (>1200px): Grid de 3 columnas
-- [ ] Tablet (768-1200px): Grid adaptado
-- [ ] Mobile (<768px): Columnas apiladas
-- [ ] Todos los elementos visibles y accesibles
+- [SI] Desktop (>1200px): Grid de 3 columnas
+- [SI] Tablet (768-1200px): Grid adaptado
+- [SI] Mobile (<768px): Columnas apiladas
+- [SI] Todos los elementos visibles y accesibles
 
 **Resultado Esperado**: ✅ Interfaz responsive funciona correctamente
 
@@ -367,10 +410,10 @@ Este documento cubre el testing de las mejoras implementadas en el sistema de cr
 
 **Verificar**:
 
-- [ ] Mensaje de error claro
-- [ ] No se rompe la aplicación
-- [ ] Botón vuelve a estado normal
-- [ ] Usuario puede reintentar
+- [SI] Mensaje de error claro
+- [SI] No se rompe la aplicación
+- [SI] Botón vuelve a estado normal
+- [SI] Usuario puede reintentar
 
 **Resultado Esperado**: ✅ Errores de red manejados correctamente
 
@@ -399,24 +442,24 @@ Este documento cubre el testing de las mejoras implementadas en el sistema de cr
 
 ### **Funcionalidad**:
 
-- [ ] Los 3 tipos de despliegue funcionan correctamente
-- [ ] Verificación de DockerHub funciona
-- [ ] Detección de puertos funciona
-- [ ] Exclusión de campos funciona
-- [ ] Botones "Verificar" y "Limpiar" funcionan
+- [SI] Los 3 tipos de despliegue funcionan correctamente
+- [SI] Verificación de DockerHub funciona
+- [SI] Detección de puertos funciona
+- [SI] Exclusión de campos funciona
+- [SI] Botones "Verificar" y "Limpiar" funcionan
 
 ### **UI/UX**:
 
-- [ ] Diseño limpio y profesional
-- [ ] Responsive en diferentes tamaños
-- [ ] Transiciones suaves
-- [ ] Mensajes de error claros
+- [SI] Diseño limpio y profesional
+- [SI] Responsive en diferentes tamaños
+- [SI] Transiciones suaves
+- [SI] Mensajes de error claros
 
 ### **Seguridad**:
 
-- [ ] Solo imágenes públicas (warning visible)
-- [ ] Validación de entrada
-- [ ] Manejo de errores robusto
+- [SI] Solo imágenes públicas (warning visible)
+- [SI] Validación de entrada
+- [SI] Manejo de errores robusto
 
 ---
 
@@ -474,6 +517,70 @@ Este documento cubre el testing de las mejoras implementadas en el sistema de cr
 
 ---
 
-**Última actualización**: 2026-02-02  
-**Estado**: PENDIENTE  
-**Próximo paso**: Ejecutar todos los tests y documentar resultados
+## 📊 RESUMEN DE RESULTADOS
+
+### **Estadísticas de Testing**:
+
+- **Total de tests ejecutados**: 15
+- **Tests pasados**: 15 ✅
+- **Tests fallados**: 0 ❌
+- **Tasa de éxito**: 100%
+
+### **Bugs Encontrados y Solucionados**:
+
+#### **Bug #1: Validación de Imagen DockerHub**
+
+- **Descripción**: El sistema permitía crear servicios con imágenes de DockerHub que no existían, causando errores en tiempo de ejecución.
+- **Solución**: Implementada validación obligatoria en el backend (`containers/serializers.py`) que verifica la existencia de la imagen en DockerHub antes de crear el servicio.
+- **Estado**: ✅ SOLUCIONADO
+
+#### **Bug #2: Conflicto de Nombres de Campos**
+
+- **Descripción**: El campo de imagen del catálogo y el campo de DockerHub tenían el mismo nombre `image`, causando conflictos en el envío del formulario.
+- **Solución**: Actualizada la lógica JavaScript para deshabilitar el campo no activo según el modo seleccionado, asegurando que solo se envíe un valor.
+- **Estado**: ✅ SOLUCIONADO
+
+### **Mejoras Implementadas Durante el Testing**:
+
+1. **Nota Informativa de Puerto Interno**: Añadida nota que indica que el puerto por defecto es 80 si no se especifica ninguno.
+2. **Mejora Visual de Radio Buttons**: Implementado diseño moderno con cards resaltadas en lugar de radio buttons tradicionales.
+3. **Validación Automática de Imágenes**: Sistema ahora valida automáticamente que las imágenes de DockerHub existen antes de crear el servicio.
+
+---
+
+## 📝 ARCHIVOS MODIFICADOS
+
+### **Backend**:
+
+- `containers/serializers.py` - Validación de imágenes DockerHub
+- `containers/views.py` - Vista `verify_dockerhub_image` y soporte para modo DockerHub
+- `containers/urls.py` - Nueva ruta `/verify-dockerhub/`
+
+### **Frontend**:
+
+- `templates/containers/new_service.html` - Refactorización tipos de despliegue y mejoras visuales
+- `templates/containers/_partials/panels/_scripts.html` - Funciones JS actualizadas para modo DockerHub
+
+---
+
+## 🔗 REFERENCIAS
+
+**Documentos relacionados**:
+
+- Implementación: `implementacion_mejoras_ui_configuracion_personalizada_20260201.md`
+- Mejora futura: `mejora_dockerhub_api_auth_global.md`
+- Mejora futura: `mejora_dockerhub_imagenes_privadas.md`
+
+**Código fuente**:
+
+- Vista verificación: `containers/views.py` (función `verify_dockerhub_image`)
+- Serializer: `containers/serializers.py` (validación modo DockerHub)
+- JavaScript: `templates/containers/_partials/panels/_scripts.html`
+- Template: `templates/containers/new_service.html`
+
+---
+
+**Fecha de Inicio**: 2026-02-02  
+**Fecha de Finalización**: 2026-02-03  
+**Estado**: ✅ COMPLETADO  
+**Resultado**: Todos los tests pasados exitosamente. Sistema listo para producción.

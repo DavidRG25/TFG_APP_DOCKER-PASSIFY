@@ -81,32 +81,64 @@
 
   // Listener para errores de validación
   document.body.addEventListener("showValidationError", (evt) => {
-    // Extraer mensaje (HTMX a veces lo mete en detail.value)
-    let message = evt.detail;
-    if (evt.detail && typeof evt.detail === "object") {
-      message = evt.detail.value || JSON.stringify(evt.detail);
+    // Extraer mensaje correctamente del evento HTMX
+    let message = "";
+    
+    if (evt.detail) {
+      // HTMX envía el mensaje en evt.detail directamente cuando es un string
+      if (typeof evt.detail === "string") {
+        message = evt.detail;
+      }
+      // O en evt.detail.showValidationError cuando viene del HX-Trigger
+      else if (evt.detail.showValidationError) {
+        message = evt.detail.showValidationError;
+      }
+      // O en evt.detail.value
+      else if (evt.detail.value) {
+        message = evt.detail.value;
+      }
+      // Último recurso
+      else {
+        message = JSON.stringify(evt.detail);
+      }
     }
-    if (!message) message = "Error desconocido";
+    
+    if (!message || message === "{}") {
+      message = "Error desconocido al crear el servicio";
+    }
 
-    // Buscar el contenedor en el modal
-    const errorContainer = document.getElementById("modal-form-errors");
+    // Buscar el contenedor en el modal (si existe)
+    const modalErrorContainer = document.getElementById("modal-form-errors");
+    // Buscar el contenedor en la página
+    const pageErrorContainer = document.getElementById("form-errors");
 
-    if (errorContainer) {
-      // Mostrar alerta bonita dentro del modal
-      errorContainer.innerHTML = `
-            <div class="alert alert-danger alert-dismissible fade show mb-2" role="alert">
-                <div class="d-flex align-items-center">
-                    <i class="bi bi-exclamation-triangle-fill text-danger fs-4 me-2"></i>
-                    <div>
-                        <strong>No se pudo crear el servicio:</strong><br>
-                        ${String(message).replace(/\\n/g, "<br>").replace(/\n/g, "<br>")}
-                    </div>
-                </div>
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    const errorHTML = `
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <div class="d-flex align-items-start">
+          <i class="fas fa-exclamation-triangle fs-4 me-3 mt-1" style="color: #dc3545;"></i>
+          <div class="flex-grow-1">
+            <strong class="d-block mb-1">❌ No se pudo crear el servicio</strong>
+            <div class="small">
+              ${message}
             </div>
-        `;
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    `;
+
+    if (modalErrorContainer) {
+      // Mostrar en el modal si existe
+      modalErrorContainer.innerHTML = errorHTML;
+      modalErrorContainer.style.display = "block";
+    } else if (pageErrorContainer) {
+      // Mostrar en la página
+      pageErrorContainer.innerHTML = errorHTML;
+      pageErrorContainer.style.display = "block";
+      // Hacer scroll al error
+      pageErrorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
     } else {
-      // Fallback a alert si no existe el contenedor
+      // Fallback a alert solo si no existe ningún contenedor
       alert("❌ Error de Validación\n\n" + message);
     }
   });
@@ -140,10 +172,14 @@
     showToast(`Error (${status}): ${msg}`, "text-bg-danger");
   });
 
-  function applyMode() {
+    function applyMode() {
     const mode =
       document.querySelector('input[name="mode"]:checked')?.value || "default";
-    const imgSel = document.querySelector('select[name="image"]');
+    
+    // Buscar elementos por ID para mayor precisión
+    const imgSel = document.getElementById("service-image");
+    const dockerhubInput = document.getElementById("service-dockerhub");
+    
     const dockerfile = document.querySelector('input[name="dockerfile"]');
     const compose = document.querySelector('input[name="compose"]');
     const code = document.querySelector('input[name="code"]');
@@ -151,21 +187,19 @@
     const customPort = document.querySelector('input[name="custom_port"]');
 
     // Obtener los contenedores de los campos
-    const imageContainer = imgSel?.closest(".mb-3");
+    const imageContainer = document.getElementById("block-default-image");
     const customBlocks = document.querySelectorAll(".custom-block");
     const dockerhubBlock = document.getElementById("block-dockerhub-mode");
-    const dockerhubInput = document.querySelector(
-      'input[name="dockerhub_image"]',
-    );
 
     if (mode === "default") {
       // Modo default: Mostrar imagen del catálogo
       if (imageContainer) imageContainer.style.display = "block";
       if (dockerhubBlock) dockerhubBlock.style.display = "none";
-      imgSel.disabled = false;
+      
+      if (imgSel) imgSel.disabled = false;
       if (dockerhubInput) {
         dockerhubInput.disabled = true;
-        dockerhubInput.value = "";
+        dockerhubInput.removeAttribute('required'); // No obligatorio en modo default
       }
 
       // Limpiar feedback de DockerHub
@@ -175,12 +209,6 @@
         dockerhubFeedback.style.display = "none";
       }
 
-      // Limpiar puerto personalizado y su feedback
-      clearCustomPort();
-      
-      // Limpiar puerto interno
-      if (internalPort) internalPort.value = "";
-
       customBlocks.forEach((b) => {
         b.style.display = "none";
       });
@@ -191,28 +219,16 @@
         input.value = "";
         input.dispatchEvent(new Event("change"));
       });
-
-      // IMPORTANTE: Los puertos SIEMPRE deben estar habilitados
-      if (internalPort) {
-        internalPort.disabled = false;
-      }
-      if (customPort) {
-        customPort.disabled = false;
-      }
     } else if (mode === "dockerhub") {
       // Modo DockerHub: Mostrar solo campo de DockerHub
       if (imageContainer) imageContainer.style.display = "none";
       if (dockerhubBlock) dockerhubBlock.style.display = "block";
-      imgSel.disabled = true;
+      
+      if (imgSel) imgSel.disabled = true;
       if (dockerhubInput) {
         dockerhubInput.disabled = false;
+        dockerhubInput.required = true; // Hacer obligatorio en modo DockerHub
       }
-
-      // Limpiar puerto personalizado y su feedback
-      clearCustomPort();
-      
-      // Limpiar puerto interno
-      if (internalPort) internalPort.value = "";
 
       customBlocks.forEach((b) => {
         b.style.display = "none";
@@ -224,36 +240,23 @@
         input.value = "";
         input.dispatchEvent(new Event("change"));
       });
-
-      // IMPORTANTE: Los puertos SIEMPRE deben estar habilitados
-      if (internalPort) {
-        internalPort.disabled = false;
-      }
-      if (customPort) {
-        customPort.disabled = false;
-      }
     } else {
       // Modo custom: Mostrar Dockerfile/Compose/Código
       if (imageContainer) imageContainer.style.display = "none";
       if (dockerhubBlock) dockerhubBlock.style.display = "none";
-      imgSel.disabled = true;
+      
+      if (imgSel) imgSel.disabled = true;
       if (dockerhubInput) {
         dockerhubInput.disabled = true;
-        dockerhubInput.value = "";
+        dockerhubInput.removeAttribute('required'); // No obligatorio en modo custom
       }
 
       // Limpiar feedback de DockerHub
-      const dockerhubFeedback = document.getElementById('dockerhub-feedback');
+      const dockerhubFeedback = document.getElementById("dockerhub-feedback");
       if (dockerhubFeedback) {
-        dockerhubFeedback.innerHTML = '';
-        dockerhubFeedback.style.display = 'none';
+        dockerhubFeedback.innerHTML = "";
+        dockerhubFeedback.style.display = "none";
       }
-
-      // Limpiar puerto personalizado y su feedback
-      clearCustomPort();
-      
-      // Limpiar puerto interno
-      if (internalPort) internalPort.value = "";
 
       customBlocks.forEach((b) => {
         b.style.display = "block";
@@ -262,15 +265,12 @@
       [dockerfile, compose, code].forEach((input) => {
         if (input) input.disabled = false;
       });
-
-      // IMPORTANTE: Los puertos SIEMPRE deben estar habilitados
-      if (internalPort) {
-        internalPort.disabled = false;
-      }
-      if (customPort) {
-        customPort.disabled = false;
-      }
     }
+    
+    // IMPORTANTE: Los puertos SIEMPRE deben estar habilitados si el modo lo permite
+    if (internalPort) internalPort.disabled = false;
+    if (customPort) customPort.disabled = false;
+    
     syncExclusion();
   }
 
@@ -547,6 +547,27 @@
     );
     popoverTriggerList.forEach((el) => new bootstrap.Popover(el));
 
+    // BUGFIX: Copiar dockerhub_image a image antes de enviar el formulario
+    const form = document.getElementById('newServiceForm');
+    if (form) {
+      form.addEventListener('submit', function(e) {
+        const mode = document.querySelector('input[name=\"mode\"]:checked')?.value;
+        if (mode === 'dockerhub') {
+          const dockerhubInput = document.querySelector('input[name=\"dockerhub_image\"]');
+          const imageSelect = document.querySelector('select[name=\"image\"]');
+          
+          if (dockerhubInput && imageSelect && dockerhubInput.value.trim()) {
+            // Crear una opci�n temporal con el valor de DockerHub
+            const tempOption = document.createElement('option');
+            tempOption.value = dockerhubInput.value.trim();
+            tempOption.selected = true;
+            imageSelect.appendChild(tempOption);
+            imageSelect.disabled = false; // Habilitar temporalmente para que se env�e
+          }
+        }
+      });
+    }
+
     // Función para refrescar la tabla
     function refreshTable() {
       const tableElement = document.getElementById("service-table");
@@ -660,6 +681,39 @@
       if (subjectSelect.value) {
         subjectSelect.dispatchEvent(new Event('change'));
       }
+    }
+
+    // Detectar si venimos de crear un servicio para mostrar un BANNER de éxito prominente
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('created')) {
+      const alertContainer = document.getElementById('global-alert-container');
+      if (alertContainer) {
+        const banner = document.createElement('div');
+        banner.className = 'alert alert-success border-0 shadow-sm d-flex align-items-center show fade';
+        banner.style.borderLeft = '5px solid #1cc88a';
+        banner.innerHTML = `
+          <div class="d-flex align-items-center w-100 p-2">
+            <div class="bg-success rounded-circle p-2 me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+              <i class="fas fa-check text-white"></i>
+            </div>
+            <div>
+              <h5 class="mb-1 fw-bold text-success">¡Servicio Creado!</h5>
+              <p class="mb-0 text-dark">El servicio se ha creado correctamente y se está iniciando en segundo plano.</p>
+            </div>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        `;
+        alertContainer.appendChild(banner);
+        
+        // Quitarlo automáticamente después de 3 segundos
+        setTimeout(() => {
+          const bsAlert = new bootstrap.Alert(banner);
+          bsAlert.close();
+        }, 3000);
+      }
+      
+      // Limpiar la URL para que no vuelva a salir el mensaje al recargar
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
     }
   });
 </script>

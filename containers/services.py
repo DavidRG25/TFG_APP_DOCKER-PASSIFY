@@ -49,10 +49,86 @@ def ensure_service_workspace(service: Service) -> Path:
 
 
 def cleanup_service_workspace(service: Service) -> None:
-    """Elimina completamente el workspace del servicio"""
-    workspace = SERVICE_WORKSPACES_ROOT / str(service.pk)
+    """Elimina completamente el workspace y cualquier rastro del servicio en media/"""
+    import time
+    import stat
+    import os
+    import shutil
+    from pathlib import Path
+    from django.conf import settings
+    from django.db import models
+
+    sid = str(service.id)
+    try:
+        media_path = Path(settings.MEDIA_ROOT)
+        
+        # 1. Barredora de directorios de carga (dockerfiles, compose_files, user_code)
+        for subdir in ["dockerfiles", "compose_files", "user_code"]:
+            base_dir = media_path / subdir
+            if not base_dir.exists(): continue
+            
+            # A. Borrar carpeta services/<id> si existe
+            path_id = base_dir / "services" / sid
+            if path_id.exists():
+                for attempt in range(3):
+                    try:
+                        if os.name == 'nt':
+                            for root, dirs, files in os.walk(path_id):
+                                for d in dirs:
+                                    try: os.chmod(os.path.join(root, d), stat.S_IRWXU)
+                                    except: pass
+                                for f in files:
+                                    try: os.chmod(os.path.join(root, f), stat.S_IRWXU)
+                                    except: pass
+                        shutil.rmtree(path_id)
+                        break
+                    except:
+                        time.sleep(1)
+
+            # B. Limpiar archivos huérfanos (los que Django renombra con sufijos aleatorios)
+            for item in base_dir.iterdir():
+                if item.is_file():
+                    iname = item.name.lower()
+                    is_huerfano = False
+                    
+                    # Pattern matching: si lleva el ID o es un nombre genérico
+                    if f"_{sid}" in iname:
+                        is_huerfano = True
+                    elif any(iname.startswith(p) for p in ["docker-compose", "dockerfile", "source"]):
+                        # Verificación de match EXACTO en base de datos
+                        django_rel_path = f"{subdir}/{item.name}"
+                        from containers.models import Service as SModel
+                        if not SModel.objects.filter(
+                            models.Q(compose=django_rel_path) | 
+                            models.Q(code=django_rel_path) | 
+                            models.Q(dockerfile=django_rel_path)
+                        ).exclude(id=service.id).exists():
+                            is_huerfano = True
+                    
+                    if is_huerfano:
+                        try: item.unlink()
+                        except: pass
+    except Exception:
+        pass
+
+    # 2. Limpiar el workspace principal (media/services/<id>)
+    workspace = SERVICE_WORKSPACES_ROOT / sid
     if workspace.exists():
-        shutil.rmtree(workspace, ignore_errors=True)
+        for attempt in range(3):
+            try:
+                if os.name == 'nt':
+                    for root, dirs, files in os.walk(workspace):
+                        for d in dirs:
+                            try: os.chmod(os.path.join(root, d), stat.S_IRWXU)
+                            except: pass
+                        for f in files:
+                            try: os.chmod(os.path.join(root, f), stat.S_IRWXU)
+                            except: pass
+                shutil.rmtree(workspace)
+                break
+            except:
+                if attempt < 2: time.sleep(1)
+                else: shutil.rmtree(workspace, ignore_errors=True)
 
 
 def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> Path:

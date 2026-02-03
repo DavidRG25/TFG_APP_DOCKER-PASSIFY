@@ -17,18 +17,18 @@
 1. Acceder al panel de servicios (`/paasify/containers/`)
 2. Hacer clic en botón "Nuevo servicio"
 3. **Verificar**:
-   - [x] Redirige a `/paasify/containers/new/`
-   - [x] Página carga sin errores
-   - [x] Se muestran breadcrumbs: Inicio > Servicios > Nuevo Servicio
-   - [x] Se muestra header con título "Crear Nuevo Servicio"
-   - [x] Se muestra formulario en columna izquierda
-   - [x] Se muestra ayuda contextual en columna derecha
+   - [SI] Redirige a `/paasify/containers/new/`
+   - [SI] Página carga sin errores
+   - [SI] Se muestran breadcrumbs: Inicio > Servicios > Nuevo Servicio
+   - [SI] Se muestra header con título "Crear Nuevo Servicio"
+   - [SI] Se muestra formulario en columna izquierda
+   - [SI] Se muestra ayuda contextual en columna derecha
 4. Hacer clic en breadcrumb "Inicio"
 5. **Verificar**:
-   - [x] Redirige correctamente al panel principal
+   - [SI] Redirige correctamente al panel principal
 6. Hacer clic en botón "Cancelar"
 7. **Verificar**:
-   - [x] Redirige correctamente al panel principal
+   - [SI] Redirige correctamente al panel principal
 
 **Resultado Esperado**: ✅ Navegación funciona correctamente
 
@@ -43,7 +43,7 @@
 1. Acceder a `/paasify/containers/new/`
 2. Intentar enviar formulario vacío
 3. **Verificar**:
-   - [ ] Muestra error "Campo requerido" en nombre
+   - [SI] Muestra error "Campo requerido" en nombre
    - [ ] Muestra error "Campo requerido" en proyecto
    - [ ] NO permite enviar formulario
 4. Ingresar nombre con espacios: "mi servicio"
@@ -64,6 +64,36 @@
 
 ---
 
+### **Test 2.1: Mensajes de Error Mejorados**
+
+**Objetivo**: Verificar que los errores se muestran de forma elegante sin modals básicos
+
+**Pasos**:
+
+1. Acceder a `/paasify/containers/new/`
+2. Seleccionar modo "Imagen desde DockerHub"
+3. Escribir una imagen que NO existe: `imagen-inexistente-12345:latest`
+4. Click en "Crear Servicio" (sin verificar primero)
+5. **Verificar**:
+   - [SI] NO aparece alert() básico de JavaScript
+   - [SI] Aparece mensaje de error en el área de feedback del campo
+   - [SI] Error muestra icono de advertencia (⚠️)
+   - [SI] Mensaje es claro: "La imagen 'imagen-inexistente-12345:latest' no existe en DockerHub"
+   - [SI] Scroll automático al mensaje de error
+   - [SI] Botón de cerrar (X) funciona
+6. Cerrar el mensaje de error
+7. Corregir la imagen a `nginx:latest`
+8. Click en "Crear Servicio"
+9. **Verificar**:
+   - [SI] Muestra loading: "Verificando imagen en DockerHub..."
+   - [SI] Muestra éxito: "Imagen verificada. Creando servicio..."
+   - [SI] Formulario se envía automáticamente
+   - [SI] Servicio se crea correctamente
+
+**Resultado Esperado**: ✅ Errores se muestran de forma elegante y profesional
+
+---
+
 ### **Test 3: Modo Default - Imagen del Catálogo**
 
 **Objetivo**: Verificar creación de servicio con imagen del catálogo
@@ -78,21 +108,21 @@
    - Imagen: nginx:latest
    - Puerto personalizado: 45100
 3. **Verificar antes de enviar**:
-   - [ ] Selector de imagen está habilitado
-   - [ ] Campos de Dockerfile están deshabilitados (opacity-50)
-   - [ ] Campos de Compose están deshabilitados
-   - [ ] Campo de código fuente está deshabilitado
+   - [SI] Selector de imagen está habilitado
+   - [SI] Campos de Dockerfile están deshabilitados (opacity-50)
+   - [SI] Campos de Compose están deshabilitados
+   - [SI] Campo de código fuente está deshabilitado
 4. Hacer clic en "Crear Servicio"
 5. **Verificar**:
-   - [ ] Redirige al panel de servicios
-   - [ ] Servicio aparece en la tabla
-   - [ ] Estado es "creating" o "running"
-   - [ ] Puerto asignado es 45100
+   - [SI] Redirige al panel de servicios
+   - [SI] Servicio aparece en la tabla
+   - [SI] Estado es "creating" o "running"
+   - [SI] Puerto asignado es 45100
 6. Esperar a que el servicio esté "running"
 7. **Verificar**:
-   - [ ] Botón "Acceder" funciona
-   - [ ] Abre nginx en nueva pestaña
-   - [ ] Puerto correcto (45100)
+   - [SI] Botón "Acceder" funciona
+   - [SI] Abre nginx en nueva pestaña
+   - [SI] Puerto correcto (45100)
 
 **Resultado Esperado**: ✅ Servicio se crea correctamente desde la nueva página
 
@@ -112,23 +142,23 @@
    - Imagen: nginx:latest
 3. Hacer clic en "Crear Servicio"
 4. **Verificar inmediatamente**:
-   - [ ] Aparece toast verde: "✅ Servicio creado exitosamente. Redirigiendo..."
-   - [ ] Toast permanece visible ~1.5 segundos
+   - [SI] Aparece toast verde: "✅ Servicio creado exitosamente. Redirigiendo..."
+   - [SI] Toast permanece visible ~1.5 segundos
 5. **Verificar después de 1.5 segundos**:
-   - [ ] Redirige automáticamente a `/paasify/containers/` (panel principal)
-   - [ ] URL cambia correctamente
+   - [SI] Redirige automáticamente a `/paasify/containers/` (panel principal)
+   - [SI] URL cambia correctamente
 6. **Verificar en panel principal**:
-   - [ ] Servicio "test-redirect" aparece en la tabla
-   - [ ] Estado es "creating" o "running"
-   - [ ] Todos los datos son correctos
+   - [SI] Servicio "test-redirect" aparece en la tabla
+   - [SI] Estado es "creating" o "running"
+   - [SI] Todos los datos son correctos
 7. **Probar con error** (puerto inválido):
    - Volver a `/paasify/containers/new/`
    - Intentar crear servicio con puerto 30000 (fuera de rango)
    - **Verificar**:
-     - [ ] NO redirige
-     - [ ] Aparece toast rojo con mensaje de error
-     - [ ] Aparece alerta roja en el formulario con detalles del error
-     - [ ] Usuario puede corregir y volver a intentar
+     - [SI] NO redirige
+     - [SI] Aparece toast rojo con mensaje de error
+     - [SI] Aparece alerta roja en el formulario con detalles del error
+     - [SI] Usuario puede corregir y volver a intentar
 
 **Resultado Esperado**: ✅ Redirección automática funciona correctamente en éxito, y muestra errores claros en fallo
 
@@ -211,7 +241,7 @@
         - "6379:6379"
   ```
 - Incluir Dockerfile y app.py del test anterior
-- Crear ZIP con todos los archivos
+  -- Crear ZIP con todos los archivos
 
 **Pasos**:
 

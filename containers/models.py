@@ -175,3 +175,57 @@ class AllowedImage(models.Model):
 
     def __str__(self) -> str:
         return f"{self.name}:{self.tag}"
+
+
+# ==================== SIGNALS PARA LIMPIEZA AUTOMÁTICA ====================
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
+import shutil
+from pathlib import Path
+
+@receiver(post_delete, sender=Service)
+def auto_cleanup_service_files(sender, instance, **kwargs):
+    """Limpia todos los rastro físicos de un servicio al borrarlo de la BD usando lógica de barredora"""
+    try:
+        from django.conf import settings
+        media_root = Path(settings.MEDIA_ROOT)
+        
+        # 1. Obtener todos los archivos que SÍ deberían estar en el disco (de todos los servicios activos)
+        active_files = set()
+        for s in Service.objects.all():
+            if s.dockerfile: active_files.add(s.dockerfile.name)
+            if s.compose: active_files.add(s.compose.name)
+            if s.code: active_files.add(s.code.name)
+        
+        db_ids = set(Service.objects.values_list('id', flat=True))
+
+        # 2. Barrer directorios de carga (dockerfiles, compose_files, user_code)
+        for dir_name in ["dockerfiles", "compose_files", "user_code"]:
+            directory = media_root / dir_name
+            if not directory.exists(): continue
+            
+            # Limpiar subcarpeta 'services/<id>'
+            services_subdir = directory / "services"
+            if services_subdir.exists():
+                for item in services_subdir.iterdir():
+                    if item.is_dir():
+                        try:
+                            if int(item.name) not in db_ids:
+                                shutil.rmtree(item, ignore_errors=True)
+                        except: pass
+
+            # Limpiar archivos sueltos (los docker-compose_XXXX.yml huérfanos)
+            for item in directory.iterdir():
+                if item.is_file():
+                    rel_path = f"{dir_name}/{item.name}"
+                    if rel_path not in active_files:
+                        try: item.unlink()
+                        except: pass
+                
+        # 3. Borrar el workspace principal: media/services/<id>
+        # (Usamos el PK original porque el ID ya no estará en db_ids)
+        from .services import cleanup_service_workspace
+        cleanup_service_workspace(instance)
+        
+    except Exception:
+        pass
