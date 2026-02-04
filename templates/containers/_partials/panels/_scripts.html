@@ -9,6 +9,49 @@
     showToast("¡Copiado!");
   }
 
+  // Confirmación de eliminación (Totalmente blindada contra refrescos de tabla)
+  window.confirmDelete = function(elt) {
+    if (!elt) return;
+
+    // 1. Capturamos los datos críticos ANTES de mostrar el modal
+    const name = elt.getAttribute("data-service-name") || "este servicio";
+    const deleteUrl = elt.getAttribute("hx-post");
+    const targetId = elt.getAttribute("hx-target"); // ej: #service-178
+    
+    // 2. Definimos la acción de borrado
+    const executeDelete = () => {
+        if (!window.htmx) return;
+        
+        // Buscamos el objetivo actual en el DOM (por si la tabla se refrescó)
+        const currentTarget = document.querySelector(targetId);
+        
+        htmx.ajax("POST", deleteUrl, {
+            target: targetId,
+            swap: "outerHTML",
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+            }
+        });
+    };
+
+    // 3. Mostramos la confirmación
+    if (window.swal) {
+      swal({
+        title: "¿Eliminar servicio?",
+        text: `Vas a eliminar "${name}" de forma permanente. Esta acción no se puede deshacer.`,
+        icon: "warning",
+        buttons: ["Cancelar", "Sí, eliminar"],
+        dangerMode: true,
+      }).then((confirmed) => {
+        if (confirmed) {
+          executeDelete();
+        }
+      });
+    } else {
+      if (confirm(`¿Eliminar ${name}?`)) executeDelete();
+    }
+  };
+
   htmx.on("htmx:configRequest", (e) => {
     const token = document.querySelector(
       'input[name="csrfmiddlewaretoken"]',
@@ -18,20 +61,63 @@
     }
   });
 
-  function showToast(message, extraClass = "text-bg-success") {
-    const box = document.getElementById("toast-container");
+  function showToast(message, variant = "text-bg-success", title = null) {
+    const box = document.getElementById("global-alert-container");
     if (!box) return;
-    const el = document.createElement("div");
-    el.className = `toast align-items-center ${extraClass} border-0 show`;
-    el.role = "alert";
-    el.innerHTML = `
-      <div class="d-flex">
-        <div class="toast-body">${message}</div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto"
-                data-bs-dismiss="toast" aria-label="Cerrar"></button>
-      </div>`;
-    box.appendChild(el);
-    setTimeout(() => el.remove(), 2500);
+
+    const variantMap = {
+      "text-bg-success": "success",
+      "text-bg-danger": "danger",
+      "text-bg-warning": "warning",
+      "text-bg-info": "info",
+      "text-bg-primary": "primary"
+    };
+    
+    const v = variantMap[variant] || "success";
+    const config = {
+      "success": { icon: "fa-check", title: "¡Éxito!" },
+      "danger": { icon: "fa-times", title: "Error" },
+      "warning": { icon: "fa-exclamation-triangle", title: "Atención" },
+      "info": { icon: "fa-info-circle", title: "Información" },
+      "primary": { icon: "fa-rocket", title: "Procesando" }
+    };
+
+    const c = config[v];
+    const displayTitle = title || c.title;
+
+    const banner = document.createElement("div");
+    banner.className = `alert alert-${v} border-0 shadow-lg d-flex align-items-center show fade mb-2`;
+    banner.style.borderLeft = `3px solid ${v === 'success' ? '#1cc88a' : (v === 'danger' ? '#e74a3b' : '#f6c23e')}`;
+    banner.style.width = "fit-content";
+    banner.style.minWidth = "230px";
+    banner.style.maxWidth = "380px";
+    banner.style.backgroundColor = "white";
+    banner.style.borderRadius = "6px";
+    banner.style.pointerEvents = "auto";
+    
+    banner.innerHTML = `
+      <div class="d-flex align-items-center w-100 p-2 px-3">
+        <div class="bg-${v} rounded-circle p-1 me-3 d-flex align-items-center justify-content-center shadow-sm" style="width: 20px; height: 20px; min-width: 20px;">
+          <i class="fas ${c.icon} text-white" style="font-size: 0.55rem;"></i>
+        </div>
+        <div class="flex-grow-1 text-start">
+          <div class="fw-bold text-${v}" style="letter-spacing: -0.2px; line-height: 1.1; font-size: 0.76rem;">${displayTitle}</div>
+          <div class="text-dark opacity-75 mt-1" style="font-size: 0.7rem; line-height: 1.2;">${message}</div>
+        </div>
+        <button type="button" class="btn btn-link text-muted p-0 ms-3" data-bs-dismiss="alert" aria-label="Close" style="text-decoration: none; opacity: 0.3;">
+          <i class="fas fa-times" style="font-size: 0.6rem;"></i>
+        </button>
+      </div>
+    `;
+
+    // Insertar al principio para que se vea arriba
+    box.prepend(banner);
+
+    // Auto-eliminar después de 4 segundos
+    setTimeout(() => {
+      const bsAlert = new bootstrap.Alert(banner);
+      if (banner.parentNode) bsAlert.close();
+    }, 4500);
   }
 
   function resetNewServiceForm() {
@@ -71,10 +157,10 @@
     resetNewServiceForm();
   });
 
-  document.body.addEventListener("service:toast", (evt) => {
+  document.addEventListener("service:toast", (evt) => {
     const detail = evt.detail || {};
     showToast(
-      detail.message || "Operacion completada",
+      detail.message || "Operación completada",
       detail.variant || "text-bg-success",
     );
   });
@@ -83,7 +169,7 @@
   document.body.addEventListener("showValidationError", (evt) => {
     // Extraer mensaje correctamente del evento HTMX
     let message = "";
-    
+
     if (evt.detail) {
       // HTMX envía el mensaje en evt.detail directamente cuando es un string
       if (typeof evt.detail === "string") {
@@ -102,7 +188,7 @@
         message = JSON.stringify(evt.detail);
       }
     }
-    
+
     if (!message || message === "{}") {
       message = "Error desconocido al crear el servicio";
     }
@@ -136,7 +222,10 @@
       pageErrorContainer.innerHTML = errorHTML;
       pageErrorContainer.style.display = "block";
       // Hacer scroll al error
-      pageErrorContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      pageErrorContainer.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
     } else {
       // Fallback a alert solo si no existe ningún contenedor
       alert("❌ Error de Validación\n\n" + message);
@@ -172,14 +261,14 @@
     showToast(`Error (${status}): ${msg}`, "text-bg-danger");
   });
 
-    function applyMode() {
+  function applyMode() {
     const mode =
       document.querySelector('input[name="mode"]:checked')?.value || "default";
-    
+
     // Buscar elementos por ID para mayor precisión
     const imgSel = document.getElementById("service-image");
     const dockerhubInput = document.getElementById("service-dockerhub");
-    
+
     const dockerfile = document.querySelector('input[name="dockerfile"]');
     const compose = document.querySelector('input[name="compose"]');
     const code = document.querySelector('input[name="code"]');
@@ -195,11 +284,11 @@
       // Modo default: Mostrar imagen del catálogo
       if (imageContainer) imageContainer.style.display = "block";
       if (dockerhubBlock) dockerhubBlock.style.display = "none";
-      
+
       if (imgSel) imgSel.disabled = false;
       if (dockerhubInput) {
         dockerhubInput.disabled = true;
-        dockerhubInput.removeAttribute('required'); // No obligatorio en modo default
+        dockerhubInput.removeAttribute("required"); // No obligatorio en modo default
       }
 
       // Limpiar feedback de DockerHub
@@ -223,7 +312,7 @@
       // Modo DockerHub: Mostrar solo campo de DockerHub
       if (imageContainer) imageContainer.style.display = "none";
       if (dockerhubBlock) dockerhubBlock.style.display = "block";
-      
+
       if (imgSel) imgSel.disabled = true;
       if (dockerhubInput) {
         dockerhubInput.disabled = false;
@@ -244,11 +333,11 @@
       // Modo custom: Mostrar Dockerfile/Compose/Código
       if (imageContainer) imageContainer.style.display = "none";
       if (dockerhubBlock) dockerhubBlock.style.display = "none";
-      
+
       if (imgSel) imgSel.disabled = true;
       if (dockerhubInput) {
         dockerhubInput.disabled = true;
-        dockerhubInput.removeAttribute('required'); // No obligatorio en modo custom
+        dockerhubInput.removeAttribute("required"); // No obligatorio en modo custom
       }
 
       // Limpiar feedback de DockerHub
@@ -266,11 +355,11 @@
         if (input) input.disabled = false;
       });
     }
-    
+
     // IMPORTANTE: Los puertos SIEMPRE deben estar habilitados si el modo lo permite
     if (internalPort) internalPort.disabled = false;
     if (customPort) customPort.disabled = false;
-    
+
     syncExclusion();
   }
 
@@ -435,11 +524,12 @@
     }
 
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Verificando...';
+    btn.innerHTML =
+      '<i class="fas fa-spinner fa-spin me-1"></i> Verificando...';
 
     try {
       const response = await fetch(
-        `/paasify/containers/check-port/?port=${encodeURIComponent(port)}`
+        `/paasify/containers/check-port/?port=${encodeURIComponent(port)}`,
       );
       const data = await response.json();
 
@@ -471,7 +561,7 @@
                   >
                     <i class="fas fa-magic me-1"></i> ${p}
                   </button>
-                `
+                `,
                   )
                   .join("")}
               </div>
@@ -515,7 +605,7 @@
   function clearCustomPort() {
     const portInput = document.getElementById("service-port");
     const feedback = document.getElementById("port-availability-feedback");
-    
+
     if (portInput) portInput.value = "";
     if (feedback) {
       feedback.innerHTML = "";
@@ -548,17 +638,21 @@
     popoverTriggerList.forEach((el) => new bootstrap.Popover(el));
 
     // BUGFIX: Copiar dockerhub_image a image antes de enviar el formulario
-    const form = document.getElementById('newServiceForm');
+    const form = document.getElementById("newServiceForm");
     if (form) {
-      form.addEventListener('submit', function(e) {
-        const mode = document.querySelector('input[name=\"mode\"]:checked')?.value;
-        if (mode === 'dockerhub') {
-          const dockerhubInput = document.querySelector('input[name=\"dockerhub_image\"]');
+      form.addEventListener("submit", function (e) {
+        const mode = document.querySelector(
+          'input[name=\"mode\"]:checked',
+        )?.value;
+        if (mode === "dockerhub") {
+          const dockerhubInput = document.querySelector(
+            'input[name=\"dockerhub_image\"]',
+          );
           const imageSelect = document.querySelector('select[name=\"image\"]');
-          
+
           if (dockerhubInput && imageSelect && dockerhubInput.value.trim()) {
             // Crear una opci�n temporal con el valor de DockerHub
-            const tempOption = document.createElement('option');
+            const tempOption = document.createElement("option");
             tempOption.value = dockerhubInput.value.trim();
             tempOption.selected = true;
             imageSelect.appendChild(tempOption);
@@ -618,11 +712,49 @@
     // Auto-refresh de la tabla cada 2 segundos
     setInterval(refreshTable, 2000);
 
-    // Al terminar cualquier request HTMX (tabla actualizada o acción botón)
+    // State Observer: Detectar cambios de estado
+    let lastServiceStates = {};
+
+    function observeStatusChanges() {
+      const rows = document.querySelectorAll("#service-table > tr[id^='service-']");
+      const currentStates = {};
+
+      rows.forEach(row => {
+        const sid = row.id.replace("service-", "");
+        const badge = row.querySelector(".badge");
+        if (!badge) return;
+        
+        const status = badge.textContent.trim().toUpperCase();
+        currentStates[sid] = status;
+
+        if (lastServiceStates[sid]) {
+          const name = row.querySelector(".fw-semibold")?.textContent || "su servicio";
+          
+          // 1. Inició correctamente (de algo que no era RUNNING a RUNNING)
+          if (lastServiceStates[sid] !== "RUNNING" && status === "RUNNING") {
+            showToast(`¡Buenas noticias! El servicio <strong>${name}</strong> ya está en marcha y listo para usar.`, "text-bg-success", "¡Servicio Listo!");
+          }
+          // 2. Parada o Fallo (de RUNNING a otra cosa)
+          else if (lastServiceStates[sid] === "RUNNING" && status !== "RUNNING") {
+            if (status === "ERROR") {
+                showToast(`Ha ocurrido un problema al procesar <strong>${name}</strong>. Revisa los logs.`, "text-bg-danger", "Fallo en el servicio");
+            } else {
+                showToast(`El servicio <strong>${name}</strong> se ha detenido correctamente.`, "text-bg-warning", "Servicio Detenido");
+            }
+          }
+        }
+      });
+      lastServiceStates = currentStates;
+    }
+
+    // Al terminar cualquier request HTMX de la tabla
     document.body.addEventListener("htmx:afterOnLoad", (evt) => {
-      // Recalcular estadísticas inmediatamente
-      setTimeout(updateStatsFromTable, 100);
+      if (evt.detail.target.id === "service-table") {
+        updateStatsFromTable();
+        observeStatusChanges();
+      }
     });
+
 
     // Detectar cambios de estado y forzar refresh inmediato de tabla
     document.body.addEventListener("htmx:afterRequest", (evt) => {
@@ -638,82 +770,68 @@
   });
 
   // Filtrar proyectos por asignatura seleccionada
-  document.addEventListener('DOMContentLoaded', function() {
-    const subjectSelect = document.getElementById('service-subject');
-    const projectSelect = document.getElementById('service-project');
-    
+  document.addEventListener("DOMContentLoaded", function () {
+    const subjectSelect = document.getElementById("service-subject");
+    const projectSelect = document.getElementById("service-project");
+
     if (subjectSelect && projectSelect) {
       // Guardar todas las opciones de proyecto originales
       const allProjectOptions = Array.from(projectSelect.options);
-      
-      subjectSelect.addEventListener('change', function() {
+
+      subjectSelect.addEventListener("change", function () {
         const selectedSubjectId = this.value;
-        
+
         // Limpiar el select de proyectos
-        projectSelect.innerHTML = '';
-        
+        projectSelect.innerHTML = "";
+
         // Añadir opción por defecto
-        const defaultOption = document.createElement('option');
-        defaultOption.value = '';
+        const defaultOption = document.createElement("option");
+        defaultOption.value = "";
         defaultOption.disabled = true;
         defaultOption.selected = true;
-        defaultOption.textContent = '📁 Selecciona un proyecto';
+        defaultOption.textContent = "📁 Selecciona un proyecto";
         projectSelect.appendChild(defaultOption);
-        
+
         // Filtrar y añadir solo los proyectos de la asignatura seleccionada
-        allProjectOptions.forEach(option => {
+        allProjectOptions.forEach((option) => {
           if (option.dataset.subjectId === selectedSubjectId) {
             projectSelect.appendChild(option.cloneNode(true));
           }
         });
-        
+
         // Si no hay proyectos para esta asignatura, mostrar mensaje
         if (projectSelect.options.length === 1) {
-          const noProjectsOption = document.createElement('option');
-          noProjectsOption.value = '';
+          const noProjectsOption = document.createElement("option");
+          noProjectsOption.value = "";
           noProjectsOption.disabled = true;
-          noProjectsOption.textContent = '⚠️ No hay proyectos en esta asignatura';
+          noProjectsOption.textContent =
+            "⚠️ No hay proyectos en esta asignatura";
           projectSelect.appendChild(noProjectsOption);
         }
       });
-      
+
       // Trigger inicial si hay asignatura pre-seleccionada
       if (subjectSelect.value) {
-        subjectSelect.dispatchEvent(new Event('change'));
+        subjectSelect.dispatchEvent(new Event("change"));
       }
     }
 
-    // Detectar si venimos de crear un servicio para mostrar un BANNER de éxito prominente
+    // Detectar si venimos de crear un servicio para mostrar la notificación de éxito
     const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('created')) {
-      const alertContainer = document.getElementById('global-alert-container');
-      if (alertContainer) {
-        const banner = document.createElement('div');
-        banner.className = 'alert alert-success border-0 shadow-sm d-flex align-items-center show fade';
-        banner.style.borderLeft = '5px solid #1cc88a';
-        banner.innerHTML = `
-          <div class="d-flex align-items-center w-100 p-2">
-            <div class="bg-success rounded-circle p-2 me-3 d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-              <i class="fas fa-check text-white"></i>
-            </div>
-            <div>
-              <h5 class="mb-1 fw-bold text-success">¡Servicio Creado!</h5>
-              <p class="mb-0 text-dark">El servicio se ha creado correctamente y se está iniciando en segundo plano.</p>
-            </div>
-            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
-          </div>
-        `;
-        alertContainer.appendChild(banner);
-        
-        // Quitarlo automáticamente después de 3 segundos
-        setTimeout(() => {
-          const bsAlert = new bootstrap.Alert(banner);
-          bsAlert.close();
-        }, 3000);
-      }
-      
+    if (urlParams.has("created")) {
+      // Usamos el sistema global showToast para mantener el diseño unificado
+      showToast(
+        "El servicio se ha creado correctamente y se está iniciando en segundo plano.",
+        "text-bg-success",
+        "¡Servicio Creado!"
+      );
+
       // Limpiar la URL para que no vuelva a salir el mensaje al recargar
-      window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+      window.history.replaceState(
+        {},
+        document.title,
+        window.location.pathname + window.location.hash,
+      );
     }
   });
 </script>

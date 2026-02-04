@@ -168,9 +168,6 @@ _default_media_root = BASE_DIR / "media"
 MEDIA_ROOT = Path(os.environ.get("DJANGO_MEDIA_ROOT", _default_media_root))
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
-USER_UPLOADS_DIR = MEDIA_ROOT / "user_code"
-USER_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-
 # ---------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------
