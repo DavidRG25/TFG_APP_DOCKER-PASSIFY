@@ -15,7 +15,7 @@ def get_docker_client() -> docker.DockerClient | None:
     """
     try:
         client = docker.from_env()
-        client.ping()
+        # Quitamos ping() para mejorar performance y evitar bloqueos en el arranque
         return client
     except (DockerException, OSError):
         return None

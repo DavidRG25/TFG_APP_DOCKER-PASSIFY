@@ -14,8 +14,14 @@
             Detener servicios
         </button>
 
-        <button class="btn btn-sm btn-danger" hx-post="{% url 'service-remove' service.id %}"
-            hx-target="#service-{{ service.id }}" hx-swap="outerHTML" hx-confirm="¿Eliminar definitivamente?"
+        <button class="btn btn-sm btn-danger" 
+            hx-post="{% url 'service-remove' service.id %}"
+            hx-target="#service-{{ service.id }}" 
+            hx-swap="outerHTML" 
+            hx-trigger="confirmed"
+            data-service-id="{{ service.id }}"
+            data-service-name="{{ service.name }}"
+            onclick="confirmDelete(this)"
             title="Eliminar servicio">
             Eliminar
         </button>

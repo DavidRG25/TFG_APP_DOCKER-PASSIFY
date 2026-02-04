@@ -366,9 +366,9 @@
 <!-- Contenido principal -->
 <div id="content-wrapper">
     <div id="main-content">
-        <!-- Contenedor para alertas globales y toasts -->
-        <div id="global-alert-container" class="mb-4"></div>
-        <div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index: 9999"></div>
+        <!-- Contenedor Maestro de Banners (Alineado bajo PaaSify) -->
+        <div id="global-alert-container" class="position-fixed p-0" 
+             style="z-index: 10005; width: fit-content; max-width: 450px; top: 75px; left: 25px; pointer-events: none;"></div>
 
         {% block body %}
         <!-- Contenido especifico de cada pagina -->
@@ -404,6 +404,8 @@
         });
     }
 </script>
+<!-- Contenedor maestro de Toasts (Notificaciones) -->
+<div id="toast-container" class="position-fixed top-0 start-50 translate-middle-x p-4" style="z-index: 10000; display: flex; flex-direction: column; align-items: center;"></div>
 {% block extrascripts %}{% endblock %}
 </body>
 </html>

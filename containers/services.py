@@ -30,7 +30,7 @@ COMPOSE_EXTENSIONS = {".yml", ".yaml"}
 CODE_EXTENSIONS = {".zip", ".rar"}
 
 EXECUTOR = ThreadPoolExecutor(
-    max_workers=int(os.environ.get("SERVICE_WORKERS", "2"))
+    max_workers=int(os.environ.get("SERVICE_WORKERS", "10"))
 )
 
 SERVICE_WORKSPACES_ROOT = Path(getattr(settings, "SERVICE_WORKSPACES_ROOT", Path(settings.MEDIA_ROOT) / "services"))
@@ -55,67 +55,14 @@ def cleanup_service_workspace(service: Service) -> None:
     import os
     import shutil
     from pathlib import Path
-    from django.conf import settings
-    from django.db import models
 
     sid = str(service.id)
-    try:
-        media_path = Path(settings.MEDIA_ROOT)
-        
-        # 1. Barredora de directorios de carga (dockerfiles, compose_files, user_code)
-        for subdir in ["dockerfiles", "compose_files", "user_code"]:
-            base_dir = media_path / subdir
-            if not base_dir.exists(): continue
-            
-            # A. Borrar carpeta services/<id> si existe
-            path_id = base_dir / "services" / sid
-            if path_id.exists():
-                for attempt in range(3):
-                    try:
-                        if os.name == 'nt':
-                            for root, dirs, files in os.walk(path_id):
-                                for d in dirs:
-                                    try: os.chmod(os.path.join(root, d), stat.S_IRWXU)
-                                    except: pass
-                                for f in files:
-                                    try: os.chmod(os.path.join(root, f), stat.S_IRWXU)
-                                    except: pass
-                        shutil.rmtree(path_id)
-                        break
-                    except:
-                        time.sleep(1)
-
-            # B. Limpiar archivos huérfanos (los que Django renombra con sufijos aleatorios)
-            for item in base_dir.iterdir():
-                if item.is_file():
-                    iname = item.name.lower()
-                    is_huerfano = False
-                    
-                    # Pattern matching: si lleva el ID o es un nombre genérico
-                    if f"_{sid}" in iname:
-                        is_huerfano = True
-                    elif any(iname.startswith(p) for p in ["docker-compose", "dockerfile", "source"]):
-                        # Verificación de match EXACTO en base de datos
-                        django_rel_path = f"{subdir}/{item.name}"
-                        from containers.models import Service as SModel
-                        if not SModel.objects.filter(
-                            models.Q(compose=django_rel_path) | 
-                            models.Q(code=django_rel_path) | 
-                            models.Q(dockerfile=django_rel_path)
-                        ).exclude(id=service.id).exists():
-                            is_huerfano = True
-                    
-                    if is_huerfano:
-                        try: item.unlink()
-                        except: pass
-    except Exception:
-        pass
-
-    # 2. Limpiar el workspace principal (media/services/<id>)
     workspace = SERVICE_WORKSPACES_ROOT / sid
+    
     if workspace.exists():
         for attempt in range(3):
             try:
+                # En Windows a veces hay problemas de permisos con archivos de solo lectura dentro de .git o similares
                 if os.name == 'nt':
                     for root, dirs, files in os.walk(workspace):
                         for d in dirs:
@@ -124,20 +71,22 @@ def cleanup_service_workspace(service: Service) -> None:
                         for f in files:
                             try: os.chmod(os.path.join(root, f), stat.S_IRWXU)
                             except: pass
+                
                 shutil.rmtree(workspace)
                 break
-            except:
-                if attempt < 2: time.sleep(1)
-                else: shutil.rmtree(workspace, ignore_errors=True)
+            except Exception:
+                if attempt < 2: 
+                    time.sleep(1)
+                else: 
+                    # Último intento: forzar borrado ignorando errores
+                    shutil.rmtree(workspace, ignore_errors=True)
 
 
 def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> Path:
     """
     Prepara el workspace del servicio asegurando que:
     1. Todos los archivos (Dockerfile, docker-compose.yml) estén en services/<id>/
-    2. El código fuente esté descomprimido según el modo:
-       - Dockerfile: descomprime en services/<id>/ (mismo nivel que Dockerfile)
-       - Compose: descomprime en services/<id>/src/
+    2. El código fuente esté descomprimido en services/<id>/
     
     Retorna el Path del workspace.
     """
@@ -149,46 +98,77 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> 
         "compose": "docker-compose.yml",
     }
     updated_fields = []
+    from django.core.files.storage import default_storage
+    from django.core.files.base import ContentFile
     
     for field, filename in mapping.items():
         ff = getattr(service, field, None)
         if not ff:
             continue
         
-        # Ruta esperada en el workspace
-        desired_rel = f"services/{service.pk}/{filename}"
-        
-        # Si el FileField no apunta a la ruta correcta, moverlo
-        if ff.name != desired_rel:
-            with ff.open("rb") as fh:
-                getattr(service, field).save(desired_rel, fh, save=False)
-            updated_fields.append(field)
-        
-        # Asegurar que existe una copia física en el workspace
+        # Ruta física deseada
         dest = workspace / filename
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        with ff.open("rb") as source, open(dest, "wb") as target:
-            shutil.copyfileobj(source, target)
-    
+        desired_rel = f"services/{service.id}/{filename}"
+        
+        # Caso A: El archivo ya está en el sitio correcto y existe físicamente
+        if ff.name == desired_rel and dest.exists():
+            continue
+            
+        # Caso B: El archivo necesita ser movido o copiado
+        try:
+            # Si el archivo está en 'tmp/', lo leemos y movemos
+            content = ff.read()
+            
+            # 1. Si el nombre en DB está mal (ej. apunta a 'tmp/'), actualizarlo
+            if ff.name != desired_rel:
+                old_path = ff.name
+                ff.save(desired_rel, ContentFile(content), save=False)
+                updated_fields.append(field)
+                
+                # Intentar borrar el rastro viejo (especialmente útil para limpiar services/tmp/)
+                if old_path and old_path != desired_rel:
+                    try: 
+                        if default_storage.exists(old_path):
+                            default_storage.delete(old_path)
+                    except: pass
+            
+            # 2. Asegurar que el archivo existe físicamente en el workspace
+            if not dest.exists():
+                with open(dest, "wb") as f_out:
+                    f_out.write(content)
+                    
+        except Exception as e:
+            print(f"[warning] Error preparando {field}: {e}")
+            continue
+
     if updated_fields:
         service.save(update_fields=updated_fields)
     
     # Descomprimir código si existe
     if unpack_code and service.code:
         code_ext = os.path.splitext(service.code.name or "")[1] or ".zip"
-        code_rel = f"services/{service.pk}/source{code_ext}"
-        if service.code.name != code_rel:
-            with service.code.open("rb") as fh:
-                service.code.save(code_rel, fh, save=False)
+        code_rel = f"services/{service.id}/source{code_ext}"
+        code_dest_phys = workspace / f"source{code_ext}"
+        
+        # Si el código no está en su sitio o es un temporal, moverlo
+        if service.code.name != code_rel or not code_dest_phys.exists():
+            old_code_path = service.code.name
+            with service.code.open("rb") as f_in:
+                content = f_in.read()
+                service.code.save(code_rel, ContentFile(content), save=False)
             service.save(update_fields=["code"])
+            
+            if old_code_path and old_code_path != code_rel:
+                try: 
+                    if default_storage.exists(old_code_path):
+                        default_storage.delete(old_code_path)
+                except: pass
+            
+            # Asegurar copia física para descompresión
+            with open(code_dest_phys, "wb") as f_out:
+                f_out.write(content)
         
-        # SIEMPRE descomprimir en la raíz del workspace
-        # Esto funciona para:
-        # - Dockerfile: COPY requirements.txt funciona
-        # - Compose: build context "." encuentra Dockerfile y archivos
-        code_target = workspace
-        
-        # Limpiar archivos de código previos pero mantener Dockerfile/compose
+        # Limpiar archivos previos pero mantener los estructurales
         for item in workspace.iterdir():
             if item.name not in ["Dockerfile", "docker-compose.yml", "source.zip", "source.rar"]:
                 if item.is_file():
@@ -196,7 +176,8 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> 
                 elif item.is_dir() and item.name not in [".vs"]:
                     shutil.rmtree(item)
         
-        _unpack_code_archive_to(str(code_target), service.code)
+        # Descomprimir usando la ruta física para evitar errores de reapertura
+        _unpack_code_archive_to(str(workspace), archive_path=str(code_dest_phys))
     
     return workspace
 
@@ -594,30 +575,39 @@ def _save_filefield_to(tmp_path: str, ff) -> str:
     return tmp_path
 
 
-def _unpack_code_archive_to(target_dir: str, ff) -> None:
+def _unpack_code_archive_to(target_dir: str, ff=None, archive_path=None) -> None:
     """
-    Descomprime un archivo de codigo (zip o rar) a 'target_dir'.
+    Descomprime un archivo de código (zip o rar) a 'target_dir'.
+    Puede recibir un FileField (ff) o una ruta física (archive_path).
     """
     os.makedirs(target_dir, exist_ok=True)
-    name = getattr(ff, "name", "") or ""
-    extension = os.path.splitext(name)[1].lower()
-    tmp_path = os.path.join(target_dir, f"_code{extension or '.tmp'}")
-    _save_filefield_to(tmp_path, ff)
-
-    if extension == ".rar":
-        try:
-            _extract_rar_with_tool(tmp_path, target_dir)
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-        return
+    
+    if archive_path and os.path.exists(archive_path):
+        tmp_path = archive_path
+        # No borraremos el archivo original si nos dan archive_path
+        should_delete_tmp = False
+        extension = os.path.splitext(archive_path)[1].lower()
+    elif ff:
+        name = getattr(ff, "name", "") or ""
+        extension = os.path.splitext(name)[1].lower()
+        tmp_path = os.path.join(target_dir, f"_code_tmp{extension or '.tmp'}")
+        _save_filefield_to(tmp_path, ff)
+        should_delete_tmp = True
+    else:
+        raise ValueError("Se debe proporcionar al menos 'ff' o 'archive_path'")
 
     try:
-        shutil.unpack_archive(tmp_path, target_dir)
-    except Exception as exc:
-        raise RuntimeError(f"No se pudo descomprimir el archivo: {exc}") from exc
+        if extension == ".rar":
+            _extract_rar_with_tool(tmp_path, target_dir)
+        else:
+            try:
+                shutil.unpack_archive(tmp_path, target_dir)
+            except Exception as exc:
+                raise RuntimeError(f"No se pudo descomprimir el archivo: {exc}") from exc
     finally:
-        os.remove(tmp_path)
+        if should_delete_tmp and os.path.exists(tmp_path):
+            try: os.remove(tmp_path)
+            except: pass
 
 
 def _extract_rar_with_tool(tmp_path: str, target_dir: str) -> None:
@@ -828,13 +818,19 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
         # Si ya existe y no es reinicio, asegurar que esté en marcha y salir
         if service.container_id and not force_restart:
             try:
+                _append_log(service, f"Intentando arrancar contenedor existente: {service.container_id}")
                 container = docker_client.containers.get(service.container_id)
                 if container.status != "running":
                     container.start()
                     service.status = "running"
-                    service.save()
+                    _append_log(service, "Contenedor arrancado (reutilizado).")
+                    service.save(update_fields=["status", "logs", "updated_at"])
+                else:
+                    service.status = "running"
+                    service.save(update_fields=["status", "updated_at"])
                 return
             except NotFound:
+                _append_log(service, "Contenedor previo no encontrado en Docker, se creará uno nuevo.")
                 service.container_id = None
             except DockerException as exc:
                 service.logs = f"Error al consultar el contenedor existente: {exc}"
@@ -916,7 +912,9 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
         
         # Nombre descriptivo: usar nombre del servicio o slug como fallback
         safe_name = re.sub(r'[^a-z0-9_-]', '_', (service.name or slug).lower())
-        container_name = f"{safe_name}_ctr"
+        container_name = f"{safe_name}_{service.id}_ctr"
+
+        _append_log(service, f"Arrancando nuevo contenedor: {container_name}")
 
         normalized_command = command
         if isinstance(normalized_command, (list, tuple)):
@@ -945,6 +943,7 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
             volumes=volumes or None,
             environment=env_vars or None,
         )
+        _append_log(service, "Contenedor creado, esperando verificación...")
         _ensure_container_running(service, container, port)
 
         service.container_id = container.id
@@ -968,13 +967,25 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
 def _run_container_worker(
     service_id: int, force_restart: bool, custom_port: int | None, command: list[str] | None
 ) -> None:
+    service = None
     try:
         service = Service.objects.get(pk=service_id)
+        _run_container_internal(
+            service, force_restart=force_restart, custom_port=custom_port, command=command
+        )
     except Service.DoesNotExist:
         return
-    _run_container_internal(
-        service, force_restart=force_restart, custom_port=custom_port, command=command
-    )
+    except Exception as exc:
+        if service:
+            try:
+                service.status = "error"
+                _append_log(service, f"Error crítico en el worker: {str(exc)}")
+                service.save(update_fields=["status", "logs", "updated_at"])
+            except:
+                pass
+        print(f"[error] Excepción no controlada en _run_container_worker: {exc}")
+        import traceback
+        traceback.print_exc()
 
 
 def run_container(
@@ -987,6 +998,10 @@ def run_container(
     """
     Encola la ejecucion del contenedor para no bloquear el hilo que atiende la peticion.
     """
+    # Guardar contra ejecuciones duplicadas si ya está en cola o iniciándose
+    if service.status in ["pending", "starting"] and not force_restart:
+        return
+
     if not enqueue:
         _run_container_internal(
             service,

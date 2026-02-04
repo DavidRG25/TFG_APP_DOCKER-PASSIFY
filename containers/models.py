@@ -1,3 +1,4 @@
+import os
 from django.conf import settings
 from django.db import models, transaction
 from django.db.utils import IntegrityError
@@ -28,6 +29,22 @@ class PortReservation(models.Model):
     def __str__(self) -> str:
         return str(self.port)
 
+
+def get_service_upload_path(instance, filename):
+    """
+    Ruta centralizada: services/<id>/<filename>
+    Si no hay ID todavía, se guarda en services/tmp/ para ser movido luego.
+    Se usa basename para evitar anidamientos accidentales como services/1/services/1/file.
+    """
+    import os
+    sid = instance.id if instance.id else "tmp"
+    pure_filename = os.path.basename(filename)
+    return f"services/{sid}/{pure_filename}"
+
+# Aliases para compatibilidad con migraciones antiguas
+def get_dockerfile_path(instance, filename): return get_service_upload_path(instance, filename)
+def get_compose_path(instance, filename): return get_service_upload_path(instance, filename)
+def get_code_path(instance, filename): return get_service_upload_path(instance, filename)
 
 class Service(models.Model):
     """Servicio o contenedor desplegado por un usuario."""
@@ -62,9 +79,9 @@ class Service(models.Model):
     internal_port = models.PositiveIntegerField("Puerto interno", default=80)
     status = models.CharField("Estado", max_length=20, default="stopped")
     logs = models.TextField("Logs", blank=True)
-    dockerfile = models.FileField("Dockerfile", upload_to="dockerfiles/", blank=True, null=True)
-    compose = models.FileField("docker-compose.yml", upload_to="compose_files/", blank=True, null=True)
-    code = models.FileField("Codigo fuente (zip)", upload_to="user_code/", blank=True, null=True)
+    dockerfile = models.FileField("Dockerfile", upload_to=get_service_upload_path, blank=True, null=True)
+    compose = models.FileField("docker-compose.yml", upload_to=get_service_upload_path, blank=True, null=True)
+    code = models.FileField("Codigo fuente (zip)", upload_to=get_service_upload_path, blank=True, null=True)
     volumes = models.JSONField("Volumenes", blank=True, null=True)
     env_vars = models.JSONField("Variables de entorno", blank=True, null=True)
     build_context_dir = models.CharField("Directorio de build (tmp)", max_length=300, blank=True, null=True)
@@ -185,47 +202,12 @@ from pathlib import Path
 
 @receiver(post_delete, sender=Service)
 def auto_cleanup_service_files(sender, instance, **kwargs):
-    """Limpia todos los rastro físicos de un servicio al borrarlo de la BD usando lógica de barredora"""
+    """
+    Limpia todos los rastro físicos de un servicio al borrarlo de la BD.
+    Ahora centralizado en una única carpeta por servicio.
+    """
     try:
-        from django.conf import settings
-        media_root = Path(settings.MEDIA_ROOT)
-        
-        # 1. Obtener todos los archivos que SÍ deberían estar en el disco (de todos los servicios activos)
-        active_files = set()
-        for s in Service.objects.all():
-            if s.dockerfile: active_files.add(s.dockerfile.name)
-            if s.compose: active_files.add(s.compose.name)
-            if s.code: active_files.add(s.code.name)
-        
-        db_ids = set(Service.objects.values_list('id', flat=True))
-
-        # 2. Barrer directorios de carga (dockerfiles, compose_files, user_code)
-        for dir_name in ["dockerfiles", "compose_files", "user_code"]:
-            directory = media_root / dir_name
-            if not directory.exists(): continue
-            
-            # Limpiar subcarpeta 'services/<id>'
-            services_subdir = directory / "services"
-            if services_subdir.exists():
-                for item in services_subdir.iterdir():
-                    if item.is_dir():
-                        try:
-                            if int(item.name) not in db_ids:
-                                shutil.rmtree(item, ignore_errors=True)
-                        except: pass
-
-            # Limpiar archivos sueltos (los docker-compose_XXXX.yml huérfanos)
-            for item in directory.iterdir():
-                if item.is_file():
-                    rel_path = f"{dir_name}/{item.name}"
-                    if rel_path not in active_files:
-                        try: item.unlink()
-                        except: pass
-                
-        # 3. Borrar el workspace principal: media/services/<id>
-        # (Usamos el PK original porque el ID ya no estará en db_ids)
         from .services import cleanup_service_workspace
         cleanup_service_workspace(instance)
-        
     except Exception:
         pass

@@ -225,8 +225,6 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
         service = serializer.save(owner=request.user, status="creating", project=project)
 
-        self._attach_uploaded_files(service, request, mode)
-
         try:
             run_container(service, custom_port=custom_port)
         except Exception as exc:
@@ -316,11 +314,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
             return DRF_Response({"status": "error", "message": str(exc)}, status=500)
 
         if self._is_htmx(request):
-            return self._htmx_response(
-                request,
-                message="Servicio encolado para iniciar.",
-                level="text-bg-success",
-            )
+            return self._htmx_response(request)
         return DRF_Response({"status": "queued", "message": "Servicio encolado para iniciar."})
 
     @action(detail=True, methods=["post"])
@@ -339,11 +333,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
             return DRF_Response({"status": "error", "message": str(exc)}, status=500)
 
         if self._is_htmx(request):
-            return self._htmx_response(
-                request,
-                message="Servicio detenido.",
-                level="text-bg-warning",
-            )
+            return self._htmx_response(request)
         return DRF_Response({"status": "stopped", "message": "Servicio detenido."})
 
     @action(detail=True, methods=["post"], url_path="remove")
@@ -366,8 +356,8 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if self._is_htmx(request):
             return self._htmx_response(
                 request,
-                message="Servicio eliminado.",
-                level="text-bg-danger",
+                message="El servicio ha sido eliminado correctamente.",
+                level="text-bg-success",
             )
         return DRF_Response({"status": "removed", "message": "Servicio eliminado."})
 
