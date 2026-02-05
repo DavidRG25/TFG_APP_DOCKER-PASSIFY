@@ -26,4 +26,10 @@ urlpatterns = [
     
     # Gestión de tokens API
     path("api-token/", views.manage_api_token, name="api_token"),
+    
+    # Documentación dedicada de la API
+    path("api-docs/", views.api_documentation_view, name="api_docs"),
+
+    # Generador interactivo de comandos API
+    path("api-generator/", views.api_command_generator_view, name="api_generator"),
 ]

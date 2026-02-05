@@ -10,9 +10,14 @@
         <h1 class="h3 mb-1 text-white fw-bold">Mis servicios</h1>
         <p class="text-white-50 mb-0">Gestiona tus contenedores y despliegues activos.</p>
       </div>
-      <a href="{% url 'containers:new_service' %}" class="btn btn-light shadow-sm">
-        <i class="fas fa-plus me-2"></i>Nuevo servicio
-      </a>
+      <div class="d-flex gap-2">
+        <a href="{% url 'containers:api_generator' %}" class="btn btn-outline-light d-flex align-items-center">
+          <i class="fas fa-terminal me-2"></i>Comandos API
+        </a>
+        <a href="{% url 'containers:new_service' %}" class="btn btn-light shadow-sm">
+          <i class="fas fa-plus me-2"></i>Nuevo servicio
+        </a>
+      </div>
     </div>
   </div>
 
