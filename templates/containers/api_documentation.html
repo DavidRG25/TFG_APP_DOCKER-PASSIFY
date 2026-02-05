@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Documentación API REST | PaaSify{% endblock %}
+
+{% block extrahead %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<style>
+    :root {
+        --api-primary: #4e73df;
+        --api-success: #1cc88a;
+        --api-sidebar-bg: #f8f9fc;
+        --api-content-bg: #ffffff;
+    }
+
+    .api-docs-container {
+        display: flex;
+        min-height: calc(100vh - 120px);
+        margin: -20px;
+    }
+
+    /* Sidebar Navigation */
+    .api-sidebar {
+        width: 300px;
+        background-color: var(--api-sidebar-bg);
+        border-right: 1px solid #e3e6f0;
+        padding: 2.5rem 1.5rem;
+        position: sticky;
+        top: 60px;
+        height: calc(100vh - 60px);
+        overflow-y: auto;
+    }
+
+    .api-sidebar h5 {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.15em;
+        color: #aeb1c5;
+        margin-bottom: 1.5rem;
+        font-weight: 700;
+    }
+
+    .api-nav {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .api-nav-item {
+        margin-bottom: 0.25rem;
+    }
+
+    .api-nav-link {
+        color: #4e5d78;
+        text-decoration: none;
+        font-size: 0.95rem;
+        display: flex;
+        align-items: center;
+        padding: 0.6rem 1rem;
+        border-radius: 0.75rem;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        border: 1px solid transparent;
+    }
+
+    .api-nav-link:hover {
+        background-color: #fff;
+        color: var(--api-primary);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    }
+
+    .api-nav-link.active {
+        background-color: var(--api-primary);
+        color: white !important;
+        font-weight: 600;
+        box-shadow: 0 4px 12px rgba(78, 115, 223, 0.25);
+    }
+
+    .api-nav-link i {
+        font-size: 0.8rem;
+        margin-right: 0.75rem;
+        opacity: 0.6;
+    }
+
+    .api-nav-link.active i {
+        opacity: 1;
+    }
+
+    /* Main Content */
+    .api-content {
+        flex: 1;
+        padding: 3rem 4rem;
+        max-width: 1000px;
+        background-color: var(--api-content-bg);
+    }
+
+    /* Markdown Overrides */
+    #markdown-render h1 { font-weight: 800; color: #2e384d; margin-bottom: 2rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 1rem; }
+    #markdown-render h2 { font-weight: 700; color: #334155; margin-top: 3rem; margin-bottom: 1.5rem; scroll-margin-top: 100px; }
+    #markdown-render h3 { font-size: 1.25rem; font-weight: 600; color: #475569; margin-top: 2rem; }
+    #markdown-render p { color: #64748b; line-height: 1.8; font-size: 1.05rem; }
+    
+    /* Tables in Markdown */
+    #markdown-render table { width: 100%; margin: 2rem 0; border-collapse: separate; border-spacing: 0; border: 1px solid #e2e8f0; border-radius: 0.75rem; overflow: hidden; }
+    #markdown-render th { background-color: #f8fafc; padding: 1rem; text-align: left; font-size: 0.8rem; text-transform: uppercase; color: #64748b; }
+    #markdown-render td { padding: 1rem; border-top: 1px solid #e2e8f0; font-size: 0.95rem; color: #334155; }
+
+    /* Blockquotes */
+    #markdown-render blockquote { background: #f0f7ff; border-left: 4px solid var(--api-primary); padding: 1.25rem 1.5rem; margin: 2rem 0; border-radius: 0.5rem; color: #1e40af; }
+    #markdown-render blockquote p { margin-bottom: 0; color: #1e40af; font-weight: 500; }
+
+    /* Code Blocks */
+    .code-wrapper { position: relative; margin: 1.5rem 0; }
+    .copy-btn-api { position: absolute; top: 12px; right: 12px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 0.35rem 0.75rem; border-radius: 0.5rem; font-size: 0.7rem; cursor: pointer; transition: all 0.2s; z-index: 10; }
+    .copy-btn-api:hover { background: rgba(255,255,255,0.25); }
+    pre { border-radius: 0.75rem !important; padding: 1.5rem !important; background: #1e293b !important; }
+    code { font-family: 'Fira Code', monospace !important; }
+
+    @media (max-width: 992px) { .api-sidebar { display: none; } .api-content { padding: 2rem; } }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="api-docs-container">
+    <aside class="api-sidebar">
+        <h5>Contenido</h5>
+        <ul class="api-nav" id="sidebar-nav">
+            <!-- Se generará dinámicamente -->
+        </ul>
+        
+        <div class="mt-5 pt-4 border-top text-center">
+            <p class="text-muted small">Referencia técnica oficial de la API PaaSify</p>
+        </div>
+    </aside>
+
+    <main class="api-content">
+        <div id="markdown-render">
+            <!-- Aquí se renderiza el Markdown -->
+            <div class="text-center py-5">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="mt-2 text-muted">Cargando documentación...</p>
+            </div>
+        </div>
+    </main>
+</div>
+
+<!-- Scripts de dependencias -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script id="markdown-source" type="text/markdown" style="display:none;">{{ markdown_content|safe }}</script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const sourceElement = document.getElementById('markdown-source');
+        const rawMarkdown = sourceElement.textContent;
+        const userToken = "{{ token }}"; // Ya no lo usaremos directamente en el texto
+        const apiUrl = "{{ PAASIFY_API_URL }}";
+
+        // 1. Procesar Markdown (Reemplazos genéricos, NO del token real por seguridad)
+        let processedMd = rawMarkdown
+            .replace(/\{\{\s*PAASIFY_API_URL\s*\}\}/g, apiUrl)
+            .replace(/\{\{\s*TU_API_TOKEN\s*\}\}/g, '<TU_API_TOKEN>')
+            .replace(/<TU_API_TOKEN>/g, '<TU_API_TOKEN>');
+
+        // 2. Renderizar HTML
+        const html = marked.parse(processedMd);
+        const container = document.getElementById('markdown-render');
+        container.innerHTML = html;
+
+        // 3. Post-procesado (Botones de copiar y Prism)
+        container.querySelectorAll('pre').forEach(pre => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'code-wrapper';
+            pre.parentNode.insertBefore(wrapper, pre);
+            wrapper.appendChild(pre);
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'copy-btn-api';
+            copyBtn.innerHTML = '<i class="fas fa-copy"></i> Copiar';
+            copyBtn.onclick = () => copyText(pre.innerText, copyBtn);
+            wrapper.appendChild(copyBtn);
+        });
+
+        if (window.Prism) Prism.highlightAll();
+
+        // 4. Generar Sidebar Dinámico con limpieza de labels
+        const sidebar = document.getElementById('sidebar-nav');
+        container.querySelectorAll('h2').forEach(h2 => {
+            // Limpiar el texto si tuviera el patrón {#id} (aunque ya lo quitamos del .md)
+            const cleanText = h2.innerText.replace(/\{#.*\}/g, '').trim();
+            const id = h2.id || cleanText.toLowerCase().replace(/\s+/g, '-');
+            h2.id = id;
+            h2.innerText = cleanText; // Limpiar también el header visualmente
+            
+            const li = document.createElement('li');
+            li.className = 'api-nav-item';
+            li.innerHTML = `<a href="#${id}" class="api-nav-link"><i class="fas fa-chevron-right"></i> ${cleanText}</a>`;
+            sidebar.appendChild(li);
+        });
+
+        // 5. Scroll Spy simple
+        const links = document.querySelectorAll('.api-nav-link');
+        window.addEventListener('scroll', () => {
+            let current = '';
+            container.querySelectorAll('h2').forEach(h2 => {
+                if (window.pageYOffset >= h2.offsetTop - 120) {
+                    current = h2.id;
+                }
+            });
+            links.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${current}`) link.classList.add('active');
+            });
+        });
+    });
+
+    function copyText(text, btn) {
+        navigator.clipboard.writeText(text).then(() => {
+            const original = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i>';
+            btn.style.background = 'var(--api-success)';
+            
+            setTimeout(() => {
+                btn.innerHTML = original;
+                btn.style.background = '';
+            }, 2000);
+
+            Swal.fire({
+                title: '¡Copiado!',
+                text: 'Comando copiado al portapapeles',
+                icon: 'success',
+                timer: 1000,
+                showConfirmButton: false,
+                toast: true,
+                position: 'top-end'
+            });
+        });
+    }
+</script>
+{% endblock %}

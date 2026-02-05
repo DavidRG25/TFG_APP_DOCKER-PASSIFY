@@ -63,7 +63,7 @@
         <table class="table table-sm">
           <tr>
             <td class="fw-semibold">Base URL:</td>
-            <td><code>{{ request.scheme }}://{{ request.get_host }}/api/</code></td>
+            <td><code>{{ PAASIFY_API_URL }}</code></td>
           </tr>
           <tr>
             <td class="fw-semibold">Autenticación:</td>
@@ -91,7 +91,7 @@
               
               <p><strong>Ejemplo:</strong></p>
               <pre class="bg-light p-3 rounded"><code>curl --request POST \
-  {{ request.scheme }}://{{ request.get_host }}/api/containers/ \
+  {{ PAASIFY_API_URL }}/containers/ \
   --header 'Authorization: Bearer {{ token }}' \
   --header 'Content-Type: application/json' \
   --data '{
@@ -132,7 +132,7 @@
               
               <p><strong>Ejemplo:</strong></p>
               <pre class="bg-light p-3 rounded"><code>curl --request GET \
-  {{ request.scheme }}://{{ request.get_host }}/api/containers/ \
+  {{ PAASIFY_API_URL }}/containers/ \
   --header 'Authorization: Bearer {{ token }}'</code></pre>
               
               <button class="btn btn-sm btn-outline-primary" onclick="copyExample('listServicesExample')">
@@ -155,7 +155,7 @@
               
               <p><strong>Ejemplo:</strong></p>
               <pre class="bg-light p-3 rounded"><code>curl --request POST \
-  {{ request.scheme }}://{{ request.get_host }}/api/containers/42/start/ \
+  {{ PAASIFY_API_URL }}/containers/42/start/ \
   --header 'Authorization: Bearer {{ token }}'</code></pre>
               
               <button class="btn btn-sm btn-outline-primary" onclick="copyExample('startServiceExample')">
@@ -178,7 +178,7 @@
               
               <p><strong>Ejemplo:</strong></p>
               <pre class="bg-light p-3 rounded"><code>curl --request POST \
-  {{ request.scheme }}://{{ request.get_host }}/api/containers/42/stop/ \
+  {{ PAASIFY_API_URL }}/containers/42/stop/ \
   --header 'Authorization: Bearer {{ token }}'</code></pre>
               
               <button class="btn btn-sm btn-outline-primary" onclick="copyExample('stopServiceExample')">
@@ -201,7 +201,7 @@
               
               <p><strong>Ejemplo:</strong></p>
               <pre class="bg-light p-3 rounded"><code>curl --request POST \
-  {{ request.scheme }}://{{ request.get_host }}/api/containers/42/remove/ \
+  {{ PAASIFY_API_URL }}/containers/42/remove/ \
   --header 'Authorization: Bearer {{ token }}'</code></pre>
               
               <button class="btn btn-sm btn-outline-primary" onclick="copyExample('deleteServiceExample')">
@@ -231,8 +231,8 @@ jobs:
       - name: Deploy to PaaSify
         run: |
           curl --request POST \
-            {{ request.scheme }}://{{ request.get_host }}/api/containers/ \
-            --header 'Authorization: Bearer ${{ '{{' }} secrets.PAASIFY_TOKEN {{ '}}' }}' \
+            {{ PAASIFY_API_URL }}/containers/ \
+            --header 'Authorization: Bearer ${% templatetag openvariable %} secrets.PAASIFY_TOKEN {% templatetag closevariable %}' \
             --header 'Content-Type: application/json' \
             --data '{
               "name": "my-app",

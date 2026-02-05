@@ -57,10 +57,8 @@
               }
             "
           >
-            {% csrf_token %}
-
-            {# Contenedor de errores de validación #}
-            <div id="form-errors" class="mb-3" style="display: none;"></div>
+            {% csrf_token %} {# Contenedor de errores de validación #}
+            <div id="form-errors" class="mb-3" style="display: none"></div>
 
             {# Sección 1: Información Básica #}
             <div class="mb-4">
@@ -191,7 +189,7 @@
                   <div
                     class="mode-card p-3 border rounded"
                     data-mode="default"
-                    style="cursor: pointer; transition: all 0.3s ease;"
+                    style="cursor: pointer; transition: all 0.3s ease"
                   >
                     <input
                       class="form-check-input d-none"
@@ -225,7 +223,7 @@
                   <div
                     class="mode-card p-3 border rounded"
                     data-mode="dockerhub"
-                    style="cursor: pointer; transition: all 0.3s ease;"
+                    style="cursor: pointer; transition: all 0.3s ease"
                   >
                     <input
                       class="form-check-input d-none"
@@ -258,7 +256,7 @@
                   <div
                     class="mode-card p-3 border rounded"
                     data-mode="custom"
-                    style="cursor: pointer; transition: all 0.3s ease;"
+                    style="cursor: pointer; transition: all 0.3s ease"
                   >
                     <input
                       class="form-check-input d-none"
@@ -426,7 +424,11 @@
                   />
                   <small class="text-muted">
                     El botón "Usar este puerto" de arriba rellena este campo
-                    automáticamente. <strong>Si se deja vacío, se usará el puerto 80 por defecto.</strong>
+                    automáticamente.
+                    <strong
+                      >Si se deja vacío, se usará el puerto 80 por
+                      defecto.</strong
+                    >
                   </small>
                 </div>
               </div>
@@ -706,6 +708,10 @@
               <i class="fas fa-check-circle text-success me-2"></i>El ZIP debe
               contener Dockerfile o docker-compose.yml
             </li>
+            <li class="mb-2">
+              <i class="fas fa-check-circle text-success me-2"></i>Verifica que
+              la imagen de DockerHub sea pública
+            </li>
           </ul>
         </div>
       </div>
@@ -734,6 +740,14 @@ Código: app.zip
 Puerto interno: 3000</code></pre>
           </div>
 
+          <div class="mb-3">
+            <h6 class="fw-semibold">Imagen desde DockerHub</h6>
+            <pre class="bg-light p-2 rounded"><code>Nombre: mi-python-app
+Modo: DockerHub
+Imagen: python:3.9-slim
+Puerto interno: 5000</code></pre>
+          </div>
+
           <div>
             <h6 class="fw-semibold">Docker Compose</h6>
             <pre class="bg-light p-2 rounded"><code>Nombre: mi-stack
@@ -755,12 +769,12 @@ Código: proyecto.zip</code></pre>
     border: 2px solid #dee2e6 !important;
     background-color: #fff;
   }
-  
+
   .mode-card:hover {
     border-color: #adb5bd !important;
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
   }
-  
+
   .mode-card.selected {
     border-color: #4e73df !important;
     background-color: #f0f4ff;
@@ -771,58 +785,60 @@ Código: proyecto.zip</code></pre>
 <script>
   // Función para actualizar el resaltado de las cards de modo
   function updateModeCardSelection() {
-    document.querySelectorAll('.mode-card').forEach(card => {
+    document.querySelectorAll(".mode-card").forEach((card) => {
       const radio = card.querySelector('input[type="radio"]');
       if (radio && radio.checked) {
-        card.classList.add('selected');
+        card.classList.add("selected");
       } else {
-        card.classList.remove('selected');
+        card.classList.remove("selected");
       }
     });
   }
-  
+
   // Inicializar al cargar la página
-  document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener("DOMContentLoaded", function () {
     updateModeCardSelection();
-    
+
     // Añadir listeners a todos los radio buttons de modo
-    document.querySelectorAll('input[name="mode"]').forEach(radio => {
-      radio.addEventListener('change', function() {
+    document.querySelectorAll('input[name="mode"]').forEach((radio) => {
+      radio.addEventListener("change", function () {
         updateModeCardSelection();
         applyMode(); // Llamar a la función existente
       });
     });
-    
+
     // Hacer que toda la card sea clickeable
-    document.querySelectorAll('.mode-card').forEach(card => {
-      card.addEventListener('click', function() {
+    document.querySelectorAll(".mode-card").forEach((card) => {
+      card.addEventListener("click", function () {
         const radio = this.querySelector('input[type="radio"]');
         if (radio) {
           radio.checked = true;
-          radio.dispatchEvent(new Event('change'));
+          radio.dispatchEvent(new Event("change"));
         }
       });
     });
-    
+
     // Validación del formulario para modo DockerHub
-    const form = document.getElementById('newServiceForm');
+    const form = document.getElementById("newServiceForm");
     if (form) {
-      form.addEventListener('submit', async function(e) {
-        const mode = document.querySelector('input[name="mode"]:checked')?.value;
-        
-        if (mode === 'dockerhub') {
-          const dockerhubInput = document.getElementById('service-dockerhub');
+      form.addEventListener("submit", async function (e) {
+        const mode = document.querySelector(
+          'input[name="mode"]:checked',
+        )?.value;
+
+        if (mode === "dockerhub") {
+          const dockerhubInput = document.getElementById("service-dockerhub");
           const imageName = dockerhubInput?.value.trim();
-          
+
           if (!imageName) {
             return; // La validación HTML5 required se encargará
           }
-          
+
           // Prevenir el envío mientras validamos
           e.preventDefault();
-          
-          const feedback = document.getElementById('dockerhub-feedback');
-          
+
+          const feedback = document.getElementById("dockerhub-feedback");
+
           // Mostrar loading
           feedback.innerHTML = `
             <div class="alert alert-info mb-0">
@@ -830,14 +846,14 @@ Código: proyecto.zip</code></pre>
               Verificando imagen en DockerHub...
             </div>
           `;
-          feedback.style.display = 'block';
-          
+          feedback.style.display = "block";
+
           try {
             const response = await fetch(
-              `/paasify/containers/verify-dockerhub/?image=${encodeURIComponent(imageName)}`
+              `/paasify/containers/verify-dockerhub/?image=${encodeURIComponent(imageName)}`,
             );
             const data = await response.json();
-            
+
             if (data.success) {
               // Imagen válida, permitir el envío
               feedback.innerHTML = `
@@ -846,9 +862,9 @@ Código: proyecto.zip</code></pre>
                   Imagen verificada. Creando servicio...
                 </div>
               `;
-              
+
               // Enviar el formulario usando HTMX para que la redirección funcione
-              htmx.trigger(form, 'submit');
+              htmx.trigger(form, "submit");
             } else {
               // Imagen no válida, mostrar error
               feedback.innerHTML = `
@@ -859,10 +875,10 @@ Código: proyecto.zip</code></pre>
                   <small>Por favor, verifica el nombre de la imagen y vuelve a intentarlo.</small>
                 </div>
               `;
-              feedback.style.display = 'block';
-              
+              feedback.style.display = "block";
+
               // Hacer scroll al feedback para que el usuario lo vea
-              feedback.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              feedback.scrollIntoView({ behavior: "smooth", block: "center" });
             }
           } catch (error) {
             feedback.innerHTML = `
@@ -873,7 +889,7 @@ Código: proyecto.zip</code></pre>
                 <small>${error.message}</small>
               </div>
             `;
-            feedback.style.display = 'block';
+            feedback.style.display = "block";
           }
         }
       });

@@ -105,6 +105,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'paasify.context_processors.role_flags',
+                'paasify.context_processors.global_settings',
             ],
         },
     },
@@ -138,6 +139,14 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
+
+# ---------------------------------------------------------------------
+# Configuración de URL Base (para API y Documentación)
+# ---------------------------------------------------------------------
+# Permite fijar el dominio/IP de la plataforma (ej: https://passify-urjc.es)
+# Si se deja vacío, se detectará dinámicamente desde la petición.
+PAASIFY_BASE_URL = os.environ.get("PAASIFY_BASE_URL", "").rstrip("/")
+
 
 # ---------------------------------------------------------------------
 # Archivos estáticos (CSS/JS/Imágenes)

@@ -160,24 +160,17 @@ def copy_token_view(request):
     if request.method == 'GET':
         user = request.user
         
-        # Verificar que el usuario tenga UserProfile
         try:
-            profile = user.user_profile
-        except UserProfile.DoesNotExist:
+            from paasify.models.TokenModel import ExpiringToken
+            token = ExpiringToken.objects.get(user=user)
+            return JsonResponse({
+                'success': True,
+                'token': token.key
+            })
+        except ExpiringToken.DoesNotExist:
             return JsonResponse({
                 'success': False,
-                'error': 'No tienes un perfil asociado.'
-            }, status=400)
-        
-        if not profile.api_token:
-            return JsonResponse({
-                'success': False,
-                'error': 'No tienes un token generado. Genera uno primero.'
-            }, status=400)
-        
-        return JsonResponse({
-            'success': True,
-            'token': profile.api_token
-        })
+                'error': 'No tienes un token generado. Por favor, genera uno nuevo.'
+            }, status=404)
     
     return JsonResponse({'success': False, 'error': 'Metodo no permitido'}, status=405)

@@ -1148,3 +1148,64 @@ def manage_api_token(request):
     }
     
     return render(request, 'containers/api_token.html', context)
+
+@login_required
+def api_documentation_view(request):
+    """
+    Pagina dedicada de documentacion de la API REST para los alumnos.
+    Incluye ejemplos detallados, casos de uso y fragmentos de codigo.
+    """
+    from paasify.models.TokenModel import ExpiringToken
+    
+    import os
+    from django.conf import settings
+
+    # Obtener el token del usuario para los ejemplos interactivos
+    token, _ = ExpiringToken.objects.get_or_create(user=request.user)
+    
+    # Intentar leer el archivo Markdown de documentacion
+    md_content = ""
+    docs_path = os.path.join(settings.BASE_DIR, "templates", "api_docs", "api_reference.md")
+    if os.path.exists(docs_path):
+        with open(docs_path, "r", encoding="utf-8") as f:
+            md_content = f.read()
+    
+    context = {
+        'token': token.key,
+        'user_token': token.key,
+        'markdown_content': md_content,
+        'PAASIFY_API_URL': f"{request.scheme}://{request.get_host()}/api",
+    }
+    
+    return render(request, 'containers/api_documentation.html', context)
+
+@login_required
+def api_command_generator_view(request):
+    """
+    Generador interactivo de comandos API.
+    Permite al alumno configurar un servicio visualmente y obtener el comando curl.
+    """
+    from paasify.models.TokenModel import ExpiringToken
+    
+    token, _ = ExpiringToken.objects.get_or_create(user=request.user)
+    images = AllowedImage.objects.all().order_by('name')
+    subjects = Subject.objects.filter(students=request.user)
+    user_projects = UserProject.objects.filter(
+        user_profile__user=request.user
+    ).select_related('subject')
+    
+    # URL de retorno
+    return_url = request.GET.get('return_url')
+    if not return_url:
+        from django.urls import reverse
+        return_url = reverse('containers:student_panel')
+        
+    context = {
+        'token': token.key,
+        'images': images,
+        'available_subjects': subjects,
+        'user_projects': user_projects,
+        'return_url': return_url,
+    }
+    
+    return render(request, 'containers/api_command_generator.html', context)

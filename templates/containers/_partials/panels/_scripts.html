@@ -1,5 +1,6 @@
 <script src="https://unpkg.com/htmx.org@1.9.12"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
   function copyToClipboard(elementSelector) {
     const element = document.querySelector(elementSelector);
@@ -34,23 +35,31 @@
         });
     };
 
-    // 3. Mostramos la confirmación
-    if (window.swal) {
-      swal({
-        title: "¿Eliminar servicio?",
-        text: `Vas a eliminar "${name}" de forma permanente. Esta acción no se puede deshacer.`,
-        icon: "warning",
-        buttons: ["Cancelar", "Sí, eliminar"],
-        dangerMode: true,
-      }).then((confirmed) => {
-        if (confirmed) {
-          executeDelete();
-        }
-      });
-    } else {
-      if (confirm(`¿Eliminar ${name}?`)) executeDelete();
-    }
+    // 3. Mostramos la confirmación Premium
+    Swal.fire({
+      title: '<h4 class="fw-bold mb-0">¿Eliminar servicio?</h4>',
+      html: `<p class="text-muted mt-2 mb-0">Vas a eliminar <strong>${name}</strong> de forma permanente. Esta acción no se puede deshacer.</p>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: '<i class="fas fa-trash-alt me-2"></i>Sí, eliminar',
+      cancelButtonText: 'Cancelar',
+      reverseButtons: true,
+      confirmButtonColor: '#e74a3b',
+      cancelButtonColor: '#858796',
+      borderRadius: '1.25rem',
+      padding: '2rem',
+      customClass: {
+          confirmButton: 'btn btn-danger px-4 py-2 fw-bold',
+          cancelButton: 'btn btn-light px-4 py-2 fw-bold'
+      },
+      buttonsStyling: false
+    }).then((result) => {
+      if (result.isConfirmed) {
+        executeDelete();
+      }
+    });
   };
+
 
   htmx.on("htmx:configRequest", (e) => {
     const token = document.querySelector(
@@ -62,63 +71,41 @@
   });
 
   function showToast(message, variant = "text-bg-success", title = null) {
-    const box = document.getElementById("global-alert-container");
-    if (!box) return;
-
     const variantMap = {
       "text-bg-success": "success",
-      "text-bg-danger": "danger",
+      "text-bg-danger": "error",
       "text-bg-warning": "warning",
       "text-bg-info": "info",
-      "text-bg-primary": "primary"
+      "text-bg-primary": "info"
     };
     
-    const v = variantMap[variant] || "success";
-    const config = {
-      "success": { icon: "fa-check", title: "¡Éxito!" },
-      "danger": { icon: "fa-times", title: "Error" },
-      "warning": { icon: "fa-exclamation-triangle", title: "Atención" },
-      "info": { icon: "fa-info-circle", title: "Información" },
-      "primary": { icon: "fa-rocket", title: "Procesando" }
-    };
-
-    const c = config[v];
-    const displayTitle = title || c.title;
-
-    const banner = document.createElement("div");
-    banner.className = `alert alert-${v} border-0 shadow-lg d-flex align-items-center show fade mb-2`;
-    banner.style.borderLeft = `3px solid ${v === 'success' ? '#1cc88a' : (v === 'danger' ? '#e74a3b' : '#f6c23e')}`;
-    banner.style.width = "fit-content";
-    banner.style.minWidth = "230px";
-    banner.style.maxWidth = "380px";
-    banner.style.backgroundColor = "white";
-    banner.style.borderRadius = "6px";
-    banner.style.pointerEvents = "auto";
+    const icon = variantMap[variant] || "success";
     
-    banner.innerHTML = `
-      <div class="d-flex align-items-center w-100 p-2 px-3">
-        <div class="bg-${v} rounded-circle p-1 me-3 d-flex align-items-center justify-content-center shadow-sm" style="width: 20px; height: 20px; min-width: 20px;">
-          <i class="fas ${c.icon} text-white" style="font-size: 0.55rem;"></i>
-        </div>
-        <div class="flex-grow-1 text-start">
-          <div class="fw-bold text-${v}" style="letter-spacing: -0.2px; line-height: 1.1; font-size: 0.76rem;">${displayTitle}</div>
-          <div class="text-dark opacity-75 mt-1" style="font-size: 0.7rem; line-height: 1.2;">${message}</div>
-        </div>
-        <button type="button" class="btn btn-link text-muted p-0 ms-3" data-bs-dismiss="alert" aria-label="Close" style="text-decoration: none; opacity: 0.3;">
-          <i class="fas fa-times" style="font-size: 0.6rem;"></i>
-        </button>
-      </div>
-    `;
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-start',
+      showConfirmButton: false,
+      timer: 3500,
+      timerProgressBar: true,
+      didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer)
+        toast.addEventListener('mouseleave', Swal.resumeTimer)
+      }
+    });
 
-    // Insertar al principio para que se vea arriba
-    box.prepend(banner);
-
-    // Auto-eliminar después de 4 segundos
-    setTimeout(() => {
-      const bsAlert = new bootstrap.Alert(banner);
-      if (banner.parentNode) bsAlert.close();
-    }, 4500);
+    Toast.fire({
+      icon: icon,
+      title: title ? `<strong>${title}</strong><br>${message}` : message,
+      background: '#fff',
+      color: '#2d3748',
+      padding: '1rem',
+      borderRadius: '1rem',
+      customClass: {
+        popup: 'shadow-lg border-0'
+      }
+    });
   }
+
 
   function resetNewServiceForm() {
     const form = document.getElementById("newServiceForm");

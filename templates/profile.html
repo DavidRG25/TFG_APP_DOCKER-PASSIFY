@@ -1,366 +1,496 @@
-{% extends "base.html" %} {% load static %} {% block body %}
-<div class="container py-4">
-  <div class="row">
-    <div class="col-12">
-      <h2 class="mb-4"><i class="fas fa-user-circle"></i> Mi Perfil</h2>
+{% extends "base.html" %} {% load static %} {% block extrahead %}
+<style>
+  /* Variables y estilos base del perfil premium */
+  :root {
+    --glass-bg: rgba(255, 255, 255, 0.95);
+    --premium-blue: #4e73df;
+    --premium-blue-dark: #224abe;
+    --premium-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --premium-radius: 1rem;
+  }
+
+  .profile-container {
+    animation: fadeIn 0.5s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Avatar con iniciales */
+  .avatar-circle {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, var(--premium-blue) 0%, var(--premium-blue-dark) 100%);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(78, 115, 223, 0.3);
+    margin-right: 1.5rem;
+  }
+
+  /* Cards refinadas */
+  .premium-card {
+    border: none;
+    border-radius: var(--premium-radius);
+    box-shadow: var(--premium-shadow);
+    background: var(--glass-bg);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    overflow: hidden;
+  }
+
+  .premium-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+
+  .premium-card .card-header {
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+    background: transparent;
+    padding: 1.25rem 1.5rem;
+  }
+
+  .card-icon-container {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-right: 10px;
+  }
+
+  /* Estilos específicos para el token */
+  .token-box {
+    background: #f8fafc;
+    border: 2px dashed #e2e8f0;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    font-family: 'Fira Code', 'Courier New', monospace;
+    position: relative;
+    transition: all 0.2s;
+  }
+
+  .token-box:hover {
+      background: #f1f5f9;
+      border-color: var(--premium-blue);
+  }
+
+  /* Pills premium para asignaturas */
+  .year-badge {
+    background: rgba(78, 115, 223, 0.1);
+    color: var(--premium-blue);
+    font-weight: 600;
+    padding: 0.4rem 0.8rem;
+    border-radius: 2rem;
+    font-size: 0.8rem;
+    border: 1px solid rgba(78, 115, 223, 0.2);
+  }
+
+  /* Alerts minimalistas */
+  .premium-alert {
+      border: none;
+      border-radius: 0.75rem;
+      border-left: 5px solid;
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+  }
+
+  /* Estilos para inputs */
+  .premium-form-control {
+      border: 2px solid #f1f5f9;
+      border-radius: 0.75rem;
+      padding: 0.75rem 1rem;
+      transition: all 0.2s;
+  }
+
+  .premium-form-control:focus {
+      border-color: var(--premium-blue);
+      box-shadow: 0 0 0 4px rgba(78, 115, 223, 0.1);
+      background-color: white;
+  }
+
+  /* Diseño Premium para el Modal de Token */
+  .token-modal-content {
+      border: none;
+      border-radius: 1.5rem;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+
+  .token-modal-header {
+      background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%);
+      padding: 2rem;
+      border: none;
+  }
+
+  .token-display-box {
+      background: #f8fafc;
+      border: 2px dashed #e2e8f0;
+      border-radius: 1rem;
+      padding: 1.5rem;
+      font-family: 'Fira Code', monospace;
+      color: var(--premium-blue);
+      word-break: break-all;
+      font-size: 1.1rem;
+      position: relative;
+  }
+
+  .copy-feedback-badge {
+      position: absolute;
+      top: -10px;
+      right: 10px;
+      display: none;
+      animation: fadeInDown 0.3s ease;
+  }
+
+  /* Nueva caja de guía premium */
+  .premium-guide-box {
+      background: linear-gradient(135deg, rgba(78, 115, 223, 0.05) 0%, rgba(78, 115, 223, 0.02) 100%);
+      border: 1px solid rgba(78, 115, 223, 0.1);
+      border-radius: 1rem;
+      padding: 1.25rem;
+  }
+
+  .code-snippet {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 1rem;
+      border-radius: 0.75rem;
+      font-family: 'Fira Code', monospace;
+      font-size: 0.8rem;
+      margin: 1rem 0;
+      position: relative;
+      overflow-x: auto;
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container py-5 profile-container">
+  <!-- Header con Avatar -->
+  <div class="d-flex align-items-center mb-5">
+    <div class="avatar-circle">
+      {{ user.username|first|upper }}
+    </div>
+    <div>
+      <h1 class="h2 fw-bold mb-1 text-gray-800">Mi Perfil</h1>
+      <p class="text-muted mb-0">Gestiona tus datos personales y credenciales de acceso</p>
     </div>
   </div>
 
-  <div class="row">
+  <div class="row g-4">
     <!-- Columna izquierda: Datos personales y contraseña -->
-    <div class="col-md-6">
+    <div class="col-lg-6">
+      
       <!-- Datos personales -->
-      <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-primary text-white">
-          <h5 class="mb-0"><i class="fas fa-id-card"></i> Datos Personales</h5>
+      <div class="card premium-card mb-4">
+        <div class="card-header d-flex align-items-center">
+          <div class="card-icon-container bg-primary-soft" style="background: rgba(78, 115, 223, 0.1); color: var(--premium-blue);">
+              <i class="fas fa-id-card"></i>
+          </div>
+          <h5 class="mb-0 fw-bold">Datos Personales</h5>
         </div>
-        <div class="card-body">
-          <div class="mb-3">
-            <label class="form-label fw-bold">Usuario</label>
-            <input
-              type="text"
-              class="form-control"
-              value="{{ user.username }}"
-              readonly
-            />
-          </div>
-
-          {% if profile %}
-          <div class="mb-3">
-            <label class="form-label fw-bold">Nombre completo</label>
-            <input
-              type="text"
-              class="form-control"
-              value="{{ profile.nombre }}"
-              readonly
-            />
-          </div>
-          {% endif %}
-
-          <div class="mb-3">
-            <label class="form-label fw-bold">Email</label>
-            <input
-              type="email"
-              class="form-control"
-              value="{{ user.email }}"
-              readonly
-            />
-          </div>
-
-          <div class="mb-0">
-            <label class="form-label fw-bold">Rol</label>
-            <div>
-              {% if is_student %}
-              <span class="badge bg-info">Alumno</span>
-              {% endif %} {% if is_teacher %}
-              <span class="badge bg-success">Profesor</span>
-              {% endif %} {% if user.is_superuser %}
-              <span class="badge bg-danger">Administrador</span>
+        <div class="card-body p-4">
+          <div class="row">
+              <div class="col-md-6 mb-3">
+                  <label class="form-label fw-semibold text-muted small text-uppercase">Usuario</label>
+                  <div class="fw-bold">{{ user.username }}</div>
+              </div>
+              <div class="col-md-6 mb-3">
+                  <label class="form-label fw-semibold text-muted small text-uppercase">Email</label>
+                  <div class="fw-bold">{{ user.email }}</div>
+              </div>
+              {% if profile %}
+              <div class="col-12 mb-3">
+                  <label class="form-label fw-semibold text-muted small text-uppercase">Nombre completo</label>
+                  <div class="fw-bold text-primary">{{ profile.nombre }}</div>
+              </div>
               {% endif %}
-            </div>
+              <div class="col-12 mt-2">
+                  <label class="form-label fw-semibold text-muted small text-uppercase d-block mb-2">Rol en la plataforma</label>
+                  <div>
+                    {% if is_student %}
+                    <span class="badge rounded-pill px-3 py-2 bg-info" style="font-size: 0.85rem;"><i class="fas fa-graduation-cap me-1"></i> Alumno</span>
+                    {% endif %} 
+                    {% if is_teacher %}
+                    <span class="badge rounded-pill px-3 py-2 bg-success" style="font-size: 0.85rem;"><i class="fas fa-chalkboard-teacher me-1"></i> Profesor</span>
+                    {% endif %} 
+                    {% if user.is_superuser %}
+                    <span class="badge rounded-pill px-3 py-2 bg-danger" style="font-size: 0.85rem;"><i class="fas fa-user-shield me-1"></i> Administrador</span>
+                    {% endif %}
+                  </div>
+              </div>
           </div>
         </div>
       </div>
 
       <!-- Cambio de contraseña -->
-      <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-warning text-dark">
-          <h5 class="mb-0"><i class="fas fa-key"></i> Cambiar Contraseña</h5>
+      <div class="card premium-card shadow-sm border-0">
+        <div class="card-header d-flex align-items-center" style="border-top: 4px solid #f6c23e;">
+          <div class="card-icon-container" style="background: rgba(246, 194, 62, 0.1); color: #f6c23e;">
+              <i class="fas fa-key"></i>
+          </div>
+          <h5 class="mb-0 fw-bold">Seguridad</h5>
         </div>
-        <div class="card-body">
+        <div class="card-body p-4">
           <form method="POST" action="{% url 'change_password' %}">
             {% csrf_token %}
             <div class="mb-3">
-              <label for="old_password" class="form-label"
-                >Contraseña actual</label
-              >
-              <input
-                type="password"
-                class="form-control"
-                id="old_password"
-                name="old_password"
-                required
-              />
+              <label for="old_password" class="form-label small fw-bold">Contraseña actual</label>
+              <input type="password" class="form-control premium-form-control" id="old_password" name="old_password" placeholder="••••••••" required />
             </div>
-            <div class="mb-3">
-              <label for="new_password1" class="form-label"
-                >Nueva contraseña</label
-              >
-              <input
-                type="password"
-                class="form-control"
-                id="new_password1"
-                name="new_password1"
-                required
-              />
+            <div class="row g-3 mb-4">
+                <div class="col-md-6">
+                    <label for="new_password1" class="form-label small fw-bold">Nueva contraseña</label>
+                    <input type="password" class="form-control premium-form-control" id="new_password1" name="new_password1" placeholder="Nueva" required />
+                </div>
+                <div class="col-md-6">
+                    <label for="new_password2" class="form-label small fw-bold">Confirmar</label>
+                    <input type="password" class="form-control premium-form-control" id="new_password2" name="new_password2" placeholder="Repite" required />
+                </div>
             </div>
-            <div class="mb-3">
-              <label for="new_password2" class="form-label"
-                >Confirmar nueva contraseña</label
-              >
-              <input
-                type="password"
-                class="form-control"
-                id="new_password2"
-                name="new_password2"
-                required
-              />
-            </div>
-            <button type="submit" class="btn btn-warning w-100">
-              <i class="fas fa-save"></i> Cambiar Contraseña
+            <button type="submit" class="btn btn-warning w-100 fw-bold py-2 shadow-sm">
+              <i class="fas fa-save me-2"></i> Actualizar Contraseña
             </button>
           </form>
         </div>
       </div>
+
+      <!-- Asignaturas (Movido bajo Seguridad) -->
+      {% if subjects_as_student or subjects_as_teacher %}
+      <div class="card premium-card border-0 mt-4">
+        <div class="card-header d-flex align-items-center" style="border-top: 4px solid #6c757d;">
+          <div class="card-icon-container" style="background: rgba(108, 117, 125, 0.1); color: #6c757d;">
+              <i class="fas fa-graduation-cap"></i>
+          </div>
+          <h5 class="mb-0 fw-bold">{% if is_student %}Mis Estudios{% else %}Cursos Impartidos{% endif %}</h5>
+        </div>
+        <div class="card-body p-0">
+          <div class="list-group list-group-flush">
+            {% if subjects_as_student %}
+              {% for subject in subjects_as_student %}
+              <div class="list-group-item d-flex justify-content-between align-items-center p-3 border-0">
+                <div class="d-flex align-items-center">
+                    <div class="p-2 bg-light rounded-circle me-3" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-book text-muted"></i>
+                    </div>
+                    <span class="fw-bold">{{ subject.name }}</span>
+                </div>
+                <span class="year-badge">{{ subject.genero }}</span>
+              </div>
+              {% endfor %}
+            {% endif %} 
+            
+            {% if subjects_as_teacher %}
+              {% for subject in subjects_as_teacher %}
+              <div class="list-group-item d-flex justify-content-between align-items-center p-3 border-0">
+                <div class="d-flex align-items-center">
+                    <div class="p-2 bg-light rounded-circle me-3" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-users text-muted"></i>
+                    </div>
+                    <span class="fw-bold">{{ subject.name }}</span>
+                </div>
+                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3">
+                  {{ subject.students.count }} alumnos
+                </span>
+              </div>
+              {% endfor %}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
     </div>
 
     <!-- Columna derecha: Token API y asignaturas -->
-    <div class="col-md-6">
+    <div class="col-lg-6">
       <!-- Token API -->
       {% if profile %}
-      <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-dark text-white">
-          <h5 class="mb-0"><i class="fas fa-key"></i> Token de API</h5>
+      <div class="card premium-card mb-4 border-0">
+        <div class="card-header d-flex align-items-center bg-dark text-white">
+          <div class="card-icon-container" style="background: rgba(255, 255, 255, 0.1);">
+              <i class="fas fa-terminal"></i>
+          </div>
+          <h5 class="mb-0 fw-bold">Token de Desarrollador</h5>
         </div>
-        <div class="card-body">
-          <p class="text-muted small mb-3">
-            Usa este token para autenticarte en la API de PaaSify y desplegar
-            contenedores programáticamente.
-            <strong>Caducidad: 30 días.</strong>
+        <div class="card-body p-4">
+          <p class="text-muted small mb-4">
+            Usa este token para autenticarte en la API y desplegar contenedores desde tus propios scripts o CI/CD.
           </p>
 
           {% if api_token %}
-          <!-- Token existente -->
-          <div class="mb-3">
-            <label class="form-label fw-bold">Token actual</label>
-            <div class="input-group">
-              <input
-                type="text"
-                class="form-control font-monospace"
-                id="masked-token"
-                value="{{ api_token.masked }}"
-                readonly
-              />
-              <button
-                class="btn btn-outline-secondary"
-                type="button"
-                onclick="copyFullToken()"
-              >
-                <i class="fas fa-copy"></i> Copiar
+          <!-- Token Box -->
+          <div class="mb-4">
+            <label class="form-label small fw-bold text-muted text-uppercase mb-2">Token actual</label>
+            <div class="token-box d-flex justify-content-between align-items-center">
+              <span id="masked-token-display" class="text-primary fw-bold" style="letter-spacing: 2px;">{{ api_token.masked }}</span>
+              <button class="btn btn-sm btn-primary rounded-pill px-3" type="button" onclick="copyFullToken()">
+                <i class="fas fa-copy me-1"></i> Copiar
               </button>
             </div>
           </div>
 
-          <!-- Información de fechas -->
-          <div class="row mb-3">
-            <div class="col-md-6">
-              <small class="text-muted d-block">
-                <i class="fas fa-calendar-plus"></i> <strong>Creado:</strong
-                ><br />
-                {{ api_token.created|date:"d/m/Y H:i" }}
-              </small>
+          <!-- Metadatos del Token -->
+          <div class="row mb-4">
+            <div class="col-6">
+              <div class="p-3 bg-light rounded-3 text-center border">
+                  <div class="small text-muted fw-bold text-uppercase" style="font-size: 0.65rem;">Creado</div>
+                  <div id="token-created-display" class="fw-bold" style="font-size: 0.9rem;">{{ api_token.created|date:"d M Y" }}</div>
+              </div>
             </div>
-            <div class="col-md-6">
-              <small class="text-muted d-block">
-                <i class="fas fa-calendar-times"></i> <strong>Caduca:</strong
-                ><br />
-                {{ api_token.expires_at|date:"d/m/Y H:i" }}
-              </small>
+            <div class="col-6">
+              <div class="p-3 bg-light rounded-3 text-center border">
+                  <div class="small text-muted fw-bold text-uppercase" style="font-size: 0.65rem;">Caduca</div>
+                  <div id="token-expires-display" class="fw-bold" style="font-size: 0.9rem;">{{ api_token.expires_at|date:"d M Y" }}</div>
+              </div>
             </div>
           </div>
 
-          <!-- Días restantes -->
+          <!-- Estado del Token -->
           {% if api_token.is_expired %}
-          <div class="alert alert-danger small mb-3">
-            <i class="fas fa-exclamation-triangle"></i>
-            <strong>Token expirado.</strong> Por favor, regenera un nuevo token.
+          <div class="alert premium-alert alert-danger bg-danger-subtle mb-4" style="border-left-color: #ef4444;">
+            <div class="d-flex align-items-center">
+                <i class="fas fa-times-circle fa-lg me-3"></i>
+                <div>
+                    <strong>Token expirado</strong><br>Regenera uno nuevo para seguir usando la API.
+                </div>
+            </div>
           </div>
           {% else %}
-          <div class="alert alert-success small mb-3">
-            <i class="fas fa-check-circle"></i>
-            <strong>Token activo.</strong> Días restantes:
-            <strong>{{ api_token.days_remaining }}</strong>
+          <div class="alert premium-alert alert-success bg-success-subtle mb-4" style="border-left-color: #10b981;">
+             <div class="d-flex align-items-center">
+                  <i class="fas fa-check-circle fa-lg me-3"></i>
+                  <div>
+                      <strong>Token activo</strong><br>Te quedan <strong>{{ api_token.days_remaining }} días</strong> de acceso.
+                  </div>
+              </div>
           </div>
           {% endif %}
 
-          <div class="alert alert-info small mb-3">
-            <i class="fas fa-info-circle"></i>
-            Por seguridad, solo se muestran los últimos 8 caracteres. Usa el
-            botón "Copiar" para obtener el token completo.
+          <div class="d-flex gap-2">
+              <button class="btn btn-primary flex-grow-1 fw-bold py-2 shadow-sm" onclick="actionRefreshToken()">
+                <i class="fas fa-sync-alt me-2"></i> Regenerar Token
+              </button>
+          </div>
+          <div class="text-center mt-3">
+              <small class="text-muted"><i class="fas fa-exclamation-triangle me-1"></i> Cambiar el token invalidará el anterior inmediatamente.</small>
           </div>
 
-          <button class="btn btn-primary w-100 mb-2" onclick="refreshToken()">
-            <i class="fas fa-sync-alt"></i> Refrescar Token
-          </button>
-          <small class="text-muted d-block text-center">
-            ⚠️ Refrescar invalidará el token anterior
-          </small>
           {% else %}
           <!-- Sin token -->
-          <div class="alert alert-warning mb-3">
-            <i class="fas fa-exclamation-triangle"></i>
-            No tienes un token API generado.
+          <div class="alert premium-alert alert-warning mb-4" style="border-left-color: #f6c23e;">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            No tienes un token API habilitado.
           </div>
-
-          <button class="btn btn-success w-100" onclick="generateToken()">
-            <i class="fas fa-plus-circle"></i> Generar Token
+          <button class="btn btn-success w-100 fw-bold py-2 shadow-sm" onclick="generateToken()">
+            <i class="fas fa-plus-circle me-2"></i> Activar acceso API
           </button>
           {% endif %}
 
-          <!-- Instrucciones de uso -->
-          <div class="mt-3">
-            <button
-              class="btn btn-link p-0 text-decoration-none"
-              type="button"
-              data-bs-toggle="collapse"
-              data-bs-target="#tokenInstructions"
-            >
-              <i class="fas fa-question-circle"></i> ¿Cómo usar el token?
-            </button>
-            <div class="collapse mt-2" id="tokenInstructions">
-              <div class="card card-body bg-light small">
-                <p class="mb-2"><strong>Ejemplo con curl:</strong></p>
-                <pre
-                  class="bg-dark text-white p-2 rounded"
-                ><code>curl -X POST http://localhost:8000/api/containers/ \
-  -H "Authorization: Bearer TU_TOKEN_AQUI" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"mi-servicio","mode":"default","image":"nginx:latest"}'</code></pre>
-                <p class="mb-0 mt-2">
-                  <strong>Nota:</strong> El token expira en 30 días.
-                </p>
+          <!-- Acordeón de Ayuda Mejorado -->
+          <div class="mt-4 pt-3 border-top">
+            <div class="d-flex align-items-center justify-content-between" 
+               data-bs-toggle="collapse" 
+               data-bs-target="#tokenInstructions" 
+               data-toggle="collapse" 
+               data-target="#tokenInstructions" 
+               style="cursor: pointer;">
+              <span class="fw-bold text-dark"><i class="fas fa-lightbulb me-2 text-warning"></i> Guía rápida de uso</span>
+              <i class="fas fa-chevron-down small text-muted"></i>
+            </div>
+            <div class="collapse mt-3" id="tokenInstructions">
+              <div class="premium-guide-box">
+                <p class="mb-2 text-primary fw-bold text-uppercase" style="font-size: 0.7rem;">Ejemplo con cURL:</p>
+                <div class="code-snippet">
+                    <code>curl -X GET {{ request.scheme }}://{{ request.get_host }}/api/containers/ \
+  -H "Authorization: Bearer <span class="text-white">TU_TOKEN</span>"</code>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
       {% endif %}
-
-      <!-- Asignaturas -->
-      {% if subjects_as_student or subjects_as_teacher %}
-      <div class="card shadow-sm">
-        <div class="card-header bg-secondary text-white">
-          <h5 class="mb-0">
-            <i class="fas fa-book"></i>
-            {% if is_student %}Mis Asignaturas{% else %}Asignaturas que
-            imparto{% endif %}
-          </h5>
-        </div>
-        <div class="card-body">
-          {% if subjects_as_student %}
-          <ul class="list-group list-group-flush">
-            {% for subject in subjects_as_student %}
-            <li
-              class="list-group-item d-flex justify-content-between align-items-center"
-            >
-              {{ subject.name }}
-              <span class="badge bg-info rounded-pill"
-                >{{ subject.genero }}</span
-              >
-            </li>
-            {% endfor %}
-          </ul>
-          {% endif %} {% if subjects_as_teacher %}
-          <ul class="list-group list-group-flush">
-            {% for subject in subjects_as_teacher %}
-            <li
-              class="list-group-item d-flex justify-content-between align-items-center"
-            >
-              {{ subject.name }}
-              <span class="badge bg-success rounded-pill"
-                >{{ subject.students.count }} alumnos</span
-              >
-            </li>
-            {% endfor %}
-          </ul>
-          {% endif %}
-        </div>
-      </div>
-      {% endif %}
     </div>
   </div>
 </div>
 
-<!-- Modal para mostrar token completo al generar/refrescar -->
-<div class="modal fade" id="tokenModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header bg-success text-white">
-        <h5 class="modal-title">
-          <i class="fas fa-check-circle"></i> Token Generado
-        </h5>
-        <button
-          type="button"
-          class="btn-close btn-close-white"
-          data-bs-dismiss="modal"
-        ></button>
-      </div>
-      <div class="modal-body">
-        <p class="alert alert-warning">
-          <i class="fas fa-exclamation-triangle"></i>
-          <strong>¡Importante!</strong> Copia este token ahora. No podrás verlo
-          completo después.
-        </p>
-        <div class="mb-3">
-          <label class="form-label fw-bold">Tu token API:</label>
-          <div class="input-group">
-            <input
-              type="text"
-              class="form-control font-monospace small"
-              id="full-token"
-              readonly
-            />
-            <button
-              class="btn btn-primary"
-              type="button"
-              onclick="copyFromModal()"
-            >
-              <i class="fas fa-copy"></i> Copiar
+<!-- Modal de Token Regenerado (Premium) -->
+  <div class="modal fade" id="tokenModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content token-modal-content">
+        <div class="modal-header token-modal-header text-white justify-content-center flex-column py-4">
+          <div class="rounded-circle d-flex align-items-center justify-content-center mb-3" 
+               style="width: 70px; height: 70px; background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.3);">
+              <i class="fas fa-shield-alt fa-2x"></i>
+          </div>
+          <h4 class="modal-title fw-bold text-white">Nuevo Token Generado</h4>
+          <p class="mb-0 opacity-75 small text-center px-4 text-white">Cópialo ahora. Por seguridad, no volverá a mostrarse completo.</p>
+        </div>
+        <div class="modal-body p-4">
+          <div class="token-display-box text-center shadow-sm mb-4">
+            <span id="full-token">...</span>
+          </div>
+
+          <div class="d-grid gap-2">
+            <button type="button" class="btn btn-primary btn-lg rounded-pill py-2 fw-bold" id="btnCopyModal" onclick="copyFromModal()">
+              <i class="fas fa-copy me-2"></i>Copiar al portapapeles
+            </button>
+            <button type="button" class="btn btn-link text-muted text-decoration-none fw-semibold mt-1" 
+                    data-bs-dismiss="modal" data-dismiss="modal" onclick="closeTokenModal()">
+              Ya lo he guardado, cerrar
             </button>
           </div>
         </div>
-        <p class="text-muted small mb-0">
-          Válido hasta: <span id="token-expiry"></span>
-        </p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-          Cerrar
-        </button>
+        <div class="modal-footer border-0 bg-light py-2 justify-content-center">
+            <small class="text-muted"><i class="fas fa-clock me-1"></i> Expira el <span id="token-expiry-modal" class="fw-bold">...</span></small>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- Toast para notificaciones -->
-<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 1100">
-  <div id="toast-container"></div>
-</div>
+{% endblock %} 
 
-{% endblock %} {% block extrascripts %}
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% block extrascripts %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-  function showToast(message, type = "success") {
-    const container = document.getElementById("toast-container");
-    const bgClass =
-      type === "success"
-        ? "bg-success"
-        : type === "error"
-          ? "bg-danger"
-          : "bg-info";
+  // Inicialización de Popovers y Tooltips si es necesario
+  document.addEventListener('DOMContentLoaded', function() {
+      const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
+      popoverTriggerList.map(function (popoverTriggerEl) {
+          return new bootstrap.Popover(popoverTriggerEl)
+      })
+  });
 
-    const toast = document.createElement("div");
-    toast.className = `toast align-items-center text-white ${bgClass} border-0 show`;
-    toast.setAttribute("role", "alert");
-    toast.innerHTML = `
-      <div class="d-flex">
-        <div class="toast-body">${message}</div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-      </div>
-    `;
+  function showToast(message, icon = "success") {
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-start',
+      showConfirmButton: false,
+      timer: 2500,
+      timerProgressBar: true,
+      didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer)
+        toast.addEventListener('mouseleave', Swal.resumeTimer)
+      }
+    });
 
-    container.appendChild(toast);
-    setTimeout(() => toast.remove(), 3000);
+    Toast.fire({
+      icon: icon,
+      title: message,
+      background: '#fff',
+      color: '#2d3748',
+      padding: '1rem',
+      borderRadius: '1rem',
+      customClass: {
+        popup: 'shadow-lg border-0'
+      }
+    });
   }
 
   function generateToken() {
@@ -374,23 +504,16 @@
       .then((response) => response.json())
       .then((data) => {
         if (data.success) {
-          document.getElementById("full-token").value = data.token;
-          // Usar expires_at del servidor
+          document.getElementById("full-token").textContent = data.token;
           const expiry = new Date(data.expires_at);
-          document.getElementById("token-expiry").textContent =
-            expiry.toLocaleDateString();
+          document.getElementById("token-expiry-modal").textContent = expiry.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
 
-          const modal = new bootstrap.Modal(
-            document.getElementById("tokenModal"),
-          );
+          const modal = new bootstrap.Modal(document.getElementById("tokenModal"));
           modal.show();
 
-          // Recargar página al cerrar modal
-          document
-            .getElementById("tokenModal")
-            .addEventListener("hidden.bs.modal", () => {
+          document.getElementById("tokenModal").addEventListener("hidden.bs.modal", () => {
               location.reload();
-            });
+          });
         } else {
           showToast(data.error || "Error al generar token", "error");
         }
@@ -400,74 +523,160 @@
       });
   }
 
-  function refreshToken() {
-    if (!confirm("¿Estás seguro? Esto invalidará tu token actual.")) {
-      return;
-    }
-
-    fetch("{% url 'refresh_token' %}", {
-      method: "POST",
-      headers: {
-        "X-CSRFToken": "{{ csrf_token }}",
-        "Content-Type": "application/json",
-      },
-    })
-      .then((response) => response.json())
-      .then((data) => {
-        if (data.success) {
-          document.getElementById("full-token").value = data.token;
-          // Usar expires_at del servidor
-          const expiry = new Date(data.expires_at);
-          document.getElementById("token-expiry").textContent =
-            expiry.toLocaleDateString();
-
-          const modal = new bootstrap.Modal(
-            document.getElementById("tokenModal"),
-          );
-          modal.show();
-
-          // Recargar página al cerrar modal
-          document
-            .getElementById("tokenModal")
-            .addEventListener("hidden.bs.modal", () => {
-              location.reload();
+  function actionRefreshToken() {
+    Swal.fire({
+        title: '<h4 class="fw-bold mb-0">¿Regenerar Token?</h4>',
+        html: '<p class="text-muted mt-2 mb-0">Esta acción invalidará tu token actual inmediatamente.</p>',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: '<i class="fas fa-sync-alt me-2"></i>Sí, regenerar',
+        cancelButtonText: 'Cancelar',
+        reverseButtons: true,
+        confirmButtonColor: '#4e73df',
+        cancelButtonColor: '#858796',
+        borderRadius: '1.25rem',
+        padding: '2rem',
+        timer: 10000,
+        timerProgressBar: true,
+        customClass: {
+            confirmButton: 'btn btn-primary px-4 py-2 fw-bold',
+            cancelButton: 'btn btn-light px-4 py-2 fw-bold'
+        },
+        buttonsStyling: false
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Mostrar estado de carga intermedio
+            Swal.fire({
+                title: 'Generando nuevo token...',
+                didOpen: () => {
+                    Swal.showLoading();
+                },
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showConfirmButton: false,
+                borderRadius: '1.25rem'
             });
-        } else {
-          showToast(data.error || "Error al refrescar token", "error");
+            performRefresh();
         }
-      })
-      .catch((error) => {
-        showToast("Error de conexión", "error");
-      });
+    });
+  }
+
+  function performRefresh() {
+    fetch("{% url 'refresh_token' %}", {
+        method: "POST",
+        headers: {
+            "X-CSRFToken": "{{ csrf_token }}",
+            "Content-Type": "application/json",
+        },
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            Swal.close(); // Cerrar loading
+            
+            // 1. Actualizar el modal de copia (token completo)
+            document.getElementById("full-token").textContent = data.token;
+            
+            // 2. Actualizar metadatos en el modal
+            const expiry = new Date(data.expires_at);
+            const dateStr = expiry.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+            document.getElementById("token-expiry-modal").textContent = dateStr;
+
+            // 3. ACTUALIZACIÓN CRÍTICA: Actualizar la tarjeta principal (background) inmediatamente
+            if (document.getElementById("masked-token-display")) {
+                const masked = "..." + data.token.substring(data.token.length - 8);
+                document.getElementById("masked-token-display").textContent = masked;
+            }
+            if (document.getElementById("token-created-display")) {
+                const today = new Date();
+                const createdStr = today.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+                document.getElementById("token-created-display").textContent = createdStr;
+            }
+            if (document.getElementById("token-expires-display")) {
+                const expiresStr = expiry.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+                document.getElementById("token-expires-display").textContent = expiresStr;
+            }
+
+            // 4. Mostrar el modal con el nuevo token
+            const modal = new bootstrap.Modal(document.getElementById("tokenModal"));
+            modal.show();
+
+            // Al cerrar el modal, recargamos para asegurar sincronía total
+            document.getElementById("tokenModal").addEventListener("hidden.bs.modal", () => location.reload());
+        } else {
+
+            showToast(data.error || "Error al regenerar", "error");
+        }
+    })
+    .catch(() => showToast("Error de conexión", "error"));
   }
 
   function copyFullToken() {
     fetch("{% url 'copy_token' %}", {
       method: "GET",
-      headers: {
-        "X-CSRFToken": "{{ csrf_token }}",
-      },
+      headers: { "X-CSRFToken": "{{ csrf_token }}" },
     })
-      .then((response) => response.json())
-      .then((data) => {
+      .then(r => r.json())
+      .then(data => {
         if (data.success) {
-          navigator.clipboard.writeText(data.token).then(() => {
-            showToast("Token copiado al portapapeles", "success");
-          });
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(data.token)
+              .then(() => showToast("Token copiado"))
+              .catch(() => fallbackCopy(data.token));
+          } else {
+            fallbackCopy(data.token);
+          }
         } else {
-          showToast(data.error || "Error al copiar token", "error");
+          showToast(data.error || "Error al copiar", "error");
         }
       })
-      .catch((error) => {
-        showToast("Error de conexión", "error");
-      });
+      .catch(() => showToast("Error de comunicación", "error"));
+  }
+
+  function fallbackCopy(text) {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+        document.execCommand('copy');
+        showToast("Token copiado");
+    } catch (err) {
+        showToast("Error al copiar manualmente", "error");
+    }
+    document.body.removeChild(textArea);
   }
 
   function copyFromModal() {
-    const token = document.getElementById("full-token").value;
-    navigator.clipboard.writeText(token).then(() => {
-      showToast("Token copiado al portapapeles", "success");
-    });
+    const token = document.getElementById("full-token").textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(token).then(() => {
+            showToast("Token copiado", "success");
+        }).catch(() => fallbackCopy(token));
+    } else {
+        fallbackCopy(token);
+    }
+  }
+
+  function closeTokenModal() {
+    const modalEl = document.getElementById("tokenModal");
+    // Intentar con Bootstrap 5
+    const inst = bootstrap.Modal.getInstance(modalEl);
+    if (inst) {
+        inst.hide();
+    } else {
+        // Fallback manual con jQuery (si está disponible) o manipulación directa por si acaso
+        if (window.jQuery) {
+            $(modalEl).modal('hide');
+        } else {
+            modalEl.classList.remove('show');
+            document.body.classList.remove('modal-open');
+            const backdrop = document.querySelector('.modal-backdrop');
+            if (backdrop) backdrop.remove();
+        }
+    }
+    // Forzar recarga como estaba previsto
+    setTimeout(() => location.reload(), 300);
   }
 </script>
 {% endblock %}
