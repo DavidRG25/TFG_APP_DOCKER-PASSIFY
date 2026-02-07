@@ -1,6 +1,6 @@
 # Códigos de Error
 
-## Códigos de Error
+
 
 Estos son los códigos de estado HTTP más comunes que puedes recibir en tus respuestas:
 
@@ -44,3 +44,4 @@ Estos son los códigos de estado HTTP más comunes que puedes recibir en tus res
     <strong>Causas Comunes:</strong> Fallo en Docker Daemon, problemas de red en el servidor, o bug en la lógica de PaaSify. Contacta con el administrador.
 </div>
 </details>
+

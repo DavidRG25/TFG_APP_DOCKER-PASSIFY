@@ -1,9 +1,11 @@
 # containers/serializers.py
 from rest_framework import serializers
 from django.utils.translation import gettext_lazy as _
-
+from django.conf import settings
 from .models import Service, AllowedImage, ServiceContainer
 from paasify.models.SubjectModel import Subject
+from paasify.models.ProjectModel import UserProject
+
 
 
 class ServiceContainerSerializer(serializers.ModelSerializer):
@@ -48,11 +50,21 @@ class ServiceSerializer(serializers.ModelSerializer):
     internal_port = serializers.IntegerField(required=False, allow_null=True)
 
     # Permitir enlazar asignatura
-    subject = serializers.PrimaryKeyRelatedField(
-        queryset=Subject.objects.all(),
-        required=False,
-        allow_null=True,
-    )
+    subject = serializers.PrimaryKeyRelatedField(queryset=Subject.objects.all(), required=True)
+    project = serializers.PrimaryKeyRelatedField(queryset=UserProject.objects.none(), required=True)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        if request and request.user:
+            # Filtrar asignaturas disponibles para el alumno
+            self.fields["subject"].queryset = Subject.objects.filter(
+                students=request.user
+            ).distinct()
+            # Filtrar proyectos disponibles para el alumno
+            self.fields["project"].queryset = UserProject.objects.filter(
+                user_profile__user=request.user
+            ).distinct()
 
     # Campo calculado para indicar si usa docker-compose
     has_compose = serializers.ReadOnlyField()
@@ -71,17 +83,20 @@ class ServiceSerializer(serializers.ModelSerializer):
             "code",
             "assigned_port",
             "status",
-            "logs",
             "custom_port",
-            "mode",        # Añadido
+            "mode",        # Anadido
             "env_vars",
             "volumes",
             "subject",
+            "project",      # Anadido
             "internal_port",
-            "has_compose",  # Añadido
-            "containers",    # Añadido
+            "has_compose",  # Anadido
+            "containers",    # Anadido
         )
-        read_only_fields = ("id", "assigned_port", "status", "logs", "has_compose", "containers")
+        read_only_fields = ("id", "assigned_port", "status", "has_compose", "containers")
+
+
+
 
     # ---- Validaciones de alto nivel ----
 
@@ -535,3 +550,16 @@ class AllowedImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = AllowedImage
         fields = ("id", "name", "tag", "description")
+
+
+class ServiceSimpleSerializer(serializers.ModelSerializer):
+    "Version ligera para listados."
+    has_compose = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Service
+        fields = (
+            'id', 'name', 'image', 'assigned_port', 'status', 
+            'subject', 'project', 'created_at', 'has_compose',
+        )
+        read_only_fields = fields

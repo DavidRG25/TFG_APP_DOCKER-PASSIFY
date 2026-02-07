@@ -1,22 +1,20 @@
 # Crear Servicio
 
-## Crear Servicio
-
 Permite desplegar nuevos servicios, ya sea desde imágenes del catálogo o usando DockerHub.
 
-**Endpoint:** `POST /containers/`
+**Endpoint:** `POST /api/containers/`
 
 ### Parámetros del Body (JSON)
 
-| Campo | Tipo | Obligatorio | Descripción |
-| :--- | :--- | :--- | :--- |
-| **name** | string | **Sí** | Nombre único para el servicio (minúsculas y guiones). |
-| **image** | string | **Sí** | Imagen del catálogo o de DockerHub (nombre:tag). |
-| **mode** | string | **Sí** | `default` (catálogo) o `dockerhub`. |
-| **internal_port** | int | No | Puerto interno que usa la app (ej: 80, 5000). |
-| **environment** | object | No | Mapa de variables de entorno (key: value). |
-| **project** | int | No | ID del proyecto al que se asocia este despliegue. |
-| **subject** | int | No | ID de la asignatura a la que pertenece este servicio. |
+| Campo             | Tipo   | Obligatorio | Descripción                                           |
+| :---------------- | :----- | :---------- | :---------------------------------------------------- |
+| **name**          | string | **Sí**      | Nombre único para el servicio (minúsculas y guiones). |
+| **image**         | string | **Sí**      | Imagen del catálogo o de DockerHub (nombre:tag).      |
+| **mode**          | string | **Sí**      | `default` (catálogo) o `dockerhub`.                   |
+| **internal_port** | int    | No          | Puerto interno que usa la app (ej: 80, 5000).         |
+| **environment**   | object | No          | Mapa de variables de entorno (key: value).            |
+| **project**       | int    | **Sí**      | ID del proyecto al que se asocia este despliegue.     |
+| **subject**       | int    | **Sí**      | ID de la asignatura a la que pertenece este servicio. |
 
 ### Imagen de Catálogo
 
@@ -30,7 +28,9 @@ curl -X POST {{ PAASIFY_API_URL }}/containers/ \
     "name": "mi-app-catalogo",
     "image": "nginx:latest",
     "mode": "default",
-    "internal_port": 80
+    "internal_port": 80,
+    "project": 1,
+    "subject": 1
   }'
 ```
 
@@ -60,7 +60,9 @@ curl -X POST {{ PAASIFY_API_URL }}/containers/ \
     "image": "python:3.9-slim",
     "mode": "dockerhub",
     "internal_port": 5000,
-    "environment": { "ENV": "production" }
+    "environment": { "ENV": "production" },
+    "project": 1,
+    "subject": 1
   }'
 ```
 
@@ -78,17 +80,19 @@ curl -X POST {{ PAASIFY_API_URL }}/containers/ \
 
 Permite subir tu propio código y definir cómo se construye o despliega mediante un archivo de configuración.
 
-**Endpoint:** `POST /containers/`
+**Endpoint:** `POST /api/containers/`
 
-| Campo | Tipo | Obligatorio | Descripción |
-| :--- | :--- | :--- | :--- |
-| **mode** | string | **Sí** | `custom` |
-| **name** | string | **Sí** | Nombre único para el servicio. |
-| **code** | file | **Sí** | Archivo `.zip` o `.rar` con el código fuente. |
-| **dockerfile** | file | No* | Archivo `Dockerfile` para construir la imagen. |
-| **compose** | file | No* | Archivo `docker-compose.yml` para despliegues multi-contenedor. |
+| Campo          | Tipo   | Obligatorio | Descripción                                                     |
+| :------------- | :----- | :---------- | :-------------------------------------------------------------- |
+| **mode**       | string | **Sí**      | `custom`                                                        |
+| **name**       | string | **Sí**      | Nombre único para el servicio.                                  |
+| **code**       | file   | **Sí**      | Archivo `.zip` o `.rar` con el código fuente.                   |
+| **dockerfile** | file   | No\*        | Archivo `Dockerfile` para construir la imagen.                  |
+| **compose**    | file   | No\*        | Archivo `docker-compose.yml` para despliegues multi-contenedor. |
+| **project**    | int    | **Sí**      | ID del proyecto al que se asocia este despliegue.               |
+| **subject**    | int    | **Sí**      | ID de la asignatura a la que pertenece este servicio.           |
 
-*\*Se requiere exactamente uno de los dos: `dockerfile` o `compose`.*
+_\*Se requiere exactamente uno de los dos: `dockerfile` o `compose`._
 
 ```bash
 # Ejemplo usando Dockerfile y código fuente (multipart/form-data)
@@ -97,7 +101,9 @@ curl -X POST {{ PAASIFY_API_URL }}/containers/ \
   -F "name=mi-app-custom" \
   -F "mode=custom" \
   -F "code=@proyecto.zip" \
-  -F "dockerfile=@Dockerfile"
+  -F "dockerfile=@Dockerfile" \
+  -F "project=1" \
+  -F "subject=1"
 ```
 
 <details class="api-errors">
@@ -127,10 +133,13 @@ curl -X POST {{ PAASIFY_API_URL }}/containers/ \
   -F "name=mi-web-db" \
   -F "mode=custom" \
   -F "code=@proyecto_completo.zip" \
-  -F "compose=@docker-compose.yml"
+  -F "compose=@docker-compose.yml" \
+  -F "project=1" \
+  -F "subject=1"
 ```
 
 > **Buenas Prácticas Incluidas**:
+>
 > - **Persistencia**: Uso de volúmenes nombrados para la base de datos.
 > - **Orquestación**: Uso de `depends_on` con `condition: service_healthy`.
 > - **Seguridad**: Los contenedores deben correr como usuarios no root (appuser).
