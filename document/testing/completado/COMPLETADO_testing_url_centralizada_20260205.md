@@ -7,21 +7,21 @@
 
 ## 🏗️ PARTE 1: ESCENARIO DE DETECCIÓN AUTOMÁTICA
 
-**Configuración**: Asegurarse de que el entorno NO tiene la variable `PAASIFY_BASE_URL` seteada.
+**Configuración**: Asegurarse de que el entorno NO tiene la variable `c` seteada.
 
 ### **Test 1.1: Consistencia en Localhost**
 
 1. Arrancar el servidor normalmente: `bash run.sh`.
 2. Acceder a `http://127.0.0.1:8000/paasify/containers/api-docs/`.
 3. **Verificar**:
-   - [ ] La sección "URL Base de la API" muestra `http://127.0.0.1:8000/api`.
-   - [ ] Los ejemplos de `curl` usan `http://127.0.0.1:8000`.
+   - [SI] La sección "URL Base de la API" muestra `http://127.0.0.1:8000/api`.
+   - [SI] Los ejemplos de `curl` usan `http://127.0.0.1:8000`.
 
 ### **Test 1.2: Cambio Dinámico de Host**
 
 1. Acceder ahora usando localhost: `http://localhost:8000/paasify/containers/api-docs/`.
 2. **Verificar**:
-   - [ ] La documentación se adapta automáticamente y muestra `http://localhost:8000/api`.
+   - [SI] La documentación se adapta automáticamente y muestra `http://localhost:8000/api`.
 
 ---
 
@@ -39,23 +39,23 @@
 3. Acceder a la plataforma (aunque sea desde localhost para la prueba).
 4. Ir a **API Docs**.
 5. **Verificar**:
-   - [ ] La URL Base de la API muestra **obligatoriamente** `https://paasify-urjc.es/api` (aunque estés navegando desde 127.0.0.1).
-   - [ ] Todos los comandos `curl` de la página usan el nuevo dominio urjc.es.
+   - [SI] La URL Base de la API muestra **obligatoriamente** `https://paasify-urjc.es/api` (aunque estés navegando desde 127.0.0.1).
+   - [SI] Todos los comandos `curl` de la página usan el nuevo dominio urjc.es.
 
 ### **Test 2.2: Propagación a la Guía de Despliegue (Templates)**
 
 1. Ir a la **Guía de Despliegue por Terminal**.
 2. Navegar por las diferentes pestañas (Catálogo, DockerHub, Personalizado).
 3. **Verificar**:
-   - [ ] Todos los ejemplos de `curl` en todas las pestañas empiezan por `curl -X POST https://paasify-urjc.es/api/containers/...`.
-   - [ ] No hay rastro de `localhost` ni `127.0.0.1` en ninguna de las plantillas mostradas.
+   - [SI] Todos los ejemplos de `curl` en todas las pestañas empiezan por `curl -X POST https://paasify-urjc.es/api/containers/...`.
+   - [SI] No hay rastro de `localhost` ni `127.0.0.1` en ninguna de las plantillas mostradas.
 
 ### **Test 2.3: Ejemplo GitHub Actions**
 
 1. Ir a la página de **API Token** o a la sección CI/CD de la Doc.
 2. Revisar el snippet de YAML para GitHub.
 3. **Verificar**:
-   - [ ] La línea del `curl` apunta a `https://paasify-urjc.es/api/containers/`.
+   - [SI] La línea del `curl` apunta a `https://paasify-urjc.es/api/containers/`.
 
 ---
 
