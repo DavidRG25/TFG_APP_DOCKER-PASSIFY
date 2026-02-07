@@ -515,10 +515,58 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
 
 
+
 class AllowedImageViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AllowedImage.objects.all()
     serializer_class = AllowedImageSerializer
     permission_classes = [IsAuthenticated]
+
+
+class SubjectViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Lista las asignaturas en las que el alumno está matriculado.
+    """
+    serializer_class = None  # Se define dinámicamente o importando
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_serializer_class(self):
+        from .api_serializers import SubjectSerializer
+        return SubjectSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user_is_admin(user) or user.is_superuser:
+            return Subject.objects.all()
+        # Si es profesor, sus asignaturas
+        if user_is_teacher(user):
+            return Subject.objects.filter(teacher_user=user)
+        # Si es alumno, donde está matriculado
+        return Subject.objects.filter(students=user).distinct()
+
+
+class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Lista los proyectos asignados al alumno.
+    """
+    serializer_class = None
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_serializer_class(self):
+        from .api_serializers import ProjectSerializer
+        return ProjectSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user_is_admin(user) or user.is_superuser:
+            return UserProject.objects.all()
+        # Si es profesor, proyectos de sus asignaturas
+        if user_is_teacher(user):
+            return UserProject.objects.filter(subject__teacher_user=user)
+        # Si es alumno, sus proyectos personales
+        return UserProject.objects.filter(user_profile__user=user)
+
 
 
 @login_required
@@ -1150,33 +1198,91 @@ def manage_api_token(request):
     return render(request, 'containers/api_token.html', context)
 
 @login_required
-def api_documentation_view(request):
+def api_documentation_view(request, section_slug="introduccion"):
     """
     Pagina dedicada de documentacion de la API REST para los alumnos.
-    Incluye ejemplos detallados, casos de uso y fragmentos de codigo.
+    Ahora soporta navegacion por secciones independientes.
     """
     from paasify.models.TokenModel import ExpiringToken
-    
     import os
     from django.conf import settings
+    from django.shortcuts import redirect
+    from django.http import Http404
 
-    # Obtener el token del usuario para los ejemplos interactivos
+    # Definicion del orden fijo de secciones
+    SECTIONS = [
+        {"slug": "introduccion",    "title": "Introducción",          "file": "01_introduction.md"},
+        {"slug": "autenticacion",   "title": "Autenticación",          "file": "02_authentication.md"},
+        {"slug": "gets",            "title": "Consultas (GETs)",      "file": "03_gets.md"},
+        {"slug": "crear",           "title": "Crear Servicio",        "file": "04_create.md"},
+        {"slug": "acciones",        "title": "Acciones del Servicio", "file": "05_actions.md"},
+        {"slug": "ci-cd",           "title": "Integración CI/CD",     "file": "06_cicd.md"},
+        {"slug": "errores",         "title": "Códigos de Error",      "file": "07_errors.md"},
+    ]
+
+    # Buscar la seccion actual
+    current_index = -1
+    for i, s in enumerate(SECTIONS):
+        if s["slug"] == section_slug:
+            current_index = i
+            break
+    
+    if current_index == -1:
+        raise Http404("Sección de documentación no encontrada")
+
+    # Leer el archivo Markdown de la seccion actual y extraer H3 de todas
+    partials_dir = os.path.join(settings.BASE_DIR, "templates", "api_docs", "partials")
+    
+    # Enriquecer SECTIONS con sus sub-encabezados (H3)
+    for section in SECTIONS:
+        section["subsections"] = []
+        path = os.path.join(partials_dir, section["file"])
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                for line in lines:
+                    if line.startswith("### "):
+                        title = line.replace("### ", "").strip()
+                        # Generar slug para el link
+                        import unicodedata
+                        import re
+                        slug = unicodedata.normalize('NFD', title).encode('ascii', 'ignore').decode('utf-8')
+                        slug = re.sub(r'[^a-z0-9]+', '-', slug.lower()).strip('-')
+                        section["subsections"].append({"title": title, "slug": slug})
+
+    current_section = SECTIONS[current_index]
+    
+    # Navegacion (Siguiente / Anterior)
+    prev_section = SECTIONS[current_index - 1] if current_index > 0 else None
+    next_section = SECTIONS[current_index + 1] if current_index < len(SECTIONS) - 1 else None
+
+    # Obtener el token del usuario
     token, _ = ExpiringToken.objects.get_or_create(user=request.user)
     
-    # Intentar leer el archivo Markdown de documentacion
-    md_content = ""
-    docs_path = os.path.join(settings.BASE_DIR, "templates", "api_docs", "api_reference.md")
-    if os.path.exists(docs_path):
-        with open(docs_path, "r", encoding="utf-8") as f:
-            md_content = f.read()
+    file_path = os.path.join(partials_dir, current_section["file"])
     
+    md_content = ""
+    if os.path.exists(file_path):
+        with open(file_path, "r", encoding="utf-8") as f:
+            md_content = f.read()
+    else:
+        md_content = f"# {current_section['title']}\n\nContenido en preparación..."
+
     context = {
         'token': token.key,
         'user_token': token.key,
         'markdown_content': md_content,
+        'sections': SECTIONS,
+        'current_slug': section_slug,
+        'current_index': current_index + 1,
+        'total_sections': len(SECTIONS),
+        'prev_section': prev_section,
+        'next_section': next_section,
+        'title': f"{current_section['title']} - API Docs",
     }
     
     return render(request, 'containers/api_documentation.html', context)
+
 
 @login_required
 def api_command_generator_view(request):
