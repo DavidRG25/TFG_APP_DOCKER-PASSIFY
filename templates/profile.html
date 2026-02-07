@@ -459,12 +459,24 @@
 {% block extrascripts %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+  let shouldReloadOnClose = false;
+
   // Inicialización de Popovers y Tooltips si es necesario
   document.addEventListener('DOMContentLoaded', function() {
       const popoverTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="popover"]'))
       popoverTriggerList.map(function (popoverTriggerEl) {
           return new bootstrap.Popover(popoverTriggerEl)
       })
+
+      // Listener único para el cierre del modal
+      const tokenModal = document.getElementById('tokenModal');
+      if (tokenModal) {
+          tokenModal.addEventListener('hidden.bs.modal', function () {
+              if (shouldReloadOnClose) {
+                  window.location.reload();
+              }
+          });
+      }
   });
 
   function showToast(message, icon = "success") {
@@ -504,16 +516,14 @@
       .then((response) => response.json())
       .then((data) => {
         if (data.success) {
+          shouldReloadOnClose = true; // Activar recarga al cerrar
+
           document.getElementById("full-token").textContent = data.token;
           const expiry = new Date(data.expires_at);
           document.getElementById("token-expiry-modal").textContent = expiry.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
 
           const modal = new bootstrap.Modal(document.getElementById("tokenModal"));
           modal.show();
-
-          document.getElementById("tokenModal").addEventListener("hidden.bs.modal", () => {
-              location.reload();
-          });
         } else {
           showToast(data.error || "Error al generar token", "error");
         }
@@ -587,24 +597,39 @@
                 const masked = "..." + data.token.substring(data.token.length - 8);
                 document.getElementById("masked-token-display").textContent = masked;
             }
+
+            // Actualizar fechas en la tarjeta principal
+            const created = new Date(data.created_at); // Asegúrate de que el backend envíe 'created_at'
             if (document.getElementById("token-created-display")) {
-                const today = new Date();
-                const createdStr = today.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+                const createdStr = created.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
                 document.getElementById("token-created-display").textContent = createdStr;
             }
             if (document.getElementById("token-expires-display")) {
-                const expiresStr = expiry.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' });
+                const expiresStr = expiry.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
                 document.getElementById("token-expires-display").textContent = expiresStr;
             }
 
+            // Actualizar alertas de estado (si estaba expirado, ahora está activo)
+            const alertContainer = document.querySelector('.premium-alert');
+            if (alertContainer && alertContainer.classList.contains('alert-danger')) {
+                 alertContainer.classList.remove('alert-danger', 'bg-danger-subtle');
+                 alertContainer.classList.add('alert-success', 'bg-success-subtle');
+                 alertContainer.style.borderLeftColor = '#10b981';
+                 alertContainer.innerHTML = `
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-check-circle fa-lg me-3"></i>
+                        <div>
+                            <strong>Token activo</strong><br>Te quedan <strong>30 días</strong> de acceso.
+                        </div>
+                    </div>`;
+            }
+
             // 4. Mostrar el modal con el nuevo token
-            const modal = new bootstrap.Modal(document.getElementById("tokenModal"));
+            const modalEl = document.getElementById("tokenModal");
+            const modal = new bootstrap.Modal(modalEl);
             modal.show();
 
-            // Al cerrar el modal, recargamos para asegurar sincronía total
-            document.getElementById("tokenModal").addEventListener("hidden.bs.modal", () => location.reload());
         } else {
-
             showToast(data.error || "Error al regenerar", "error");
         }
     })
@@ -675,8 +700,7 @@
             if (backdrop) backdrop.remove();
         }
     }
-    // Forzar recarga como estaba previsto
-    setTimeout(() => location.reload(), 300);
+    // El evento 'hidden.bs.modal' se encargará de recargar si shouldReloadOnClose es true
   }
 </script>
 {% endblock %}

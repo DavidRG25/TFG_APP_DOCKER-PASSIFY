@@ -7,21 +7,18 @@
     if (!element) return;
     element.select();
     document.execCommand("copy");
-    showToast("ÂCopiado!");
+    showToast("Copiado!");
   }
 
-  // Confirmaci³n de eliminaci³n (Totalmente blindada contra refrescos de tabla)
+  // Confirmacion de eliminacion
   window.confirmDelete = function (elt) {
     if (!elt) return;
-    // 1. Capturamos los datos cr­ticos ANTES de mostrar el modal
     const name = elt.getAttribute("data-service-name") || "este servicio";
     const deleteUrl = elt.getAttribute("hx-post");
-    const targetId = elt.getAttribute("hx-target"); // ej: #service-178
-    // 2. Definimos la acci³n de borrado
+    const targetId = elt.getAttribute("hx-target");
+    
     const executeDelete = () => {
       if (!window.htmx) return;
-      // Buscamos el objetivo actual en el DOM (por si la tabla se refresc³)
-      const currentTarget = document.querySelector(targetId);
       htmx.ajax("POST", deleteUrl, {
         target: targetId,
         swap: "outerHTML",
@@ -30,19 +27,17 @@
         }
       });
     };
-    // 3. Mostramos la confirmaci³n Premium
+
     Swal.fire({
-      title: '<h4 class="fw-bold mb-0">ÂEliminar servicio?</h4>',
-      html: `<p class="text-muted mt-2 mb-0">Vas a eliminar <strong>${name}</strong> de forma permanente. Esta acci³n no se puede deshacer.</p>`,
+      title: '<h4 class="fw-bold mb-0">Eliminar servicio?</h4>',
+      html: `<p class="text-muted mt-2 mb-0">Vas a eliminar <strong>${name}</strong> de forma permanente. Esta accion no se puede deshacer.</p>`,
       icon: 'warning',
       showCancelButton: true,
-      confirmButtonText: '<i class="fas fa-trash-alt me-2"></i>S­, eliminar',
+      confirmButtonText: '<i class="fas fa-trash-alt me-2"></i>Si, eliminar',
       cancelButtonText: 'Cancelar',
       reverseButtons: true,
       confirmButtonColor: '#e74a3b',
       cancelButtonColor: '#858796',
-      borderRadius: '1.25rem',
-      padding: '2rem',
       customClass: {
         confirmButton: 'btn btn-danger px-4 py-2 fw-bold',
         cancelButton: 'btn btn-light px-4 py-2 fw-bold'
@@ -54,14 +49,14 @@
       }
     });
   };
+
   htmx.on("htmx:configRequest", (e) => {
-    const token = document.querySelector(
-      'input[name="csrfmiddlewaretoken"]',
-    )?.value;
+    const token = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
     if (token) {
       e.detail.headers["X-CSRFToken"] = token;
     }
   });
+
   function showToast(message, variant = "text-bg-success", title = null) {
     const variantMap = {
       "text-bg-success": "success",
@@ -69,6 +64,7 @@
       "text-bg-warning": "warning",
       "text-bg-info": "info",
       "text-bg-primary": "info"
+    };
     const icon = variantMap[variant] || "success";
     const Toast = Swal.mixin({
       toast: true,
@@ -79,6 +75,8 @@
       didOpen: (toast) => {
         toast.addEventListener('mouseenter', Swal.stopTimer)
         toast.addEventListener('mouseleave', Swal.resumeTimer)
+      }
+    });
     Toast.fire({
       icon: icon,
       title: title ? `<strong>${title}</strong><br>${message}` : message,
@@ -86,461 +84,315 @@
       color: '#2d3748',
       padding: '1rem',
       borderRadius: '1rem',
+      customClass: {
         popup: 'shadow-lg border-0'
+      }
+    });
+  }
+
   function resetNewServiceForm() {
     const form = document.getElementById("newServiceForm");
     if (!form) return;
     form.reset();
-    // Limpiar errores (ambos contenedores por si acaso)
     const errors = document.getElementById("form-errors");
-    if (errors) errors.innerHTML = "";
+    if (errors) {
+      errors.innerHTML = "";
+      errors.style.display = "none";
+    }
     const modalErrors = document.getElementById("modal-form-errors");
-    if (modalErrors) modalErrors.innerHTML = "";
+    if (modalErrors) {
+      modalErrors.innerHTML = "";
+      modalErrors.style.display = "none";
+    }
     ["dockerfile", "compose", "code"].forEach((name) => {
       const input = document.querySelector(`input[name="${name}"]`);
       if (input) {
         input.value = "";
         input.disabled = false;
-        input.dispatchEvent(new Event("change"));
-    applyMode();
-    syncExclusion();
+      }
+    });
+    if (typeof applyMode === 'function') applyMode();
+    if (typeof syncExclusion === 'function') syncExclusion();
     document.querySelectorAll('[data-bs-toggle="popover"]').forEach((el) => {
       const inst = bootstrap.Popover.getInstance(el);
       if (inst) inst.hide();
+    });
+  }
+
   document.body.addEventListener("service:modal-close", (evt) => {
     const modalId = evt.detail?.modalId || "newServiceModal";
     const modalEl = document.getElementById(modalId);
     if (!modalEl) return;
-    (
-      bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)
-    ).hide();
+    const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+    modal.hide();
     resetNewServiceForm();
+  });
+
   document.addEventListener("service:toast", (evt) => {
     const detail = evt.detail || {};
     showToast(
-      detail.message || "Operaci³n completada",
+      detail.message || "Operacion completada",
       detail.variant || "text-bg-success",
+      detail.title || null
     );
-  // Listener para errores de validaci³n
+  });
+
   document.body.addEventListener("showValidationError", (evt) => {
-    // Extraer mensaje correctamente del evento HTMX
     let message = "";
     if (evt.detail) {
-      // HTMX env­a el mensaje en evt.detail directamente cuando es un string
       if (typeof evt.detail === "string") {
         message = evt.detail;
-      // O en evt.detail.showValidationError cuando viene del HX-Trigger
-      else if (evt.detail.showValidationError) {
+      } else if (evt.detail.showValidationError) {
         message = evt.detail.showValidationError;
-      // O en evt.detail.value
-      else if (evt.detail.value) {
+      } else if (evt.detail.value) {
         message = evt.detail.value;
-      // šltimo recurso
-      else {
+      } else {
         message = JSON.stringify(evt.detail);
+      }
+    }
     if (!message || message === "{}") {
       message = "Error desconocido al crear el servicio";
-    // Buscar el contenedor en el modal (si existe)
+    }
     const modalErrorContainer = document.getElementById("modal-form-errors");
-    // Buscar el contenedor en la pgina
     const pageErrorContainer = document.getElementById("form-errors");
     const errorHTML = `
       <div class="alert alert-danger alert-dismissible fade show" role="alert">
         <div class="d-flex align-items-start">
           <i class="fas fa-exclamation-triangle fs-4 me-3 mt-1" style="color: #dc3545;"></i>
           <div class="flex-grow-1">
-            <strong class="d-block mb-1">âŒ No se pudo crear el servicio</strong>
-            <div class="small">
-              ${message}
-            </div>
+            <strong class="d-block mb-1">No se pudo crear el servicio</strong>
+            <div class="small">${message}</div>
           </div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
     `;
     if (modalErrorContainer) {
-      // Mostrar en el modal si existe
       modalErrorContainer.innerHTML = errorHTML;
       modalErrorContainer.style.display = "block";
     } else if (pageErrorContainer) {
-      // Mostrar en la pgina
       pageErrorContainer.innerHTML = errorHTML;
       pageErrorContainer.style.display = "block";
-      // Hacer scroll al error
-      pageErrorContainer.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
+      pageErrorContainer.scrollIntoView({ behavior: "smooth", block: "center" });
     } else {
-      // Fallback a alert solo si no existe ningºn contenedor
-      alert("âŒ Error de Validaci³n\n\n" + message);
-  const newServiceModal = document.getElementById("newServiceModal");
-  if (newServiceModal) {
-    newServiceModal.addEventListener("hidden.bs.modal", () => {
-      resetNewServiceForm();
-  htmx.on("htmx:afterRequest", (evt) => {
-    if (evt.detail?.requestConfig?.elt?.id === "newServiceForm") {
-      const status = evt.detail.xhr?.status || 0;
-      if (status < 400) {
-        resetNewServiceForm();
-        if (newServiceModal) {
-          (
-            bootstrap.Modal.getInstance(newServiceModal) ||
-            new bootstrap.Modal(newServiceModal)
-          ).hide();
-  htmx.on("htmx:responseError", (evt) => {
-    const xhr = evt.detail.xhr;
-    const status = xhr?.status ?? 0;
-    const msg = xhr?.responseText || "Se produjo un error inesperado";
-    showToast(`Error (${status}): ${msg}`, "text-bg-danger");
+      alert("Error de Validacion\n\n" + message);
+    }
+  });
+
   function applyMode() {
-    const mode =
-      document.querySelector('input[name="mode"]:checked')?.value || "default";
-    // Buscar elementos por ID para mayor precisi³n
+    const mode = document.querySelector('input[name="mode"]:checked')?.value || "default";
     const imgSel = document.getElementById("service-image");
     const dockerhubInput = document.getElementById("service-dockerhub");
     const dockerfile = document.querySelector('input[name="dockerfile"]');
     const compose = document.querySelector('input[name="compose"]');
     const code = document.querySelector('input[name="code"]');
     const internalPort = document.querySelector('input[name="internal_port"]');
-    const customPort = document.querySelector('input[name="custom_port"]');
-    // Obtener los contenedores de los campos
     const imageContainer = document.getElementById("block-default-image");
     const customBlocks = document.querySelectorAll(".custom-block");
     const dockerhubBlock = document.getElementById("block-dockerhub-mode");
+
     if (mode === "default") {
-      // Modo default: Mostrar imagen del catlogo
       if (imageContainer) imageContainer.style.display = "block";
       if (dockerhubBlock) dockerhubBlock.style.display = "none";
       if (imgSel) imgSel.disabled = false;
       if (dockerhubInput) {
         dockerhubInput.disabled = true;
-        dockerhubInput.removeAttribute("required"); // No obligatorio en modo default
-      // Limpiar feedback de DockerHub
-      const dockerhubFeedback = document.getElementById("dockerhub-feedback");
-      if (dockerhubFeedback) {
-        dockerhubFeedback.innerHTML = "";
-        dockerhubFeedback.style.display = "none";
-      customBlocks.forEach((b) => {
-        b.style.display = "none";
-      [dockerfile, compose, code].forEach((input) => {
-        if (!input) return;
-        input.disabled = true;
+        dockerhubInput.removeAttribute("required");
+      }
+      customBlocks.forEach(b => b.style.display = "none");
+      [dockerfile, compose, code].forEach(input => { if (input) input.disabled = true; });
     } else if (mode === "dockerhub") {
-      // Modo DockerHub: Mostrar solo campo de DockerHub
       if (imageContainer) imageContainer.style.display = "none";
       if (dockerhubBlock) dockerhubBlock.style.display = "block";
       if (imgSel) imgSel.disabled = true;
+      if (dockerhubInput) {
         dockerhubInput.disabled = false;
-        dockerhubInput.required = true; // Hacer obligatorio en modo DockerHub
-      // Modo custom: Mostrar Dockerfile/Compose/C³digo
-        dockerhubInput.removeAttribute("required"); // No obligatorio en modo custom
-        b.style.display = "block";
-        if (input) input.disabled = false;
-    // Puerto interno: Mostrar si es DockerHub o Custom
+        dockerhubInput.required = true;
+      }
+      customBlocks.forEach(b => b.style.display = "none");
+      [dockerfile, compose, code].forEach(input => { if (input) input.disabled = true; });
+    } else if (mode === "custom") {
+      if (imageContainer) imageContainer.style.display = "none";
+      if (dockerhubBlock) dockerhubBlock.style.display = "none";
+      if (imgSel) imgSel.disabled = true;
+      if (dockerhubInput) {
+        dockerhubInput.disabled = true;
+        dockerhubInput.removeAttribute("required");
+      }
+      customBlocks.forEach(b => b.style.display = "block");
+      [dockerfile, compose, code].forEach(input => { if (input) input.disabled = false; });
+    }
+
     const internalPortBlock = document.getElementById("block-internal-port");
     if (internalPortBlock) {
-      if (mode === "dockerhub" || mode === "custom") {
-        internalPortBlock.style.display = "block";
-      } else {
-        internalPortBlock.style.display = "none";
-    // Asegurar que los inputs est©n habilitados
-    if (internalPort) {
-      internalPort.disabled = mode === "default";
-    if (customPort) {
-      customPort.disabled = false;
+      internalPortBlock.style.display = (mode === "dockerhub" || mode === "custom") ? "block" : "none";
+    }
+    if (internalPort) internalPort.disabled = (mode === "default");
+  }
+
   function syncExclusion() {
-    // Obtener contenedores de los bloques
+    const dockerfile = document.querySelector('input[name="dockerfile"]');
+    const compose = document.querySelector('input[name="compose"]');
     const dockerfileBlock = document.getElementById("block-dockerfile");
     const composeBlock = document.getElementById("block-compose");
-    // Solo aplicar exclusi³n en modo custom
-    if (mode !== "custom") {
-      return;
-    // L³gica de exclusi³n en modo custom - OCULTAR en lugar de deshabilitar
-    // Si hay Dockerfile, ocultar compose
-    if (dockerfile.files?.length) {
+    const mode = document.querySelector('input[name="mode"]:checked')?.value;
+
+    if (mode !== "custom") return;
+
+    if (dockerfile?.files?.length) {
       if (composeBlock) composeBlock.style.display = "none";
-      compose.value = "";
-    // Si hay compose, ocultar dockerfile
-    else if (compose.files?.length) {
+      if (compose) compose.value = "";
+    } else if (compose?.files?.length) {
       if (dockerfileBlock) dockerfileBlock.style.display = "none";
-      dockerfile.value = "";
-    // Si no hay nada, mostrar todo
-    else {
+      if (dockerfile) dockerfile.value = "";
+    } else {
       if (dockerfileBlock) dockerfileBlock.style.display = "block";
       if (composeBlock) composeBlock.style.display = "block";
-  // Funci³n para verificar si una imagen existe en DockerHub
+    }
+  }
+
   async function verifyDockerHubImage() {
     const input = document.getElementById("service-dockerhub");
     const feedback = document.getElementById("dockerhub-feedback");
     const btn = document.getElementById("verify-dockerhub-btn");
     const imageName = input.value.trim();
+
     if (!imageName) {
-      feedback.innerHTML = `
-        <div class="alert alert-warning mb-0">
-          <i class="fas fa-exclamation-circle me-2"></i>
-          Por favor, ingresa un nombre de imagen
-      `;
+      feedback.innerHTML = '<div class="alert alert-warning mb-0"><i class="fas fa-exclamation-circle me-2"></i>Por favor, ingresa un nombre de imagen</div>';
       feedback.style.display = "block";
-    // Mostrar loading
+      return;
+    }
+
     btn.disabled = true;
-    btn.innerHTML =
-      '<i class="fas fa-spinner fa-spin me-1"></i> Verificando...';
-    feedback.innerHTML = `
-      <div class="alert alert-info mb-0">
-        <i class="fas fa-spinner fa-spin me-2"></i>
-        Consultando DockerHub...
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Verificando...';
+    feedback.innerHTML = '<div class="alert alert-info mb-0"><i class="fas fa-spinner fa-spin me-2"></i>Consultando DockerHub...</div>';
     feedback.style.display = "block";
+
     try {
-      // Usar endpoint de Django para evitar CORS
-      const response = await fetch(
-        `/paasify/containers/verify-dockerhub/?image=${encodeURIComponent(imageName)}`,
-      );
+      const response = await fetch(`/paasify/containers/verify-dockerhub/?image=${encodeURIComponent(imageName)}`);
       const data = await response.json();
       if (data.success) {
-        const lastUpdated = data.last_updated
-          ? new Date(data.last_updated).toLocaleDateString("es-ES")
-          : "Desconocida";
-        const sizeInMB = data.full_size
-          ? (data.full_size / (1024 * 1024)).toFixed(2)
-          : "Desconocido";
+        const lastUpdated = data.last_updated ? new Date(data.last_updated).toLocaleDateString("es-ES") : "Desconocida";
+        const sizeInMB = data.full_size ? (data.full_size / (1024 * 1024)).toFixed(2) : "Desconocido";
         let portInfo = "";
         if (data.exposed_port) {
-          portInfo = `
-            <br>
-            <strong>Puerto detectado:</strong> <code>${data.exposed_port}</code>
-            <button 
-              type="button" 
-              class="btn btn-sm btn-outline-success ms-2"
-              onclick="document.getElementById('service-internal-port').value = '${data.exposed_port}'"
-            >
-              <i class="fas fa-magic me-1"></i> Usar este puerto
-            </button>
-          `;
-        feedback.innerHTML = `
-          <div class="alert alert-success mb-0">
-            <i class="fas fa-check-circle me-2"></i>
-            <strong>âœ… Imagen encontrada en DockerHub</strong>
-            <small class="text-muted">
-              <strong>Nombre:</strong> <code>${imageName}</code><br>
-              <strong>šltima actualizaci³n:</strong> ${lastUpdated}<br>
-              <strong>Tama±o:</strong> ${sizeInMB} MB
-              ${portInfo}
-            </small>
-        `;
-          <div class="alert alert-danger mb-0">
-            <i class="fas fa-times-circle me-2"></i>
-            <strong>âŒ ${data.error}</strong>
+          portInfo = `<br><strong>Puerto detectado:</strong> <code>${data.exposed_port}</code>
+                      <button type="button" class="btn btn-sm btn-outline-success ms-2" onclick="document.getElementById('service-internal-port').value = '${data.exposed_port}'">
+                        <i class="fas fa-magic me-1"></i> Usar este puerto
+                      </button>`;
+        }
+        feedback.innerHTML = `<div class="alert alert-success mb-0">
+                                <i class="fas fa-check-circle me-2"></i><strong>Imagen encontrada en DockerHub</strong><br>
+                                <small class="text-muted">
+                                  <strong>Nombre:</strong> <code>${imageName}</code><br>
+                                  <strong>Ultima actualizacion:</strong> ${lastUpdated}<br>
+                                  <strong>Tamaño:</strong> ${sizeInMB} MB ${portInfo}
+                                </small>
+                              </div>`;
+      } else {
+        feedback.innerHTML = `<div class="alert alert-danger mb-0"><i class="fas fa-times-circle me-2"></i><strong>${data.error}</strong></div>`;
+      }
     } catch (error) {
-        <div class="alert alert-danger mb-0">
-          <i class="fas fa-exclamation-triangle me-2"></i>
-          <strong>Error al verificar</strong>
-          <br>
-          <small>${error.message}</small>
+      feedback.innerHTML = `<div class="alert alert-danger mb-0"><i class="fas fa-exclamation-triangle me-2"></i><strong>Error al verificar</strong><br><small>${error.message}</small></div>`;
     } finally {
       btn.disabled = false;
-      btn.innerHTML =
-        '<i class="fas fa-check-circle me-1" style="margin-right: 0.3rem;"></i> Verificar';
-  function clearDockerHubField() {
-    if (input) input.value = "";
-    if (feedback) {
-      feedback.innerHTML = "";
-      feedback.style.display = "none";
-  async function checkPortAvailability() {
+      btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Verificar';
+    }
+  }
+
+  function checkPortAvailability() {
     const portInput = document.getElementById("service-port");
     const feedback = document.getElementById("port-availability-feedback");
-    const btn = document.getElementById("check-port-btn");
-    if (!portInput || !feedback || !btn) return;
-    const port = portInput.value.trim();
-    if (!port) {
-          Por favor, ingresa un puerto
-        `/paasify/containers/check-port/?port=${encodeURIComponent(port)}`,
-      if (data.success && data.available) {
-        // Puerto disponible
-            <strong>${data.message}</strong>
-      } else if (data.success && !data.available) {
-        // Puerto ocupado, mostrar sugerencias
-        let suggestionsHTML = "";
-        if (data.suggestions && data.suggestions.length > 0) {
-          suggestionsHTML = `
-            <div class="mt-2">
-              <strong>Puertos disponibles sugeridos:</strong>
-              <div class="d-flex gap-2 mt-2">
-                ${data.suggestions
-              .map(
-                (p) => `
-                  <button 
-                    type="button" 
-                    class="btn btn-sm btn-outline-success"
-                    onclick="document.getElementById('service-port').value = '${p}'; checkPortAvailability();"
-                  >
-                    <i class="fas fa-magic me-1"></i> ${p}
-                  </button>
-                `,
-              )
-              .join("")}
-              </div>
-          <div class="alert alert-warning mb-0">
-            <i class="fas fa-exclamation-triangle me-2"></i>
-            ${suggestionsHTML}
-        // Error
-            <strong>Error:</strong> ${data.error || "Error desconocido"}
-        '<i class="fas fa-search me-1"></i> Verificar disponibilidad';
-  function clearCustomPort() {
-    if (portInput) portInput.value = "";
-  function clearFile(name) {
-    const input = document.querySelector(`input[name="${name}"]`);
-    if (!input) return;
-    const newInput = input.cloneNode(true);
-    newInput.value = "";
-    input.parentNode.replaceChild(newInput, input);
-    newInput.addEventListener("change", syncExclusion);
+    const port = portInput?.value.trim();
+    if (!port) return;
+
+    fetch(`/paasify/containers/check-port/?port=${encodeURIComponent(port)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && data.available) {
+          feedback.innerHTML = `<div class="alert alert-success mb-0"><strong>${data.message}</strong></div>`;
+        } else {
+          let suggestionsHTML = "";
+          if (data.suggestions?.length) {
+            suggestionsHTML = `<div class="mt-2"><strong>Sugerencias:</strong><div class="d-flex gap-2 mt-2">` +
+              data.suggestions.map(p => `<button type="button" class="btn btn-sm btn-outline-success" onclick="document.getElementById('service-port').value='${p}';checkPortAvailability();">${p}</button>`).join("") +
+              `</div></div>`;
+          }
+          feedback.innerHTML = `<div class="alert alert-warning mb-0">${data.message || data.error}${suggestionsHTML}</div>`;
+        }
+        feedback.style.display = "block";
+      });
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll('input[name="mode"]').forEach((radio) => {
+    document.querySelectorAll('input[name="mode"]').forEach(radio => {
       radio.addEventListener("change", applyMode);
-      if (input) input.addEventListener("change", syncExclusion);
-    const popoverTriggerList = Array.from(
-      document.querySelectorAll('[data-bs-toggle="popover"]'),
-    popoverTriggerList.forEach((el) => new bootstrap.Popover(el));
-    const tooltipTriggerList = Array.from(
-      document.querySelectorAll('[data-bs-toggle="tooltip"]'),
-    tooltipTriggerList.forEach((el) => new bootstrap.Tooltip(el));
-    // BUGFIX: Copiar dockerhub_image a image antes de enviar el formulario
+    });
+    
+    const dockerfile = document.querySelector('input[name="dockerfile"]');
+    const compose = document.querySelector('input[name="compose"]');
+    if (dockerfile) dockerfile.addEventListener("change", syncExclusion);
+    if (compose) compose.addEventListener("change", syncExclusion);
+
+    const form = document.getElementById("newServiceForm");
     if (form) {
       form.addEventListener("submit", function (e) {
-        const mode = document.querySelector(
-          'input[name=\"mode\"]:checked',
-        )?.value;
+        const mode = document.querySelector('input[name="mode"]:checked')?.value;
         if (mode === "dockerhub") {
-          const dockerhubInput = document.querySelector(
-            'input[name=\"dockerhub_image\"]',
-          );
-          const imageSelect = document.querySelector('select[name=\"image\"]');
-          if (dockerhubInput && imageSelect && dockerhubInput.value.trim()) {
-            // Crear una opciï½n temporal con el valor de DockerHub
-            const tempOption = document.createElement("option");
-            tempOption.value = dockerhubInput.value.trim();
-            tempOption.selected = true;
-            imageSelect.appendChild(tempOption);
-            imageSelect.disabled = false; // Habilitar temporalmente para que se envï½e
+          const dhInput = document.querySelector('input[name="dockerhub_image"]');
+          const imgSelect = document.querySelector('select[name="image"]');
+          if (dhInput && imgSelect && dhInput.value.trim()) {
+            const opt = document.createElement("option");
+            opt.value = dhInput.value.trim();
+            opt.selected = true;
+            imgSelect.appendChild(opt);
+            imgSelect.disabled = false;
           }
-    // Funci³n para refrescar la tabla
-    function refreshTable() {
-      const tableElement = document.getElementById("service-table");
-      if (tableElement && typeof htmx !== "undefined") {
-        const url =
-          tableElement.getAttribute("hx-get") ||
-          '{% url "containers:service_table" %}';
-        htmx.ajax("GET", url, {
-          target: "#service-table",
-          swap: "innerHTML",
-        });
-    // Calcular estad­sticas desde el DOM (sin recargar pgina)
-    function updateStatsFromTable() {
-      let running = 0;
-      let stopped = 0;
-      // Seleccionar solo las filas directas de la tabla
-      const rows = document.querySelectorAll("#service-table > tr");
-      rows.forEach((row) => {
-        // La columna de estado es la 5Âª (­ndice 4) ahora: Proyecto, Nombre, Imagen, Puerto, Estado, Acciones
-        const statusCell = row.children[4];
-        if (!statusCell) return;
-        // Buscar badges solo dentro de la celda de estado
-        const badge = statusCell.querySelector(".badge");
-        if (badge) {
-          const text = badge.textContent.trim().toLowerCase();
-          if (text.includes("running")) {
-            running++;
-          } else if (text.includes("stopped") || text.includes("exited")) {
-            stopped++;
-      // Actualizar DOM
-      const statRunning = document.getElementById("stat-running");
-      const statStopped = document.getElementById("stat-stopped");
-      if (statRunning) statRunning.textContent = running;
-      if (statStopped) statStopped.textContent = stopped;
-    // Auto-refresh de la tabla cada 2 segundos
-    setInterval(refreshTable, 2000);
-    // State Observer: Detectar cambios de estado
-    let lastServiceStates = {};
-    function observeStatusChanges() {
-      const rows = document.querySelectorAll("#service-table > tr[id^='service-']");
-      const currentStates = {};
-      rows.forEach(row => {
-        const sid = row.id.replace("service-", "");
-        const badge = row.querySelector(".badge");
-        if (!badge) return;
-        const status = badge.textContent.trim().toUpperCase();
-        currentStates[sid] = status;
-        if (lastServiceStates[sid]) {
-          const name = row.querySelector(".fw-semibold")?.textContent || "su servicio";
-          // 1. Inici³ correctamente (de algo que no era RUNNING a RUNNING)
-          if (lastServiceStates[sid] !== "RUNNING" && status === "RUNNING") {
-            showToast(`ÂBuenas noticias! El servicio <strong>${name}</strong> ya est en marcha y listo para usar.`, "text-bg-success", "ÂServicio Listo!");
-          // 2. Parada o Fallo (de RUNNING a otra cosa)
-          else if (lastServiceStates[sid] === "RUNNING" && status !== "RUNNING") {
-            if (status === "ERROR") {
-              showToast(`Ha ocurrido un problema al procesar <strong>${name}</strong>. Revisa los logs.`, "text-bg-danger", "Fallo en el servicio");
-            } else {
-              showToast(`El servicio <strong>${name}</strong> se ha detenido correctamente.`, "text-bg-warning", "Servicio Detenido");
-            }
-      lastServiceStates = currentStates;
-    // Al terminar cualquier request HTMX de la tabla
-    document.body.addEventListener("htmx:afterOnLoad", (evt) => {
-      if (evt.detail.target.id === "service-table") {
-        updateStatsFromTable();
-        observeStatusChanges();
-    // Detectar cambios de estado y forzar refresh inmediato de tabla
-    document.body.addEventListener("htmx:afterRequest", (evt) => {
-      const url = evt.detail.pathInfo.requestPath;
-      if (
-        url.includes("/start/") ||
-        url.includes("/stop/") ||
-        url.includes("/remove/")
-      ) {
-        setTimeout(refreshTable, 200); // Refresh tabla rpido
-  // Filtrar proyectos por asignatura seleccionada
-  document.addEventListener("DOMContentLoaded", function () {
+        }
+      });
+    }
+
+    // Filtrar proyectos por asignatura
     const subjectSelect = document.getElementById("service-subject");
     const projectSelect = document.getElementById("service-project");
     if (subjectSelect && projectSelect) {
-      // Guardar todas las opciones de proyecto originales
       const allProjectOptions = Array.from(projectSelect.options);
       subjectSelect.addEventListener("change", function () {
-        const selectedSubjectId = this.value;
-        // Limpiar el select de proyectos
+        const selectedId = this.value;
         projectSelect.innerHTML = "";
-        // A±adir opci³n por defecto
-        const defaultOption = document.createElement("option");
-        defaultOption.value = "";
-        defaultOption.disabled = true;
-        defaultOption.selected = true;
-        defaultOption.textContent = "ðŸ“ Selecciona un proyecto";
-        defaultOption.textContent = "Selecciona un proyecto";
-        // Filtrar y a±adir solo los proyectos de la asignatura seleccionada
-        allProjectOptions.forEach((option) => {
-          if (option.dataset.subjectId === selectedSubjectId) {
-            projectSelect.appendChild(option.cloneNode(true));
-        // Si no hay proyectos para esta asignatura, mostrar mensaje
+        const defOpt = document.createElement("option");
+        defOpt.value = "";
+        defOpt.disabled = true;
+        defOpt.selected = true;
+        defOpt.textContent = "Selecciona un proyecto";
+        projectSelect.appendChild(defOpt);
+
+        allProjectOptions.forEach(opt => {
+          if (opt.dataset.subjectId === selectedId) {
+            projectSelect.appendChild(opt.cloneNode(true));
+          }
+        });
+
         if (projectSelect.options.length === 1) {
-          const noProjectsOption = document.createElement("option");
-          noProjectsOption.value = "";
-          noProjectsOption.disabled = true;
-          noProjectsOption.textContent =
-            "âš ï¸ No hay proyectos en esta asignatura";
-          projectSelect.appendChild(noProjectsOption);
-      // Trigger inicial si hay asignatura pre-seleccionada
-      if (subjectSelect.value) {
-        subjectSelect.dispatchEvent(new Event("change"));
-    // Detectar si venimos de crear un servicio para mostrar la notificaci³n de ©xito
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has("created")) {
-      // Usamos el sistema global showToast para mantener el dise±o unificado
-      showToast(
-        "El servicio se ha creado correctamente y se est iniciando en segundo plano.",
-        "text-bg-success",
-        "ÂServicio Creado!"
-      // Limpiar la URL para que no vuelva a salir el mensaje al recargar
-      window.history.replaceState(
-        {},
-        document.title,
-        window.location.pathname + window.location.hash,
+          const noOpt = document.createElement("option");
+          noOpt.value = "";
+          noOpt.disabled = true;
+          noOpt.textContent = "No hay proyectos en esta asignatura";
+          projectSelect.appendChild(noOpt);
+        }
+      });
+      if (subjectSelect.value) subjectSelect.dispatchEvent(new Event("change"));
+    }
+
+    // Notificacion de exito al crear
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("created")) {
+      showToast("El servicio se ha creado correctamente y se esta iniciando.", "text-bg-success", "Servicio Creado!");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Tooltips y Popovers
+    document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => new bootstrap.Popover(el));
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+  });
 </script>

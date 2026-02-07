@@ -141,6 +141,12 @@ class ServiceViewSet(viewsets.ModelViewSet):
     serializer_class = ServiceSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_serializer_class(self):
+        if self.action == "list":
+            from .serializers import ServiceSimpleSerializer
+            return ServiceSimpleSerializer
+        return ServiceSerializer
+
     def _is_htmx(self, request) -> bool:
         return request.headers.get("HX-Request") == "true"
 
@@ -189,6 +195,23 @@ class ServiceViewSet(viewsets.ModelViewSet):
         else:
             qs = Service.objects.filter(owner=user)
         
+        # Filtros adicionales por API (GET params)
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            if not project_id.isdigit():
+                raise ValidationError({"project": "El ID del proyecto debe ser un numero entero."})
+            qs = qs.filter(project_id=project_id)
+            
+        subject_id = self.request.query_params.get('subject')
+        if subject_id:
+            if not subject_id.isdigit():
+                raise ValidationError({"subject": "El ID de la asignatura debe ser un numero entero."})
+            qs = qs.filter(subject_id=subject_id)
+            
+        status = self.request.query_params.get('status')
+        if status:
+            qs = qs.filter(status=status)
+
         for s in qs:
             _sync_service(s)
         return qs.exclude(status="removed")
@@ -561,12 +584,20 @@ class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user_is_admin(user) or user.is_superuser:
-            return UserProject.objects.all()
+            qs = UserProject.objects.all()
         # Si es profesor, proyectos de sus asignaturas
-        if user_is_teacher(user):
-            return UserProject.objects.filter(subject__teacher_user=user)
+        elif user_is_teacher(user):
+            qs = UserProject.objects.filter(subject__teacher_user=user)
         # Si es alumno, sus proyectos personales
-        return UserProject.objects.filter(user_profile__user=user)
+        else:
+            qs = UserProject.objects.filter(user_profile__user=user)
+            
+        # Filtro opcional por asignatura
+        subject_id = self.request.query_params.get('subject')
+        if subject_id:
+            qs = qs.filter(subject_id=subject_id)
+            
+        return qs
 
 
 
@@ -1217,8 +1248,9 @@ def api_documentation_view(request, section_slug="introduccion"):
         {"slug": "gets",            "title": "Consultas (GETs)",      "file": "03_gets.md"},
         {"slug": "crear",           "title": "Crear Servicio",        "file": "04_create.md"},
         {"slug": "acciones",        "title": "Acciones del Servicio", "file": "05_actions.md"},
-        {"slug": "ci-cd",           "title": "Integración CI/CD",     "file": "06_cicd.md"},
-        {"slug": "errores",         "title": "Códigos de Error",      "file": "07_errors.md"},
+        {"slug": "logs",            "title": "Logs del Servicio",     "file": "06_logs.md"},
+        {"slug": "ci-cd",           "title": "Integración CI/CD",     "file": "07_cicd.md"},
+        {"slug": "errores",         "title": "Códigos de Error",      "file": "08_errors.md"},
     ]
 
     # Buscar la seccion actual

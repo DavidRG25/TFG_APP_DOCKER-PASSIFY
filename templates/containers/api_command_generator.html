@@ -186,6 +186,16 @@
                                                     <td>Número entre 40000 y 50000</td>
                                                     <td><span class="badge bg-secondary">Opcional</span></td>
                                                 </tr>
+                                                <tr>
+                                                    <td><code>project</code></td>
+                                                    <td>ID del proyecto (ej: 1)</td>
+                                                    <td><span class="badge bg-danger">Obligatorio</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><code>subject</code></td>
+                                                    <td>ID de la asignatura (ej: 1)</td>
+                                                    <td><span class="badge bg-danger">Obligatorio</span></td>
+                                                </tr>
                                             </tbody>
                                         </table>
                                     </div>
@@ -195,8 +205,7 @@
                                     <div class="d-flex flex-wrap gap-2">
                                         {% for img in images %}
                                         <span class="badge bg-white border text-dark p-2 shadow-sm">
-                                            <i class="fas fa-check-circle text-success me-1"></i>{{ img.name }}:{{
-                                            img.tag }}
+                                            <i class="fas fa-check-circle text-success me-1"></i>{{ img.name }}:{{ img.tag }}
                                         </span>
                                         {% empty %}
                                         <p class="small text-muted">No hay imágenes disponibles en este momento.</p>
@@ -216,7 +225,9 @@
   -d '{
     "name": "mi-nombre",
     "image": "nginx:latest",
-    "mode": "default"
+    "mode": "default",
+    "project": 1,
+    "subject": 1
   }'</code></pre>
                                     </div>
                                 </div>
@@ -256,6 +267,16 @@
                                                     <td><code>internal_port</code></td>
                                                     <td>Puerto que usa la app (ej: 3000)</td>
                                                     <td><span class="badge bg-secondary">Opcional</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><code>project</code></td>
+                                                    <td>ID del proyecto (ej: 1)</td>
+                                                    <td><span class="badge bg-danger">Obligatorio</span></td>
+                                                </tr>
+                                                <tr>
+                                                    <td><code>subject</code></td>
+                                                    <td>ID de la asignatura (ej: 1)</td>
+                                                    <td><span class="badge bg-danger">Obligatorio</span></td>
                                                 </tr>
                                             </tbody>
                                         </table>
@@ -312,7 +333,9 @@
   -d '{
     "name": "mi-app",
     "image": "nginx:latest",
-    "mode": "dockerhub"
+    "mode": "dockerhub",
+    "project": 1,
+    "subject": 1
   }'</code></pre>
                                             </div>
                                         </div>
@@ -347,6 +370,8 @@
     "image": "python:3.9-slim",
     "mode": "dockerhub",
     "internal_port": 5000,
+    "project": 1,
+    "subject": 1,
     "environment": {
       "DB_HOST": "10.5.0.1",
       "DEBUG": "true"
@@ -378,8 +403,16 @@
                                                 <td>Debe ser <code>"custom"</code></td>
                                             </tr>
                                             <tr>
-                                                <td><code>file</code></td>
+                                                <td><code>code</code></td>
                                                 <td>Ruta al archivo <code>.zip</code> (usa miltipart/form-data)</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>project</code></td>
+                                                <td>ID del proyecto obligarorio</td>
+                                            </tr>
+                                            <tr>
+                                                <td><code>subject</code></td>
+                                                <td>ID de la asignatura obligatorio</td>
                                             </tr>
                                         </table>
                                     </div>
@@ -435,7 +468,10 @@
   -H "Authorization: Bearer <TU_TOKEN>" \
   -F "name=mi-app-compilada" \
   -F "mode=custom" \
-  -F "file=@proyecto.zip"</code></pre>
+  -F "code=@proyecto.zip" \
+  -F "dockerfile=@Dockerfile" \
+  -F "project=1" \
+  -F "subject=1"</code></pre>
                                             </div>
                                         </div>
                                     </div>
@@ -469,7 +505,10 @@
   -H "Authorization: Bearer <TU_TOKEN>" \
   -F "name=mi-stack-completo" \
   -F "mode=custom" \
-  -F "file=@bundle.zip"</code></pre>
+  -F "code=@bundle.zip" \
+  -F "compose=@docker-compose.yml" \
+  -F "project=1" \
+  -F "subject=1"</code></pre>
                                             </div>
                                         </div>
                                     </div>

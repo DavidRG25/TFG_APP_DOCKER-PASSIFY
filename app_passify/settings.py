@@ -68,16 +68,16 @@ INSTALLED_APPS = [
 ]
 
 # ---------------------------------------------------------------------
-# Middleware (añadimos WhiteNoise para estáticos en prod)
+# Middleware (aÃ±adimos WhiteNoise para estÃ¡ticos en prod)
 # ---------------------------------------------------------------------
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # <— IMPORTANTE
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # <â€” IMPORTANTE
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'paasify.middleware.TokenAuthMiddleware',  # <— Token JWT para API
+    'paasify.middleware.TokenAuthMiddleware',  # <â€” Token JWT para API
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -141,20 +141,20 @@ USE_L10N = True
 USE_TZ = True
 
 # ---------------------------------------------------------------------
-# Configuración de URL Base (para API y Documentación)
+# ConfiguraciÃ³n de URL Base (para API y DocumentaciÃ³n)
 # ---------------------------------------------------------------------
 # Permite fijar el dominio/IP de la plataforma (ej: https://passify-urjc.es)
-# Si se deja vacío, se detectará dinámicamente desde la petición.
+# Si se deja vacÃ­o, se detectarÃ¡ dinÃ¡micamente desde la peticiÃ³n.
 PAASIFY_BASE_URL = os.environ.get("PAASIFY_BASE_URL", "").rstrip("/")
 
 
 # ---------------------------------------------------------------------
-# Archivos estáticos (CSS/JS/Imágenes)
+# Archivos estÃ¡ticos (CSS/JS/ImÃ¡genes)
 # ---------------------------------------------------------------------
-# URL pública
+# URL pÃºblica
 STATIC_URL = '/static/'
 
-# Carpeta real donde tienes "assets" (paasify/static/assets/…)
+# Carpeta real donde tienes "assets" (paasify/static/assets/â€¦)
 STATICFILES_DIRS = [
     BASE_DIR / "paasify" / "static",
 ]
@@ -162,11 +162,11 @@ STATICFILES_DIRS = [
 # Carpeta a la que colecta en despliegue
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# WhiteNoise: compresión y versionado (recomendado)
+# WhiteNoise: compresiÃ³n y versionado (recomendado)
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-WHITENOISE_USE_FINDERS = True  # útil en dev para localizar estáticos dentro de apps
+WHITENOISE_USE_FINDERS = True  # Ãºtil en dev para localizar estÃ¡ticos dentro de apps
 
-# Silenciar warnings de archivos estáticos duplicados (no afectan funcionalidad)
+# Silenciar warnings de archivos estÃ¡ticos duplicados (no afectan funcionalidad)
 SILENCED_SYSTEM_CHECKS = ['staticfiles.W004']
 
 # ---------------------------------------------------------------------
@@ -209,3 +209,8 @@ LOGOUT_REDIRECT_URL = '/paasify/login/'
 JAZZMIN_SETTINGS = {
     "welcome_sign": "Bienvenido"
 }
+APPEND_SLASH=False
+
+APPEND_SLASH = False
+
+APPEND_SLASH = False
