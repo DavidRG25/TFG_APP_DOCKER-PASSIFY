@@ -1174,7 +1174,6 @@ def api_documentation_view(request):
         'token': token.key,
         'user_token': token.key,
         'markdown_content': md_content,
-        'PAASIFY_API_URL': f"{request.scheme}://{request.get_host()}/api",
     }
     
     return render(request, 'containers/api_documentation.html', context)
