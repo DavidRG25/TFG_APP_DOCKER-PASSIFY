@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PaaSify - Enterprise Landing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Outfit:wght@700&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+
+<body>
+  <div class="glow-bg"></div>
+
+  <main class="container">
+    <header class="hero section-animate">
+      <div class="logo">
+        <i class="fas fa-layer-group"></i>
+        <span>PaaSify</span>
+      </div>
+      <h1>Despliegue de Alto Rendimiento</h1>
+      <p class="subtitle">Validando infraestructura de nube privada con Nginx y Docker. Un entorno robusto, seguro y
+        escalable diseñado para tu TFG.</p>
+
+      <div class="badges">
+        <span class="badge"><i class="fas fa-file-code"></i> Dockerfile</span>
+        <span class="badge"><i class="fas fa-server"></i> Nginx 1.27</span>
+        <span class="badge"><i class="fas fa-user-shield"></i> Non-root</span>
+        <span class="badge"><i class="fas fa-heartbeat"></i> Healthcheck</span>
+      </div>
+    </header>
+
+    <div class="grid section-animate" style="animation-delay: 0.1s;">
+      <section class="card stats">
+        <div class="card-icon"><i class="fas fa-tachometer-alt"></i></div>
+        <h3>Estado del Sistema</h3>
+        <div class="status-indicator">
+          <span class="pulse"></span>
+          <span>Online & Saludable</span>
+        </div>
+        <p class="card-text">Nginx está operando en el puerto <strong>8080</strong> con aislamiento de usuario
+          <strong>app</strong>.</p>
+      </section>
+
+      <section class="card actions">
+        <div class="card-icon"><i class="fas fa-vial"></i></div>
+        <h3>Laboratorio de Prueba</h3>
+        <p class="card-text">Valida la interactividad del contenedor y la persistencia de los scripts de frontend.</p>
+        <button id="ping" class="btn">
+          <i class="fas fa-bolt"></i> Ejecutar Diagnóstico
+        </button>
+        <div id="out-container">
+          <p id="out" class="out-text"></p>
+        </div>
+      </section>
+    </div>
+
+    <section class="card checklist section-animate" style="animation-delay: 0.2s;">
+      <h3><i class="fas fa-tasks"></i> Roadmap de Validación</h3>
+      <div class="checklist-items">
+        <div class="check-item done">
+          <i class="fas fa-check-circle"></i>
+          <span>Build de Imagen Alpine (Optimizado)</span>
+        </div>
+        <div class="check-item done">
+          <i class="fas fa-check-circle"></i>
+          <span>Seguridad Non-Root (UID 1000)</span>
+        </div>
+        <div class="check-item current">
+          <i class="fas fa-spinner fa-spin"></i>
+          <span>Validación de Healthcheck HTTP</span>
+        </div>
+        <div class="check-item">
+          <i class="far fa-circle"></i>
+          <span>Test de Stress y Cabeceras</span>
+        </div>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>Diseñado para potenciar el despliegue dinámico en <strong>PaaSify</strong>.</p>
+      <div class="footer-links">
+        <span><i class="fas fa-code"></i> TFG 2026</span>
+        <span><i class="fas fa-shield-alt"></i> Seguridad Enterprise</span>
+      </div>
+    </footer>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+
+</html>

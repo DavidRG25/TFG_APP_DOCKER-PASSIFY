@@ -1,3 +1,4 @@
+# test comment
 # containers/views.py
 import json
 from django.db import models
@@ -62,7 +63,7 @@ def _sync_service(service: Service):
         docker_status = (container.status or "").lower()
         
         # Estados transitorios: no hacer nada, dejar que el proceso termine
-        if service.status in {"stopping", "pending", "deleting"}:
+        if service.status in {"stopping", "pending", "deleting", "building", "pulling", "starting"}:
             return
         
         # Si el servicio está stopped/error y el contenedor NO está running, sincronizar a stopped

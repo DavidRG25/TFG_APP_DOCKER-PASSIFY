@@ -59,6 +59,13 @@
    - [ ] Se documenta el uso de `-F` (multipart) para subir archivos.
    - [ ] Se explica que se requiere `code` (.zip/.rar) y un `Dockerfile` o `docker-compose.yml`.
 
+### **Test 06.b: Escenarios Avanzados (Compose)**
+1. Bajar hasta la sección **"Escenarios Avanzados"**.
+2. **Verificar**:
+   - [ ] Aparece el ejemplo de `curl` para un despliegue multi-contenedor (Web+DB).
+   - [ ] Se mencionan las buenas prácticas (Healthchecks, usuario no-root).
+   - [ ] El sidebar muestra "Escenarios Avanzados" como sub-apartado.
+
 ### **Test 07: Acordeones de Error Contextuales**
 1. Navegar por todos los endpoints y verificar que el desplegable "Códigos de error de este endpoint" muestra información coherente con la acción.
 

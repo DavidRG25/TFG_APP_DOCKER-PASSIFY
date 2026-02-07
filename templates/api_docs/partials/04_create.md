@@ -112,4 +112,37 @@ curl -X POST {{ PAASIFY_API_URL }}/containers/ \
 </div>
 </details>
 
+### Escenarios Avanzados
+
+PaaSify soporta despliegues complejos que incluyen múltiples servicios, bases de datos y configuraciones de seguridad recomendadas.
+
+#### Multi-contenedor (Docker Compose)
+
+Puedes desplegar una arquitectura completa (ej: Web + Base de Datos) subiendo un archivo `docker-compose.yml`.
+
+```bash
+# Despliegue de una App Flask + Base de Datos Postgres
+curl -X POST {{ PAASIFY_API_URL }}/containers/ \
+  -H "Authorization: Bearer <TU_API_TOKEN>" \
+  -F "name=mi-web-db" \
+  -F "mode=custom" \
+  -F "code=@proyecto_completo.zip" \
+  -F "compose=@docker-compose.yml"
+```
+
+> **Buenas Prácticas Incluidas**:
+> - **Persistencia**: Uso de volúmenes nombrados para la base de datos.
+> - **Orquestación**: Uso de `depends_on` con `condition: service_healthy`.
+> - **Seguridad**: Los contenedores deben correr como usuarios no root (appuser).
+
+#### Healthchecks y Robustez
+
+Se recomienda incluir instrucciones `HEALTHCHECK` tanto en tu `Dockerfile` como en tu `docker-compose.yml`. PaaSify utiliza estos checks para monitorizar el estado real de tu aplicación y gestionar reinicios automáticos si el servicio deja de responder.
+
+```dockerfile
+# Ejemplo de Healthcheck en Dockerfile
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD curl -f http://localhost/ || exit 1
+```
+
 ---
