@@ -3,9 +3,14 @@
     {% if service.status == 'running' %} bg-success text-white
     {% elif service.status == 'stopped' %} bg-secondary text-white
     {% elif service.status == 'error' %} bg-danger text-white
+    {% elif service.status == 'building' or service.status == 'pulling' or service.status == 'starting' %} bg-info text-white
     {% else %} bg-warning text-dark
     {% endif %}">
-    {{ service.status|default:'unknown'|title }}
+    {% if service.status == 'building' %} <i class="fas fa-hammer fa-spin me-1"></i> Construyendo
+    {% elif service.status == 'pulling' %} <i class="fas fa-download fa-spin me-1"></i> Descargando
+    {% elif service.status == 'starting' %} <i class="fas fa-play fa-spin me-1"></i> Iniciando
+    {% else %} {{ service.status|default:'unknown'|title }}
+    {% endif %}
     {% if service.has_compose %}
     {% with summary=service.get_compose_status_summary %}
     {% if summary %}

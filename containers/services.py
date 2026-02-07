@@ -459,6 +459,59 @@ def _append_log(service: Service, message: str) -> None:
         service.logs = message
 
 
+def _run_command_stream_logs(service: Service, cmd: list[str], cwd: str = None):
+    """
+    Ejecuta un comando y va guardando la salida en los logs del servicio en tiempo real.
+    """
+    import subprocess
+    import sys
+    import os
+    import time
+    
+    _append_log(service, f"> {' '.join(cmd)}")
+    service.save(update_fields=["logs"])
+    
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            cwd=cwd,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            bufsize=1,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+        )
+        
+        last_save = time.time()
+        line_count = 0
+        
+        # Leer línea a línea
+        for line in process.stdout:
+            if line:
+                _append_log(service, line.strip())
+                line_count += 1
+                
+                # Guardar cada segundo o cada 15 líneas para no saturar DB
+                now = time.time()
+                if now - last_save > 1.0 or line_count >= 15:
+                    service.save(update_fields=["logs"])
+                    last_save = now
+                    line_count = 0
+                
+        process.wait()
+        service.save(update_fields=["logs"]) # Asegurar guardado final
+        
+        if process.returncode != 0:
+            raise RuntimeError(f"El comando falló con código {process.returncode}")
+            
+    except Exception as e:
+        _append_log(service, f"ERROR al ejecutar comando: {str(e)}")
+        service.save(update_fields=["logs"])
+        raise
+
+
 def _service_slug(service: Service) -> str:
     base = (service.name or "").lower()
     base = re.sub(r"[^a-z0-9-_]+", "-", base)
@@ -714,35 +767,20 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool):
         project = _get_compose_project_name(service)
         cmd = _compose_cmd() + ["-p", project, "-f", str(compose_path), "up", "--build", "-d"]
         
-        _append_log(service, f"Ejecutando: {' '.join(cmd)}")
-        _append_log(service, f"Workspace: {workspace}")
-        service.save(update_fields=["logs"])
+        service.status = "starting"
+        _append_log(service, "Iniciando despliegue docker-compose...")
+        service.save(update_fields=["status", "logs"])
         
-        proc = subprocess.run(
-            cmd, 
-            cwd=str(workspace),  # ← IMPORTANTE: ejecutar desde workspace
-            check=True, 
-            capture_output=True, 
-            text=True,
-            encoding='utf-8',  # ← FIX: Evitar UnicodeDecodeError en Windows
-            errors='replace'    # ← FIX: Reemplazar caracteres inválidos
-        )
-        stdout = proc.stdout or ""
-        stderr = proc.stderr or ""
+        _run_command_stream_logs(service, cmd, cwd=str(workspace))
         
-        _append_log(service, f"STDOUT: {stdout}")
-        _append_log(service, f"STDERR: {stderr}")
-        service.save(update_fields=["logs"])
-        
-    except subprocess.CalledProcessError as e:
+    except (subprocess.CalledProcessError, RuntimeError) as e:
         # Liberar puertos reservados si falla
         for port in reserved_ports:
             _release_port(port)
         service.status = "error"
-        error_msg = (e.stderr or e.stdout or str(e)).strip()
-        _append_log(service, f"ERROR subprocess: {error_msg}")
+        _append_log(service, f"ERROR: {str(e)}")
         service.save()
-        raise RuntimeError(f"Error al ejecutar docker compose:\n{error_msg}")
+        raise
     except Exception as e:
         service.status = "error"
         _append_log(service, f"ERROR general: {str(e)}")
@@ -859,29 +897,26 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
                 raise RuntimeError("No se encontró Dockerfile en el workspace del servicio.")
             
             image_tag = f"svc_{service.id}_{slug}_image"
-            try:
-                proc = subprocess.run(
-                    ["docker", "build", "-t", image_tag, str(workspace)],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                    encoding='utf-8',
-                    errors='replace'
-                )
-                build_out = (proc.stdout or "") + "\n" + (proc.stderr or "")
-            except subprocess.CalledProcessError as e:
-                build_out = (e.stdout or "") + "\n" + (e.stderr or "")
-                service.status = "error"
-                service.logs = build_out.strip() or str(e)
-                service.save(update_fields=["status", "logs"])
-                raise RuntimeError(f"Error al construir la imagen:\n{service.logs}")
+            service.status = "building"
+            _append_log(service, "Construyendo imagen personalizada...")
+            service.save(update_fields=["status", "logs"])
+            
+            _run_command_stream_logs(service, ["docker", "build", "-t", image_tag, str(workspace)])
 
             image_to_run = image_tag
-            service.logs = ("docker build completado.\n" + build_out).strip()
+            _append_log(service, "Imagen construida correctamente.")
             service.save(update_fields=["logs"])
         else:
             # --------- Caso imagen directa del catálogo ---------
             image_to_run = service.image
+            service.status = "pulling"
+            _append_log(service, f"Descargando imagen: {image_to_run}...")
+            service.save(update_fields=["status", "logs"])
+            
+            # Usamos comandos docker directamente para tener streaming de logs
+            _run_command_stream_logs(service, ["docker", "pull", image_to_run])
+            _append_log(service, "Imagen descargada.")
+            service.save(update_fields=["logs"])
 
         try:
             image_attrs = docker_client.images.get(image_to_run).attrs
