@@ -8,7 +8,7 @@ from django.contrib.admin.views.decorators import staff_member_required
 from django.conf import settings
 from django.conf.urls.static import static
 
-from containers.views import ServiceViewSet, AllowedImageViewSet
+from containers.views import ServiceViewSet, AllowedImageViewSet, SubjectViewSet, ProjectViewSet
 from containers import views as container_views
 from paasify.views import ProfileView
 
@@ -21,6 +21,8 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 router = routers.DefaultRouter()
 router.register(r'containers', ServiceViewSet, basename='service')
 router.register(r'images', AllowedImageViewSet, basename='allowed-image')
+router.register(r'subjects', SubjectViewSet, basename='subject')
+router.register(r'projects', ProjectViewSet, basename='project')
 
 urlpatterns = [
     # Vistas públicas / HTML
