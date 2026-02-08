@@ -1,7 +1,5 @@
 # Códigos de Error
 
-
-
 Estos son los códigos de estado HTTP más comunes que puedes recibir en tus respuestas:
 
 <br>
@@ -45,3 +43,48 @@ Estos son los códigos de estado HTTP más comunes que puedes recibir en tus res
 </div>
 </details>
 
+---
+
+### Análisis de Errores Habituales
+
+Además de los códigos estándar, aquí tienes una guía para solucionar los problemas más frecuentes al integrar la API:
+
+#### 1. El error de la Barra Diagonal (`/`)
+
+Django es estricto con las URLs. Si olvidas poner la barra al final de un endpoint, puedes recibir un error de redirección o un `404`.
+
+- **Mal**: `.../api/containers`
+- **Bien**: `.../api/containers/` (Siempre añade la `/` al final).
+
+#### 2. Error 400 - Validación de Datos
+
+Si recibes un `400`, revisa el cuerpo de la respuesta JSON. Te dirá exactamente qué campo ha fallado:
+
+- `"name": ["Ya existe un servicio tuyo con este nombre."]`: El nombre debe ser único.
+- `"internal_port": ["Debe estar entre 1 y 65535."]`: Revisa que el puerto interno sea válido.
+- `"image": ["La imagen 'xxx' no existe en DockerHub."]`: En modo DockerHub, la imagen debe ser pública y el nombre correcto.
+
+#### 3. Error 401 - Token Incorrecto o Expirado
+
+Si el token no funciona:
+
+1.  Verifica que el formato sea exactamente `Authorization: Bearer <TU_TOKEN>`.
+2.  Asegúrate de que no haya espacios extra o caracteres invisibles.
+3.  Si ha pasado más de un mes desde que lo generaste, probablemente haya expirado. Genéralo de nuevo en tu **Perfil**.
+
+#### 4. Error 405 - Método No Permitido
+
+Este error ocurre cuando usas el verbo HTTP equivocado:
+
+- Usar `GET` en lugar de `POST` para crear o realizar acciones (start, stop).
+- Usar `POST` en lugar de `GET` para listar o ver información.
+
+---
+
+### Solución de Problemas (Troubleshooting)
+
+Si tu comando `curl` falla sin dar mucha información:
+
+1.  Añade el flag `-v` (verbose) a tu comando curl para ver las cabeceras completas de la petición y respuesta.
+2.  Verifica que el servidor PaaSify sea accesible desde tu red actual.
+3.  Revisa la sintaxis correcta en la sección de **Despliegue API/Terminal** de la interfaz web para asegurar que tu comando sigue la estructura de las plantillas oficiales.

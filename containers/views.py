@@ -37,78 +37,11 @@ from .services import (
     start_service_container_record,
     stop_service_container_record,
     fetch_container_logs,
+    sync_service_status
 )
 
 
 # ----------------------------- helpers -----------------------------
-
-def _sync_service(service: Service):
-    """
-    Sincroniza el estado del servicio con Docker.
-    
-    Mejorado para manejar estados transitorios correctamente:
-    - No marca error si el servicio está en "stopping", "pending", "deleting"
-    - Solo marca error si el contenedor está definitivamente muerto (exited, dead)
-    """
-    if not service.container_id:
-        return
-
-    docker_client = get_docker_client()
-    if docker_client is None:
-        return
-
-    try:
-        container = docker_client.containers.get(service.container_id)
-        container.reload()
-        docker_status = (container.status or "").lower()
-        
-        # Estados transitorios: no hacer nada, dejar que el proceso termine
-        if service.status in {"stopping", "pending", "deleting", "building", "pulling", "starting"}:
-            return
-        
-        # Si el servicio está stopped/error y el contenedor NO está running, sincronizar a stopped
-        # Esto evita marcar como error al reiniciar PaaSify con contenedores detenidos
-        # Docker puede reportar: exited, stopped, created, paused, dead
-        if service.status in {"stopped", "error"} and docker_status in {"exited", "stopped"}:
-            if service.status == "error":
-                # Recuperar de error si solo está detenido
-                service.status = "stopped"
-                service.save(update_fields=["status"])
-            return  # Todo OK
-        
-        # Si el servicio cree que está running pero Docker dice que no
-        if service.status == "running" and docker_status not in {"running"}:
-            # Solo marcar error si está definitivamente muerto
-            if docker_status in {"exited", "dead"}:
-                try:
-                    log_tail = container.logs(tail=200).decode(errors="replace")
-                except Exception:
-                    log_tail = "(logs no disponibles)"
-                service.status = "error"
-                service.logs = (service.logs or "") + f"\n[Docker] Contenedor en estado '{docker_status}'. Logs:\n{log_tail}".strip()
-                service.save(update_fields=["status", "logs"])
-            # Si está en otro estado (created, restarting), dar tiempo
-            elif docker_status in {"created", "restarting"}:
-                pass  # Esperar, puede estar arrancando
-            else:
-                # Estado desconocido, asumir stopped
-                service.status = "stopped"
-                service.save(update_fields=["status"])
-        
-        # Si el servicio cree que está stopped pero Docker dice running
-        elif service.status == "stopped" and docker_status == "running":
-            service.status = "running"
-            service.save(update_fields=["status"])
-            
-    except NotFound:
-        # Solo marcar como removed si no está en proceso de eliminación
-        if service.status != "deleting":
-            service.status = "removed"
-            service.save()
-    except DockerException:
-        # Si no podemos verificar el contenedor, conservamos el estado actual.
-        return
-
 
 def user_is_student(user) -> bool:
     if not getattr(user, "is_authenticated", False):
@@ -148,7 +81,9 @@ class ServiceViewSet(viewsets.ModelViewSet):
         return ServiceSerializer
 
     def _is_htmx(self, request) -> bool:
-        return request.headers.get("HX-Request") == "true"
+        # Algunos navegadores o proxys pueden variar la capitalización, comprobamos de forma más robusta
+        hx = request.headers.get("HX-Request", "").lower()
+        return hx == "true"
 
     def _render_table_fragment(self, request) -> str:
         services = self.get_queryset()
@@ -169,21 +104,27 @@ class ServiceViewSet(viewsets.ModelViewSet):
         extra_triggers=None,
     ):
         html = ""
+        # Si no es HTMX (raro pero posible), devolvemos el fragmento de la tabla
         if not self._is_htmx(request):
             html = self._render_table_fragment(request)
         response = DRF_Response(html, status=status)
+        
+        # Siempre incluimos el refresh de la tabla para asegurar que el pooling se active/actualice
         trigger = dict(extra_triggers or {})
-        trigger.setdefault("service:table-refresh", {})
+        trigger["service:table-refresh"] = {}
+        
         if message:
             trigger["service:toast"] = {"message": message, "variant": level}
-        if trigger:
-            response["HX-Trigger"] = json.dumps(trigger)
+            
+        # Siempre enviar como JSON para que HTMX lo procese consistentemente
+        response["HX-Trigger"] = json.dumps(trigger)
+            
         return response
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         user = request.user
-        if user.is_superuser or user_is_admin(user):
+        if user.is_superuser or user_is_admin(user) or user_is_teacher(user):
             return
         if not user_is_student(user):
             raise PermissionDenied("Solo los alumnos pueden gestionar contenedores.")
@@ -213,7 +154,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
             qs = qs.filter(status=status)
 
         for s in qs:
-            _sync_service(s)
+            sync_service_status(s)
         return qs.exclude(status="removed")
 
     def create(self, request, *args, **kwargs):
@@ -338,35 +279,20 @@ class ServiceViewSet(viewsets.ModelViewSet):
             return DRF_Response({"status": "error", "message": str(exc)}, status=500)
 
         if self._is_htmx(request):
-            return self._htmx_response(request)
+            return self._htmx_response(
+                request, 
+                message=f"Servicio '{service.name}' iniciado correctamente.",
+                level="text-bg-success"
+            )
         return DRF_Response({"status": "queued", "message": "Servicio encolado para iniciar."})
 
     @action(detail=True, methods=["post"])
     def stop(self, request, pk=None):
         service = self.get_object()
+        
         try:
-            stop_container(service)
-        except Exception as exc:
-            if self._is_htmx(request):
-                return self._htmx_response(
-                    request,
-                    status=500,
-                    message=str(exc),
-                    level="text-bg-danger",
-                )
-            return DRF_Response({"status": "error", "message": str(exc)}, status=500)
-
-        if self._is_htmx(request):
-            return self._htmx_response(request)
-        return DRF_Response({"status": "stopped", "message": "Servicio detenido."})
-
-    @action(detail=True, methods=["post"], url_path="remove")
-    def remove(self, request, pk=None):
-        service = self.get_object()
-        service.status = "deleting"
-        service.save(update_fields=["status", "updated_at"])
-        try:
-            remove_container(service)
+            from .services import stop_container_async
+            stop_container_async(service)
         except Exception as exc:
             if self._is_htmx(request):
                 return self._htmx_response(
@@ -380,10 +306,35 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if self._is_htmx(request):
             return self._htmx_response(
                 request,
-                message="El servicio ha sido eliminado correctamente.",
+                message=f"Servicio '{service.name}' deteniendo...",
+                level="text-bg-warning"
+            )
+        return DRF_Response({"status": "stopping", "message": "Servicio deteniendo."})
+
+    @action(detail=True, methods=["post"], url_path="remove")
+    def remove(self, request, pk=None):
+        service = self.get_object()
+        
+        try:
+            from .services import remove_container_async
+            remove_container_async(service)
+        except Exception as exc:
+            if self._is_htmx(request):
+                return self._htmx_response(
+                    request,
+                    status=500,
+                    message=str(exc),
+                    level="text-bg-danger",
+                )
+            return DRF_Response({"status": "error", "message": str(exc)}, status=500)
+
+        if self._is_htmx(request):
+            return self._htmx_response(
+                request,
+                message="El servicio está siendo eliminado...",
                 level="text-bg-success",
             )
-        return DRF_Response({"status": "removed", "message": "Servicio eliminado."})
+        return DRF_Response({"status": "deleting", "message": "Servicio eliminando."})
 
     @action(detail=True, methods=["get"])
     def logs(self, request, pk=None):
@@ -420,13 +371,26 @@ class ServiceViewSet(viewsets.ModelViewSet):
             title = f"Logs de {service.name}"
         
         if self._is_htmx(request):
+            # Determinamos si hace falta polling (si está operando o si está corriendo para ver logs frescos)
+            is_transient = service.status in ["pending", "starting", "building", "pulling", "deleting", "creating", "stopping"]
+            polling_attr = ""
+            if is_transient or service.status == "running":
+                # Si pasamos container_id, mantenerlo en el polling
+                poll_url = request.path
+                if container_id_param:
+                    poll_url += f"?container={container_id_param}"
+                polling_attr = f'hx-get="{poll_url}" hx-trigger="load delay:2s" hx-target="#genericModalContent" hx-swap="innerHTML"'
+
             html = f"""
                 <div class="modal-header">
                     <h5 class="modal-title">{title}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
-                <div class="modal-body">
-                    <pre><code class="language-plaintext">{escape(log_content)}</code></pre>
+                <div class="modal-body" {polling_attr}>
+                    <pre class="bg-dark text-light p-3 rounded shadow-sm" style="max-height: 400px; overflow-y: auto;">
+                        <code class="language-plaintext">{escape(log_content)}</code>
+                    </pre>
+                    {f'<div class="text-center mt-2"><div class="spinner-border spinner-border-sm text-primary" role="status"></div><small class="ms-2 text-muted">Actualizando logs...</small></div>' if polling_attr else ""}
                 </div>
             """
             return HttpResponse(html)
@@ -899,6 +863,10 @@ def student_services_in_subject(request, subject_id):
         .exclude(status="removed")
     )
     
+    # Sincronizar estado de servicios con Docker
+    for service in services:
+        sync_service_status(service)
+    
     # Calcular estadísticas locales para esta asignatura
     running_count = services.filter(status="running").count()
     stopped_count = services.filter(status="stopped").count()
@@ -936,24 +904,52 @@ def student_services_in_subject(request, subject_id):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def service_table(request):
-    if not (request.user.is_superuser or user_is_student(request.user)):
+    user = request.user
+    if not (user.is_superuser or user_is_admin(user) or user_is_teacher(user) or user_is_student(user)):
         return HttpResponse("No tienes permiso para consultar servicios.", status=403)
 
-    qs = Service.objects.filter(owner=request.user).exclude(status="removed")
+    if user.is_superuser or user_is_admin(user) or user_is_teacher(user):
+        qs = Service.objects.all()
+        is_supervisor = True
+    else:
+        qs = Service.objects.filter(owner=user)
+        is_supervisor = False
+        
+    qs = qs.exclude(status="removed")
     subject_id = request.GET.get("subject")
+    project_id = request.GET.get("project")
 
-    # Si el modelo tiene FK a subject, filtramos; si no, lo ignoramos (evita FieldError)
-    try:
-        if subject_id:
-            qs = qs.filter(subject_id=subject_id)
-    except FieldError:
-        pass
+    if subject_id:
+        qs = qs.filter(subject_id=subject_id)
+    if project_id:
+        qs = qs.filter(project_id=project_id)
 
+    # Sincronizar estados con Docker antes de renderizar
     for s in qs:
-        _sync_service(s)
+        sync_service_status(s)
 
     host = request.get_host().split(":")[0]
-    html = render_to_string("containers/_service_rows.html", {"services": qs, "host": host})
+    
+    # Evaluar si algún servicio está en estado transitorio para forzar polling en el cliente
+    transient_states = ["pending", "starting", "stopping", "building", "pulling", "deleting", "creating"]
+    has_transient = qs.filter(status__in=transient_states).exists()
+    
+    if not has_transient:
+        # Tambien considerar transitorios los contenedores individuales de Compose
+        # (ej: si estan en 'created', 'restarting', 'removing')
+        has_transient = ServiceContainer.objects.filter(
+            service__in=qs,
+            status__in=["created", "restarting", "removing"]
+        ).exists()
+
+    html = render_to_string("containers/_service_rows.html", {
+        "services": qs, 
+        "host": host, 
+        "is_supervisor": is_supervisor,
+        "has_transient": has_transient,
+        "subject_id": subject_id,
+        "project_id": project_id
+    }, request=request)
     return HttpResponse(html)
 
 
@@ -1035,17 +1031,31 @@ def professor_dashboard(request):
     if request.user.is_superuser:
         subjects = Subject.objects.all()
 
-    projects = (
+    projects_qs = (
         UserProject.objects.filter(subject__teacher_user=request.user)
         if not request.user.is_superuser
         else UserProject.objects.all()
-    ).select_related("subject", "user_profile")
-
-    return render(
-        request,
-        "professor/dashboard.html",
-        {"subjects": subjects, "projects": projects},
     )
+    projects = projects_qs.select_related("subject", "user_profile")
+
+    # Estadísticas para el profesor
+    total_students = subjects.values('students').distinct().count()
+    total_services = Service.objects.filter(subject__in=subjects).exclude(status="removed").count()
+    active_services = Service.objects.filter(subject__in=subjects, status="running").count()
+
+    context = {
+        "subjects": subjects,
+        "projects": projects,
+        "stats": {
+            "subjects": subjects.count(),
+            "projects": projects.count(),
+            "students": total_students,
+            "total_services": total_services,
+            "active_services": active_services,
+        }
+    }
+
+    return render(request, "professor/dashboard.html", context)
 
 
 @login_required
@@ -1064,11 +1074,18 @@ def professor_subject_detail(request, subject_id):
         .order_by("owner__username", "name")
     )
     projects = subject.projects.select_related("user_profile")
+    host = request.get_host().split(":")[0]
 
     return render(
         request,
         "professor/subject_detail.html",
-        {"subject": subject, "students": students, "services": services, "projects": projects},
+        {
+            "subject": subject,
+            "students": students,
+            "services": services,
+            "projects": projects,
+            "host": host,
+        },
     )
 
 
@@ -1091,11 +1108,12 @@ def professor_project_detail(request, project_id):
             .exclude(status="removed")
             .select_related("owner", "subject")
         )
+    host = request.get_host().split(":")[0]
 
     return render(
         request,
         "professor/project_detail.html",
-        {"project": project, "related_services": related_services},
+        {"project": project, "related_services": related_services, "host": host},
     )
 
 
@@ -1289,8 +1307,12 @@ def api_documentation_view(request, section_slug="introduccion"):
     prev_section = SECTIONS[current_index - 1] if current_index > 0 else None
     next_section = SECTIONS[current_index + 1] if current_index < len(SECTIONS) - 1 else None
 
-    # Obtener el token del usuario
+    # Obtener el token del usuario e imágenes del catálogo
+    from paasify.models.TokenModel import ExpiringToken
+    from containers.models import AllowedImage
+    
     token, _ = ExpiringToken.objects.get_or_create(user=request.user)
+    images = AllowedImage.objects.all().order_by('name')
     
     file_path = os.path.join(partials_dir, current_section["file"])
     
@@ -1311,6 +1333,7 @@ def api_documentation_view(request, section_slug="introduccion"):
         'total_sections': len(SECTIONS),
         'prev_section': prev_section,
         'next_section': next_section,
+        'images': images,
         'title': f"{current_section['title']} - API Docs",
     }
     

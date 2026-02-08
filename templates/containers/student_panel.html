@@ -43,16 +43,18 @@
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
             <thead style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
-              <tr>
-                <th class="text-white fw-semibold py-3 ps-4">Proyecto</th>
-                <th class="text-white fw-semibold py-3">Nombre</th>
-                <th class="text-white fw-semibold py-3">Imagen</th>
-                <th class="text-white fw-semibold py-3">Puerto</th>
-                <th class="text-white fw-semibold py-3">Estado</th>
-                <th class="text-white fw-semibold py-3">Acciones</th>
+              <tr class="text-white small text-uppercase">
+                <th class="py-3 ps-4">Proyecto</th>
+                <th class="py-3">Nombre</th>
+                <th class="py-3">Imagen</th>
+                <th class="py-3">Puerto</th>
+                <th class="py-3">Estado</th>
+                <th class="py-3 pe-4 text-end">Acciones</th>
               </tr>
             </thead>
-            <tbody id="service-table" class="bg-white" hx-get="{% url 'containers:service_table' %}{% if current_subject %}?subject={{ current_subject.id }}{% endif %}">
+            <tbody id="service-table" class="bg-white" 
+                   hx-get="{% url 'containers:service_table' %}{% if current_subject %}?subject={{ current_subject.id }}{% endif %}"
+                   hx-trigger="load, every 3s, service:table-refresh from:body">
               {% include "containers/_service_rows.html" %}
             </tbody>
           </table>

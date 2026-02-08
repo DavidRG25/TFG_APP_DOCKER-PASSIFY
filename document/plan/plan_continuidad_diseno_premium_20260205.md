@@ -43,6 +43,10 @@ Se utilizarán los tokens definidos en el "lavado de cara" del perfil:
 - [ ] Implementar el diseño de "Cards de Servicio" con iconos tecnológicos grandes (Node, Python, Docker).
 - [ ] Añadir el indicador de estado pulsante (verde para Running).
 - [ ] Botones de acción (Play, Stop, Terminal) estilizados como iconos en círculos flotantes.
+- [ ] **Rediseño de Botones de Despliegue (Header del Panel)**:
+  - Sustituir iconos estándar por `fas fa-rocket` (Web) y `fas fa-code` (API).
+  - Aplicar efecto `glassmorphism` al botón de API (borde sutil, fondo semi-transparente).
+  - Implementar micro-animación `hover: scale(1.05)` para mejorar el feedback visual.
 - [ ] Barra de progreso de recursos (CPU/RAM) con estética premium (delgada y redondeada).
 
 ### Fase 3: Mis Asignaturas y Cursos

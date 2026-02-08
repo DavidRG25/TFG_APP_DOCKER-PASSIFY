@@ -12,8 +12,6 @@
     <link rel="stylesheet" href="{% static 'assets/fonts/fontawesome-all.min.css' %}">
     <link rel="stylesheet" href="{% static 'assets/fonts/font-awesome.min.css' %}">
     <link rel="stylesheet" href="{% static 'assets/fonts/fontawesome5-overrides.min.css' %}">
-    {#
-    <link rel="stylesheet" href="{% static 'assets/bootstrap/css/chinchang-hint.css-9fa90f8/hint.min.css' %}"> #}
     <link rel="stylesheet" href="{% static 'assets/css/dashboard.css' %}">
 
     <!-- Bootstrap Icons: necesarios para mostrar los iconos de ayuda (bi-info-circle) en el formulario de Nuevo servicio -->
@@ -299,15 +297,10 @@
 
                 {% if user.is_authenticated %}
                 {# Mi Perfil #}
-
                 <li class="nav-item">
-
                     <a class="nav-link" href="{% url 'profile' %}">
-
                         <i class="fas fa-user"></i><span>Mi Perfil</span>
-
                     </a>
-
                 </li>
 
                 {% if nav_is_admin or nav_is_student or user.is_superuser %}
@@ -325,7 +318,7 @@
 
                 <li class="nav-item">
                     <a class="nav-link" href="{% url 'containers:api_docs' %}" data-bs-toggle="tooltip"
-                        data-bs-placement="bottom" title="DocumentaciÃ³n tÃ©cnica detallada de la API REST.">
+                        data-bs-placement="bottom" title="Documentación técnica detallada de la API REST.">
                         <i class="fas fa-code"></i><span>API Docs</span>
                     </a>
                 </li>
@@ -344,7 +337,7 @@
 
                 <li class="nav-item">
                     <a class="nav-link" href="{% url 'containers:api_docs' %}" data-bs-toggle="tooltip"
-                        data-bs-placement="bottom" title="DocumentaciÃ³n tÃ©cnica detallada de la API REST.">
+                        data-bs-placement="bottom" title="Documentación técnica detallada de la API REST.">
                         <i class="fas fa-code"></i><span>API Docs</span>
                     </a>
                 </li>

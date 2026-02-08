@@ -416,6 +416,134 @@ def _ensure_compose_ports(data: dict, previous_map: dict[str, dict[tuple[int, st
     return reserved_now
 
 
+def sync_service_status(service: Service):
+    """
+    Sincroniza el estado del servicio con Docker de forma proactiva.
+    
+    Rescata servicios estancados en estados transitorios (pending, starting, etc.)
+    si Docker ya informa de un estado estable.
+    """
+    # Ignorar servicios eliminados - no deben ser "resucitados"
+    if service.status == "removed":
+        return
+        
+    docker_client = get_docker_client()
+    if docker_client is None:
+        return
+
+    if service.has_compose:
+        # ===== SINCRONIZACIÓN COMPOSE =====
+        project = _get_compose_project_name(service)
+        
+        try:
+            containers = docker_client.containers.list(
+                all=True, 
+                filters={"label": f"com.docker.compose.project={project}"}
+            )
+            
+
+            
+            if not containers:
+
+                return
+
+            all_running = True
+            any_running = False
+            for ctr in containers:
+                ctr.reload()
+                status = (ctr.status or "").lower()
+                
+                # Un contenedor está "listo" si está corriendo O si ha terminado con éxito (exit code 0)
+                exit_code = ctr.attrs.get('State', {}).get('ExitCode', 0)
+                is_ready = (status == "running") or (status == "exited" and exit_code == 0)
+                
+
+                
+                if status == "running":
+                    any_running = True
+                
+                if not is_ready:
+                    all_running = False
+                
+                svc_name = ctr.labels.get("com.docker.compose.service") or ctr.name
+                if svc_name == "principal": continue
+                
+                internal_ports, assigned_ports = _extract_container_port_info(ctr)
+                
+                # Sincronizar ServiceContainer records
+                ServiceContainer.objects.update_or_create(
+                    service=service,
+                    name=svc_name,
+                    defaults={
+                        "container_id": ctr.id,
+                        "status": status,
+                        "internal_ports": internal_ports,
+                        "assigned_ports": assigned_ports,
+                    }
+                )
+
+
+
+            # Si PaaSify cree que no corre pero Docker dice que TODO corre, rescatarlo.
+            # Solo pasamos a 'running' si ABSOLUTAMENTE TODOS los contenedores están listos.
+            if any_running and all_running and service.status != "running":
+
+                service.status = "running"
+                if not service.container_id:
+                    service.container_id = containers[0].id
+                service.save(update_fields=["status", "container_id"])
+            elif not any_running and service.status == "running":
+                # Si PaaSify cree que corre pero Docker dice que no hay ninguno
+
+                service.status = "stopped"
+                service.save(update_fields=["status"])
+            else:
+                pass
+                
+        except Exception as e:
+            print(f"[sync_service_status] Error sincronizando servicio Compose {service.id}: {e}")
+            import traceback
+            traceback.print_exc()
+    else:
+        # ===== SINCRONIZACIÓN SIMPLE =====
+        if not service.container_id:
+            return
+
+        try:
+            container = docker_client.containers.get(service.container_id)
+            container.reload()
+            docker_status = (container.status or "").lower()
+            
+            # RESCATE: Si está running, forzar estado running
+            if docker_status == "running" and service.status != "running":
+                service.status = "running"
+                # Intentar recuperar puerto si se perdió
+                if not service.assigned_port:
+                    _, assigned = _extract_container_port_info(container)
+                    if assigned:
+                        service.assigned_port = assigned[0].get("external")
+                service.save()
+                return
+
+            # CIERRE: Si está muerto, forzar estado stopped/error
+            if docker_status in {"exited", "dead", "stopped"}:
+                if service.status not in {"stopped", "error", "removed", "deleting"}:
+                    service.status = "stopped"
+                    service.save(update_fields=["status"])
+                return
+
+            # Respetar estados transitorios de PaaSify si Docker no dice lo contrario
+            if service.status in {"building", "pulling", "deleting", "creating"}:
+                return
+                
+        except NotFound:
+            if service.status != "deleting":
+                service.status = "removed"
+                service.save()
+        except DockerException:
+            pass
+
+
 # ==================== PORT MANAGEMENT ====================
 
 def _release_port(port: int | None):
@@ -747,14 +875,21 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool):
     Ejecuta un servicio docker-compose.
     Crea ServiceContainer records para cada contenedor.
     """
+    service.status = "starting"
+    _append_log(service, "--- Iniciando proceso de despliegue Compose ---")
+    service.save(update_fields=["status", "logs"])
+
     try:
+        # 1. Preparar workspace
+        _append_log(service, "[1/3] Preparando archivos y workspace...")
         workspace = prepare_service_workspace(service)
         compose_path = workspace / "docker-compose.yml"
         
         if not compose_path.exists():
             raise RuntimeError("No se encontró docker-compose.yml en el workspace del servicio.")
         
-        # Cargar y procesar puertos
+        # 2. Cargar y procesar puertos
+        _append_log(service, "[2/3] Validando configuración y reservando puertos...")
         data = _load_compose_data(compose_path)
         previous_ports = _previous_port_assignments(service)
         reserved_ports = _ensure_compose_ports(data, previous_ports)
@@ -763,13 +898,15 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool):
         with compose_path.open("w", encoding="utf-8") as fh:
             yaml.dump(data, fh)
         
-        # Ejecutar docker compose desde workspace
+        # 3. Ejecutar docker compose
         project = _get_compose_project_name(service)
         cmd = _compose_cmd() + ["-p", project, "-f", str(compose_path), "up", "--build", "-d"]
         
-        service.status = "starting"
-        _append_log(service, "Iniciando despliegue docker-compose...")
-        service.save(update_fields=["status", "logs"])
+        _append_log(service, f"[3/3] Ejecutando orquestación (Proyecto: {project})...")
+        service.save(update_fields=["logs"])
+        
+        # Limpiar registros previos de ServiceContainer para evitar duplicados/basura
+        service.containers.all().delete()
         
         _run_command_stream_logs(service, cmd, cwd=str(workspace))
         
@@ -826,9 +963,19 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool):
     
     # Actualizar Service
     service.container_id = containers[0].id  # Contenedor principal para compatibilidad
-    service.status = "running"
-    _append_log(service, "docker-compose up -d completado.")
+    
+    # Esperar 3 segundos para dar tiempo a que los contenedores se estabilicen
+    # antes de que sync_service_status los verifique
+    import time
+    _append_log(service, "Esperando 3 segundos para estabilización de contenedores...")
+    time.sleep(3)
+    
+    # Dejar en 'starting' para que sync_service_status haga la transición a 'running'
+    # cuando verifique que todos los contenedores están realmente listos.
+    # Esto evita condiciones de carrera donde marcamos como running antes de tiempo.
+    _append_log(service, "docker-compose up ejecutado. Verificando estado de contenedores...")
     service.save()
+
 
 
 def _run_simple_service(service: Service, docker_client, force_restart: bool, custom_port: int | None, command: list[str] | None):
@@ -1070,6 +1217,10 @@ def stop_container(service: Service):
     _append_log(service, "Deteniendo servicio...")
     service.save(update_fields=["status", "logs", "updated_at"])
     
+    # Pequeño delay para que el auto-refresh capture el estado 'stopping'
+    import time
+    time.sleep(1.5)
+    
     if service.has_compose:
         # ===== MODO COMPOSE: Usar docker compose stop =====
         try:
@@ -1147,6 +1298,40 @@ def stop_container(service: Service):
             service.save()
 
 
+def _stop_container_worker(service_id: int) -> None:
+    """Worker que ejecuta stop_container en background."""
+    service = None
+    try:
+        service = Service.objects.get(pk=service_id)
+        stop_container(service)
+    except Service.DoesNotExist:
+        return
+    except Exception as exc:
+        if service:
+            try:
+                service.status = "error"
+                _append_log(service, f"Error al detener: {str(exc)}")
+                service.save(update_fields=["status", "logs", "updated_at"])
+            except:
+                pass
+        print(f"[error] Excepción en _stop_container_worker: {exc}")
+        import traceback
+        traceback.print_exc()
+
+
+def stop_container_async(service: Service) -> None:
+    """
+    Encola la detención del servicio para no bloquear el hilo HTTP.
+    """
+    # Cambiar estado a 'stopping' inmediatamente
+    service.status = "stopping"
+    _append_log(service, "Deteniendo servicio...")
+    service.save(update_fields=["status", "logs", "updated_at"])
+    
+    # Ejecutar en background
+    EXECUTOR.submit(_stop_container_worker, service.pk)
+
+
 def remove_container(service: Service):
     """
     Elimina el servicio completamente.
@@ -1157,6 +1342,10 @@ def remove_container(service: Service):
     docker_client = get_docker_client()
     if docker_client is None:
         raise RuntimeError("Docker no está disponible para eliminar el servicio.")
+
+    # Pequeño delay para que el auto-refresh capture el estado 'deleting'
+    import time
+    time.sleep(1.5)
 
     if service.has_compose:
         # ===== MODO COMPOSE: Usar docker compose down =====
@@ -1269,6 +1458,40 @@ def remove_container(service: Service):
     service.volume_name = None
     service.status = "removed"
     service.save()
+
+
+def _remove_container_worker(service_id: int) -> None:
+    """Worker que ejecuta remove_container en background."""
+    service = None
+    try:
+        service = Service.objects.get(pk=service_id)
+        remove_container(service)
+    except Service.DoesNotExist:
+        return
+    except Exception as exc:
+        if service:
+            try:
+                service.status = "error"
+                _append_log(service, f"Error al eliminar: {str(exc)}")
+                service.save(update_fields=["status", "logs", "updated_at"])
+            except:
+                pass
+        print(f"[error] Excepción en _remove_container_worker: {exc}")
+        import traceback
+        traceback.print_exc()
+
+
+def remove_container_async(service: Service) -> None:
+    """
+    Encola la eliminación del servicio para no bloquear el hilo HTTP.
+    """
+    # Cambiar estado a 'deleting' inmediatamente
+    service.status = "deleting"
+    _append_log(service, "Eliminando servicio...")
+    service.save(update_fields=["status", "logs", "updated_at"])
+    
+    # Ejecutar en background
+    EXECUTOR.submit(_remove_container_worker, service.pk)
 
 
 # ==================== SERVICE CONTAINER OPERATIONS ====================

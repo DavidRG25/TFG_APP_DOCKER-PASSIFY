@@ -1,20 +1,22 @@
 {# Partial: Modo COMPOSE - Multicontenedor #}
 <div class="d-flex flex-column gap-2 w-100">
     {# Botones globales del servicio #}
-    <div class="d-flex flex-wrap gap-1">
-        <button class="btn btn-sm btn-success" {% if service.status == 'running' %}disabled{% endif %}
+    <div class="btn-group shadow-sm">
+        <button class="btn btn-success" {% if service.status == 'running' %}disabled{% endif %}
             hx-post="{% url 'service-start' service.id %}" hx-swap="none"
+            hx-on::after-request="htmx.trigger('body', 'service:table-refresh')"
             title="Iniciar todos los contenedores">
-            Iniciar servicio
+            <i class="fas fa-play"></i>
         </button>
 
-        <button class="btn btn-sm btn-warning" {% if service.status != 'running' %}disabled{% endif %}
+        <button class="btn btn-warning" {% if service.status != 'running' %}disabled{% endif %}
             hx-post="{% url 'service-stop' service.id %}" hx-swap="none"
+            hx-on::after-request="htmx.trigger('body', 'service:table-refresh')"
             title="Detener todos los contenedores">
-            Detener servicios
+            <i class="fas fa-stop"></i>
         </button>
 
-        <button class="btn btn-sm btn-danger" 
+        <button class="btn btn-danger" 
             hx-post="{% url 'service-remove' service.id %}"
             hx-target="#service-{{ service.id }}" 
             hx-swap="outerHTML" 
@@ -23,19 +25,19 @@
             data-service-name="{{ service.name }}"
             onclick="confirmDelete(this)"
             title="Eliminar servicio">
-            Eliminar
+            <i class="fas fa-trash"></i>
         </button>
 
-        <button class="btn btn-sm btn-secondary" hx-get="{% url 'service-logs' service.id %}"
+        <button class="btn btn-secondary" hx-get="{% url 'service-logs' service.id %}"
             hx-target="#genericModalContent" hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#genericModal"
             title="Ver logs del servicio">
-            Logs
+            <i class="fas fa-history"></i>
         </button>
 
         {% if service.compose %}
-        <button class="btn btn-sm btn-info" hx-get="{% url 'service-compose' service.id %}" hx-target="#code-body"
+        <button class="btn btn-info" hx-get="{% url 'service-compose' service.id %}" hx-target="#code-body"
             hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#codeModal" title="Ver docker-compose">
-            Compose
+            <i class="fas fa-layer-group"></i>
         </button>
         {% endif %}
     </div>
@@ -46,6 +48,15 @@
     {% include "containers/_partials/services/_container_card.html" with container=container service=service host=host %}
     {% endif %}
     {% empty %}
-    <small class="text-muted">Sin contenedores detectados.</small>
+    <div class="text-center py-3 bg-white rounded border border-dashed">
+        <div class="spinner-border spinner-border-sm text-primary mb-2" role="status"></div>
+        <p class="text-muted small mb-0">
+            {% if service.status == 'starting' or service.status == 'pending' or service.status == 'building' or service.status == 'pulling' %}
+            Detectando contenedores... (Esto puede tardar si se están construyendo imágenes)
+            {% else %}
+            No se han detectado contenedores para este servicio.
+            {% endif %}
+        </p>
+    </div>
     {% endfor %}
 </div>
