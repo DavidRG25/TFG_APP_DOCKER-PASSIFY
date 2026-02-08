@@ -12,7 +12,7 @@ from django.utils.html import escape
 
 from rest_framework import viewsets
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, NotFound as DRFNotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response as DRF_Response
 from rest_framework.exceptions import ValidationError
@@ -79,6 +79,12 @@ class ServiceViewSet(viewsets.ModelViewSet):
             from .serializers import ServiceSimpleSerializer
             return ServiceSimpleSerializer
         return ServiceSerializer
+
+    def get_object(self):
+        try:
+            return super().get_object()
+        except Http404:
+            raise DRFNotFound("No se encontró ningún servicio con esa consulta o no tienes permisos.")
 
     def _is_htmx(self, request) -> bool:
         # Algunos navegadores o proxys pueden variar la capitalización, comprobamos de forma más robusta

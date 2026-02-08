@@ -17,10 +17,10 @@
 2. Verificar que en el Navbar aparece el enlace **"API Docs"** con el icono de código (`< />`).
 3. Hacer clic en el enlace.
 4. **Verificar**:
-   - [ ] Carga la URL `/paasify/containers/api-docs/`.
-   - [ ] Se visualiza el Sidebar a la izquierda y el contenido a la derecha.
-   - [ ] Al hacer scroll, el sidebar se mantiene fijo.
-   - [ ] El enlace activo en el sidebar cambia automáticamente según la sección visible.
+   - [SI] Carga la URL `/paasify/containers/api-docs/`.
+   - [SI] Se visualiza el Sidebar a la izquierda y el contenido a la derecha.
+   - [SI] Al hacer scroll, el sidebar se mantiene fijo.
+   - [SI] El enlace activo en el sidebar cambia automáticamente según la sección visible.
 
 ### **Test 4.2: Personalización de Ejemplos (Token y URL)**
 
@@ -30,10 +30,10 @@
 1. Acceder a `/paasify/containers/api-docs/`.
 2. Ir a la sección **"Autenticación"**.
 3. **Verificar**:
-   - [ ] El ejemplo de Bearer Token muestra tu token real.
+   - [SI] El ejemplo de Bearer Token no muestra tu token real.
 4. Ir a la sección **"Listar Servicios"**.
 5. **Verificar**:
-   - [ ] La URL del comando curl detecta correctamente el dominio actual.
+   - [SI] La URL del comando curl detecta correctamente el dominio actual.
 
 ### **Test 4.3: Funcionalidad de Copiado (Markdown)**
 
@@ -43,8 +43,8 @@
 1. Ir a cualquier ejemplo de código generado desde el .md.
 2. Hacer clic en el botón **"Copiar"**.
 3. **Verificar**:
-   - [ ] Aparece el Toast de SweetAlert2.
-   - [ ] Al pegar, los placeholders `{{ ... }}` han sido reemplazados por valores reales.
+   - [SI] Aparece el Toast de SweetAlert2.
+   - [SI] Al pegar, los placeholders `{{ ... }}` han sido reemplazados por valores reales.
 
 ### **Test 4.4: Diseño Responsive**
 
@@ -53,8 +53,8 @@
 
 1. Reducir ancho del navegador.
 2. **Verificar**:
-   - [ ] El sidebar se oculta.
-   - [ ] Las tablas de parámetros en Markdown son legibles o tienen scroll.
+   - [SI] El sidebar se oculta.
+   - [SI] Las tablas de parámetros en Markdown son legibles o tienen scroll.
 
 ### **Test 4.5: Mantenibilidad (Markdown Dinámico)**
 
@@ -63,6 +63,7 @@
 
 1. Editar `templates/api_docs/api_reference.md`.
 2. Verificar reflejo en web sin reiniciar servidor.
+   **Se ha modificado este tipo de ajuste y no existe ya api reference ya que se ha implementado la documentacion en diferentes archivos .md**
 
 ---
 
@@ -77,8 +78,8 @@
 2. Copiar el comando curl.
 3. Abrir una terminal (PowerShell o Bash) y pegar el comando.
 4. **Verificar**:
-   - [ ] La respuesta es un JSON con status `201 Created`.
-   - [ ] El servicio aparece inmediatamente en el panel web de PaaSify.
+   - [SI] La respuesta es un JSON con status `201 Created`.
+   - [SI] El servicio aparece inmediatamente en el panel web de PaaSify.
 
 ### **Test 5.2: Control vía API (Start/Stop)**
 
@@ -87,7 +88,7 @@
 1. Obtener el ID de un servicio desde la UI o ejecutando un GET a la API.
 2. Ejecutar el comando POST de la sección **"Control de Servicios"** para detenerlo.
 3. **Verificar**:
-   - [ ] El servicio web cambia su estado a "stopped" casi al instante.
+   - [SI] El servicio web cambia su estado a "stopped" casi al instante.
 
 ### **Test 5.3: Seguridad de Tokens Expulsados**
 
@@ -96,8 +97,8 @@
 
 1. Intentar ejecutar cualquier comando curl modificando un solo carácter del token.
 2. **Verificar**:
-   - [ ] La respuesta es un error `401 Unauthorized`.
-   - [ ] El cuerpo del JSON explica que el token es inválido o ha expirado.
+   - [SI] La respuesta es un error `401 Unauthorized`.
+   - [SI] El cuerpo del JSON explica que el token es inválido o ha expirado.
 
 ---
 
