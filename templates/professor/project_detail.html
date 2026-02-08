@@ -6,53 +6,62 @@
 {% endblock %}
 
 {% block body %}
-<div class="container py-4">
-  <div class="dashboard-hero-band mb-3">
-    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between">
+<div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh;">
+  {# Header con degradado Premium #}
+  <div class="rounded-3 p-4 mb-4 shadow-sm" style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+    <div class="d-flex justify-content-between align-items-center">
       <div>
-        <div class="dashboard-hero-title mb-1"><i class="fas fa-folder-open me-2"></i>{{ project.place }}</div>
-        <p class="dashboard-hero-subtitle mb-0">
-          Alumno: {{ project.user_profile.nombre }}{% if project.user_profile.user %} (@{{ project.user_profile.user.username }}){% endif %} · Asignatura: {{ project.subject.name }}
+        <h1 class="h3 mb-1 text-white fw-bold"><i class="fas fa-folder-open me-2"></i>{{ project.place }}</h1>
+        <p class="text-white-50 mb-0">
+          Alumno: {{ project.user_profile.nombre }}{% if project.user_profile.user %} (@{{ project.user_profile.user.username }}){% endif %} · 
+          Asignatura: {{ project.subject.name }}
         </p>
-        <p class="dashboard-hero-subtitle mb-0">Fecha prevista: {{ project.date|date:"Y-m-d" }} {{ project.time|time:"H:i" }}</p>
+        <p class="text-white-50 small mb-0"><i class="far fa-clock me-1"></i>Última actualización: {{ project.date|date:"d M Y" }}</p>
       </div>
-      <div class="mt-3 mt-lg-0">
-        <a href="{% url 'professor_dashboard' %}" class="btn btn-light">Volver al panel</a>
+      <div class="d-flex gap-2">
+        <a href="{% url 'professor_dashboard' %}" class="btn btn-light shadow-sm">
+          <i class="fas fa-arrow-left me-2"></i>Volver al Panel
+        </a>
       </div>
     </div>
   </div>
 
-  <div class="card mt-4">
-    <div class="card-header"><strong>Servicios del alumno</strong></div>
+  {# Tabla de Servicios del Proyecto #}
+  <div class="card border-0 shadow-sm overflow-hidden mt-4">
+    <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+      <h5 class="mb-0 fw-bold"><i class="fas fa-cubes text-primary me-2"></i>Servicios Asociados a este Proyecto</h5>
+    </div>
     <div class="card-body p-0">
       {% if related_services %}
         <div class="table-responsive">
-          <table class="table table-striped mb-0">
-            <thead>
-              <tr>
-                <th>Servicio</th>
-                <th>Asignatura</th>
-                <th>Estado</th>
-                <th>Puerto</th>
+          <table class="table table-hover align-middle mb-0">
+            <thead style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+              <tr class="text-white small text-uppercase">
+                <th class="py-3 ps-4">Proyecto</th>
+                <th class="py-3">Dueño</th>
+                <th class="py-3">Nombre</th>
+                <th class="py-3">Imagen</th>
+                <th class="py-3">Puerto</th>
+                <th class="py-3">Estado</th>
+                <th class="py-3 pe-4 text-end">Acciones</th>
               </tr>
             </thead>
-            <tbody>
-              {% for svc in related_services %}
-                <tr>
-                  <td>{{ svc.name }}</td>
-                  <td>{{ svc.subject.name|default:"" }}</td>
-                  <td>{{ svc.status|title }}</td>
-                  <td>{{ svc.assigned_port|default:"" }}</td>
-                </tr>
-              {% endfor %}
+            <tbody class="bg-white" id="service-table"
+                   hx-get="{% url 'containers:service_table' %}?project={{ project.id }}"
+                   hx-trigger="service:table-refresh from:body">
+              {% include "containers/_service_rows.html" with services=related_services %}
             </tbody>
           </table>
         </div>
       {% else %}
-        <p class="text-muted m-3">El alumno no tiene contenedores activos asociados.</p>
+        <div class="p-5 text-center">
+          <i class="fas fa-folder-open fa-3x text-light mb-3"></i>
+          <p class="text-muted">El alumno no tiene contenedores asociados a este proyecto.</p>
+        </div>
       {% endif %}
     </div>
   </div>
 </div>
+{% include "containers/_partials/panels/_modals.html" %}
 {% endblock %}
 

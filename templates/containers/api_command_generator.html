@@ -244,7 +244,7 @@
                             <div class="row g-4 mb-4">
                                 <div class="col-md-7">
                                     <div class="table-responsive">
-                                        <table class="table table-sm align-middle">
+                                        <table class="table table-sm align-middle h-100 mb-0">
                                             <thead class="table-light">
                                                 <tr>
                                                     <th>Campo</th>
@@ -281,16 +281,17 @@
                                             </tbody>
                                         </table>
                                     </div>
-                                    <div class="alert alert-info py-2 small mt-2 mb-0">
-                                        <i class="fas fa-lightbulb me-2"></i><b>¿Es necesario environment?</b> Solo si
-                                        tu app requiere configs externas (DB, API Keys).
-                                    </div>
                                 </div>
                                 <div class="col-md-5">
-                                    <div class="alert alert-warning py-3 small h-100 mb-0">
-                                        <i class="fas fa-exclamation-triangle me-2"></i><b>Tip de Puerto:</b> Si tu app
-                                        no usa el puerto 80 por defecto, es <u>obligatorio</u> enviar el campo
-                                        <code>internal_port</code>.
+                                    <div class="d-flex flex-column gap-3 h-100">
+                                        <div class="alert alert-info py-3 small mb-0 shadow-sm border-0" style="border-left: 4px solid #0dcaf0 !important;">
+                                            <h6 class="fw-bold mb-1"><i class="fas fa-lightbulb me-2"></i>¿Es necesario environment?</h6>
+                                            <p class="mb-0 text-dark opacity-75">Solo si tu app requiere configs externas como credenciales de DB o claves de API.</p>
+                                        </div>
+                                        <div class="alert alert-warning py-3 small mb-0 shadow-sm border-0" style="border-left: 4px solid #ffc107 !important;">
+                                            <h6 class="fw-bold mb-1"><i class="fas fa-exclamation-triangle me-2"></i>Tip de Puerto</h6>
+                                            <p class="mb-0 text-dark opacity-75">Si tu app no usa el puerto 80 por defecto, es <u>obligatorio</u> enviar <code>internal_port</code>.</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -392,37 +393,62 @@
 
                             <div class="row g-4 mb-4">
                                 <div class="col-md-7">
-                                    <div class="card border-0 bg-light p-3 h-100">
+                                    <div class="card border-0 bg-light p-3 h-100 shadow-sm">
                                         <h6 class="fw-bold small mb-2 text-uppercase text-primary"><i
-                                                class="fas fa-folder-open me-2"></i>Requisitos del ZIP:</h6>
-                                        <p class="small mb-2">PaaSify detecta el modo según los archivos encontrados en
-                                            la raíz del archivo ZIP.</p>
-                                        <table class="table table-sm table-borderless small mb-0">
-                                            <tr>
-                                                <td><code>mode</code></td>
-                                                <td>Debe ser <code>"custom"</code></td>
-                                            </tr>
-                                            <tr>
-                                                <td><code>code</code></td>
-                                                <td>Ruta al archivo <code>.zip</code> (usa miltipart/form-data)</td>
-                                            </tr>
-                                            <tr>
-                                                <td><code>project</code></td>
-                                                <td>ID del proyecto obligarorio</td>
-                                            </tr>
-                                            <tr>
-                                                <td><code>subject</code></td>
-                                                <td>ID de la asignatura obligatorio</td>
-                                            </tr>
-                                        </table>
+                                                class="fas fa-folder-open me-2"></i>Requisitos del Proyecto:</h6>
+                                        <p class="small mb-3 text-muted">PaaSify detecta el modo de despliegue según los archivos en la raíz del ZIP.</p>
+                                        <div class="table-responsive">
+                                            <table class="table table-sm align-middle h-100 mb-0">
+                                                <thead class="table-light">
+                                                    <tr style="font-size: 0.75rem;">
+                                                        <th>Campo</th>
+                                                        <th>Valor/Regla</th>
+                                                        <th>Estado</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody style="font-size: 0.85rem;">
+                                                    <tr>
+                                                        <td><code>mode</code></td>
+                                                        <td>Debe ser <code>"custom"</code></td>
+                                                        <td><span class="badge bg-danger">Obligatorio</span></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><code>code</code></td>
+                                                        <td>Archivo <code>.zip</code> (código fuente)</td>
+                                                        <td><span class="badge bg-danger">Obligatorio</span></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><code>project</code></td>
+                                                        <td>ID del proyecto (numérico)</td>
+                                                        <td><span class="badge bg-danger">Obligatorio</span></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td><code>subject</code></td>
+                                                        <td>ID de la asignatura (numérico)</td>
+                                                        <td><span class="badge bg-danger">Obligatorio</span></td>
+                                                    </tr>
+                                                    <tr class="table-info" style="font-size: 0.8rem;">
+                                                        <td colspan="2">
+                                                            <i class="fas fa-link me-1"></i>
+                                                            Enviar <strong>dockerfile</strong> O <strong>compose</strong>
+                                                        </td>
+                                                        <td><span class="badge bg-primary">Uno Obligatorio</span></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="col-md-5">
-                                    <div class="alert alert-info py-3 small h-100 mb-0 d-flex align-items-center">
-                                        <div>
-                                            <i class="fas fa-info-circle me-2"></i><b>Detección automática:</b> Si el
-                                            ZIP contiene <code>docker-compose.yml</code> se usará Compose. Si no,
-                                            buscará un <code>Dockerfile</code>.
+                                    <div class="alert alert-info py-3 mb-0 shadow-sm border-0 h-100 d-flex align-items-center" style="border-left: 4px solid #0dcaf0 !important;">
+                                        <div style="font-size: 0.82rem;">
+                                            <h6 class="fw-bold mb-2" style="font-size: 0.9rem;"><i class="fas fa-magic me-2"></i>Detección Automática</h6>
+                                            <p class="mb-2 text-dark opacity-75">El sistema prioriza los archivos encontrados:</p>
+                                            <ul class="mb-2 ps-3 text-dark opacity-75">
+                                                <li>Si existe <strong class="text-primary text-decoration-underline">docker-compose.yml</strong>, se usa modo Compose.</li>
+                                                <li>Si no, buscará un <strong class="text-primary text-decoration-underline">Dockerfile</strong>.</li>
+                                            </ul>
+                                            <p class="mb-0 x-small text-muted italic">Nota: Debes pasar el archivo correspondiente como un parámetro más en la petición API.</p>
                                         </div>
                                     </div>
                                 </div>

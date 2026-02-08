@@ -94,9 +94,16 @@ curl -X GET "{{ PAASIFY_API_URL }}/containers/{id}/" \
 ### Códigos de Respuesta Comunes
 
 <details class="api-errors">
-<summary>Posibles errores en consultas GET</summary>
+<summary>Posibles respuestas en consultas de obtención (GET)</summary>
 <div class="api-error-content">
-    <strong>401 Unauthorized:</strong> Permiso denegado. Token faltante o inválido.<br>
+    <strong>200 OK:</strong> Consulta exitosa. Se devuelve el recurso o listado solicitado.<br>
+    <strong>400 Bad Request:</strong> Parátmetros de filtrado incorrectos (ej: ID de proyecto no numérico).<br>
+    <strong>401 Unauthorized:</strong> Permiso denegado. Token faltante, inválido o expirado.<br>
+    <strong>404 Not Found:</strong> El recurso específico (ej: `/api/containers/999/`) no existe.<br>
+    <strong>405 Method Not Allowed:</strong> Estás intentando hacer un POST, PUT o DELETE en un endpoint que solo permite GET.<br>
+    <strong>415 Unsupported Media Type:</strong> No has especificado `Content-Type: application/json` en el caso de querer enviar datos.<br>
     <strong>500 Internal Server Error:</strong> Error interno del servidor.
 </div>
 </details>
+
+> 💡 **Tratamiento de Datos**: Cuando realizas una petición incorrecta (GET con filtros inválidos o POST con datos mal formados), la API te devolverá un JSON con el detalle del error en el campo `error` o campos específicos de validación, facilitando así la depuración de tu cliente o script.

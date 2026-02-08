@@ -104,18 +104,15 @@ class Service(models.Model):
     def has_compose(self) -> bool:
         """
         Indica si el servicio tiene docker-compose asociado.
-        Verifica que exista el archivo en media/services/<id>/docker-compose.yml
+        Verifica que tenga un archivo compose asignado O que tenga ServiceContainers asociados.
         """
-        if not self.compose:
-            return False
-        from django.core.files.storage import default_storage
-        from pathlib import Path
-        # Verificar que existe en la ruta esperada
-        expected_path = f"services/{self.pk}/docker-compose.yml"
-        try:
-            return default_storage.exists(expected_path) or default_storage.exists(self.compose.name)
-        except Exception:
-            return False
+        # Si tiene contenedores registrados, definitivamente es Compose
+        if self.containers.exists():
+            return True
+            
+        # Si tiene un archivo compose asignado, es Compose
+        # (incluso si el archivo aún no ha sido procesado)
+        return bool(self.compose)
     
     
     def get_compose_status_summary(self):

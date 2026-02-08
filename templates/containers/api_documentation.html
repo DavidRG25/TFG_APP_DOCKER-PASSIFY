@@ -505,6 +505,19 @@
 <!-- Source data -->
 <script id="markdown-source" type="text/markdown" style="display:none;">{{ markdown_content|safe }}</script>
 
+<!-- Rendered Images List (Hidden, for injection) -->
+<div id="catalog-images-list" style="display:none;">
+    <div class="d-flex flex-wrap gap-2 mt-3">
+        {% for img in images %}
+        <span class="badge bg-white border text-dark p-2 shadow-sm" style="font-size: 0.8rem; border-color: var(--api-border) !important;">
+            <i class="fas fa-check-circle text-success me-1"></i>{{ img.name }}:{{ img.tag }}
+        </span>
+        {% empty %}
+        <p class="small text-muted italic">No hay imágenes disponibles en el catálogo en este momento.</p>
+        {% endfor %}
+    </div>
+</div>
+
 <!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
@@ -517,6 +530,7 @@
         // 1. Render Markdown
         const source = document.getElementById('markdown-source').textContent;
         const apiUrl = "{{ PAASIFY_API_URL }}";
+        const imagesListHtml = document.getElementById('catalog-images-list').innerHTML;
 
         let processedMd = source
             .replace(/\{\{\s*PAASIFY_API_URL\s*\}\}/g, apiUrl)
@@ -524,7 +538,10 @@
             .replace(/<TU_API_TOKEN>/g, '<TU_API_TOKEN>');
 
         const container = document.getElementById('markdown-render');
-        container.innerHTML = marked.parse(processedMd);
+        let htmlContent = marked.parse(processedMd);
+        
+        // Inyectar la lista de imágenes en el HTML ya renderizado
+        container.innerHTML = htmlContent.replace(/\[\[IMAGENES_CATALOGO\]\]/g, imagesListHtml);
 
         // 2. Sincronizar IDs de H3 con el Sidebar y Manejar Navegación
         const h3Headers = container.querySelectorAll('h3');

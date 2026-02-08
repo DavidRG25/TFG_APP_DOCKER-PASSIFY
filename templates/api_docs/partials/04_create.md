@@ -20,6 +20,9 @@ Permite desplegar nuevos servicios, ya sea desde imágenes del catálogo o usand
 
 Si quieres desplegar una imagen estándar disponible en PaaSify.
 
+**🐳 Imágenes disponibles en el catálogo:**
+[[IMAGENES_CATALOGO]]
+
 ```bash
 curl -X POST {{ PAASIFY_API_URL }}/containers/ \
   -H "Authorization: Bearer <TU_API_TOKEN>" \
@@ -34,22 +37,16 @@ curl -X POST {{ PAASIFY_API_URL }}/containers/ \
   }'
 ```
 
-<details class="api-errors">
-<summary>Códigos de error de este endpoint</summary>
-<div class="api-error-content">
-    <strong>401 Unauthorized:</strong> Token inválido o expirado.<br>
-    <strong>400 Bad Request:</strong> <br>
-    - Nombre de servicio ya existe.<br>
-    - Campos obligatorios ausentes.<br>
-    - JSON mal formado.<br>
-    <strong>404 Not Found:</strong> Imagen no encontrada en el catálogo.<br>
-    <strong>500 Internal Server Error:</strong> Fallo al intentar levantar el contenedor en Docker.
-</div>
-</details>
+---
 
 ### DockerHub Personalizado
 
-Desplegar cualquier imagen pública desde DockerHub.
+Desplegar cualquier imagen pública desde DockerHub. PaaSify la descargará automáticamente.
+
+<div style="background-color: #e7f3ff; border-left: 5px solid #2196F3; padding: 15px; border-radius: 4px; margin: 20px 0;">
+    <h5 style="margin-top: 0; color: #0c5460;"><i class="fas fa-lightbulb"></i> ¿Es necesario environment?</h5>
+    <p style="margin-bottom: 0; font-size: 0.9rem;">Solo si tu aplicación requiere configuraciones externas (como credenciales de base de datos o claves de API) para funcionar correctamente.</p>
+</div>
 
 ```bash
 curl -X POST {{ PAASIFY_API_URL }}/containers/ \
@@ -60,7 +57,10 @@ curl -X POST {{ PAASIFY_API_URL }}/containers/ \
     "image": "python:3.9-slim",
     "mode": "dockerhub",
     "internal_port": 5000,
-    "environment": { "ENV": "production" },
+    "environment": {
+        "ENV": "production",
+        "DEBUG": "false"
+    },
     "project": 1,
     "subject": 1
   }'

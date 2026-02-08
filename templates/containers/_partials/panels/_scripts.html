@@ -10,6 +10,57 @@
     showToast("Copiado!");
   }
 
+  function showToast(message, variant = "text-bg-success", title = null) {
+    const variantMap = {
+      "text-bg-success": "success",
+      "text-bg-danger": "error",
+      "text-bg-warning": "warning",
+      "text-bg-info": "info",
+      "text-bg-primary": "info"
+    };
+    const icon = variantMap[variant] || "success";
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 4000,
+      timerProgressBar: true,
+      didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer)
+        toast.addEventListener('mouseleave', Swal.resumeTimer)
+      }
+    });
+
+    Toast.fire({
+      icon: icon,
+      title: title ? `<strong>${title}</strong>` : null,
+      html: message,
+      background: '#fff',
+      color: '#2d3748',
+      padding: '1rem',
+      borderRadius: '1rem',
+      customClass: {
+        popup: 'shadow-lg border-0'
+      }
+    });
+  }
+
+  // Sincronizacion de eventos para asegurar el refresh
+  document.body.addEventListener("htmx:afterRequest", (evt) => {
+    const xhr = evt.detail.xhr;
+    // Si la respuesta indica un refresh de tabla o es una accion de control con exito
+    if (xhr.status >= 200 && xhr.status < 300) {
+      const triggers = JSON.parse(xhr.getResponseHeader("HX-Trigger") || "{}");
+      const isTableFragment = evt.detail.pathInfo.path.includes("table-fragment");
+      if (triggers["service:table-refresh"] || (evt.detail.pathInfo.path.includes("/containers/") && !isTableFragment)) {
+        // Provocamos un trigger manual en el cuerpo por si acaso el fragmento tarda
+        setTimeout(() => {
+          htmx.trigger("body", "service:table-refresh");
+        }, 500);
+      }
+    }
+  });
+
   // Confirmacion de eliminacion
   window.confirmDelete = function (elt) {
     if (!elt) return;
@@ -57,38 +108,6 @@
     }
   });
 
-  function showToast(message, variant = "text-bg-success", title = null) {
-    const variantMap = {
-      "text-bg-success": "success",
-      "text-bg-danger": "error",
-      "text-bg-warning": "warning",
-      "text-bg-info": "info",
-      "text-bg-primary": "info"
-    };
-    const icon = variantMap[variant] || "success";
-    const Toast = Swal.mixin({
-      toast: true,
-      position: 'top-start',
-      showConfirmButton: false,
-      timer: 3500,
-      timerProgressBar: true,
-      didOpen: (toast) => {
-        toast.addEventListener('mouseenter', Swal.stopTimer)
-        toast.addEventListener('mouseleave', Swal.resumeTimer)
-      }
-    });
-    Toast.fire({
-      icon: icon,
-      title: title ? `<strong>${title}</strong><br>${message}` : message,
-      background: '#fff',
-      color: '#2d3748',
-      padding: '1rem',
-      borderRadius: '1rem',
-      customClass: {
-        popup: 'shadow-lg border-0'
-      }
-    });
-  }
 
   function resetNewServiceForm() {
     const form = document.getElementById("newServiceForm");

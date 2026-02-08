@@ -3,15 +3,24 @@
 <tr id="service-{{ s.id }}">
   <td class="ps-4">
     <div class="fw-bold text-primary">{{ s.project.place|default:"General" }}</div>
-  </td>
-  <td>
-    <div class="fw-semibold">{{ s.name }}</div>
     {% if s.subject %}
-    <small class="text-muted">Asignatura: {{ s.subject.name }}</small>
+    <small class="text-muted d-block" style="font-size: 0.7rem;">{{ s.subject.name }}</small>
     {% endif %}
   </td>
+  
+  {% if is_supervisor %}
+  <td>
+    <div class="fw-semibold text-dark">{{ s.owner.get_full_name|default:s.owner.username }}</div>
+    <small class="text-muted">@{{ s.owner.username }}</small>
+  </td>
+  {% endif %}
 
-  <td>{{ s.image }}</td>
+  <td>
+    <div class="fw-bold text-dark">{{ s.name }}</div>
+    <small class="text-muted" style="font-size: 0.7rem;">ID: #{{ s.id }}</small>
+  </td>
+
+  <td><code class="small text-primary">{{ s.image|truncatechars:30 }}</code></td>
 
   <td>
     {% if s.has_compose %}
@@ -54,8 +63,18 @@
 </tr>
 {% empty %}
 <tr>
-  <td colspan="6" class="text-center text-muted py-4">
+  <td colspan="7" class="text-center text-muted py-4">
     Aun no tienes servicios.
   </td>
 </tr>
 {% endfor %}
+
+{# Autorefresco inteligente si hay estados transitorios #}
+{% if has_transient %}
+<tr style="display:none;" 
+    hx-get="{% url 'containers:service_table' %}?subject={{ subject_id|default:'' }}&project={{ project_id|default:'' }}" 
+    hx-trigger="load delay:2s" 
+    hx-target="#service-table" 
+    hx-swap="innerHTML">
+</tr>
+{% endif %}
