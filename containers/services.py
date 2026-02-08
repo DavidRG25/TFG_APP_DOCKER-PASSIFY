@@ -427,6 +427,11 @@ def sync_service_status(service: Service):
     if service.status == "removed":
         return
         
+    # Ignorar servicios en estados transitorios críticos (stopping, deleting)
+    # para evitar sobrescribirlos con el estado actual de Docker durante la operación asíncrona
+    if service.status in ["stopping", "deleting"]:
+        return
+
     docker_client = get_docker_client()
     if docker_client is None:
         return
