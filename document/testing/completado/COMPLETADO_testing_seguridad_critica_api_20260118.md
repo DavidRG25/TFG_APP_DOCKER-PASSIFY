@@ -2,7 +2,7 @@
 
 **Fecha**: 18/01/2026  
 **Tipo**: Testing de Seguridad - Parte 2 (API)  
-**Estado**: PENDIENTE
+**Estado**: COMPLETADO
 
 ---
 
