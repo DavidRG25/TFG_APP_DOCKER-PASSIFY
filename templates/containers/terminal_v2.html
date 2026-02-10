@@ -4,125 +4,214 @@
 {% block extrahead %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
 <style>
-    .terminal-page {
-        background-color: #1e1e1e;
+    /* Forzamos que el fondo ocupe toda la pantalla eliminando márgenes de base.html */
+    #main-content {
+        padding: 0 !important;
+    }
+    
+    #content-wrapper {
+        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%) !important;
         min-height: 100vh;
-        padding: 20px;
+    }
+
+    .footer {
+        display: none !important;
+    }
+
+    .terminal-page {
+        background: transparent;
+        min-height: calc(100vh - 70px);
+        padding: 15px 20px; /* Reducimos padding para aprovechar espacio */
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    
+    .terminal-card {
+        width: 100%;
+        max-width: 1400px;
+        background: #1a1a1a;
+        border-radius: 16px;
+        overflow: hidden;
+        /* Sombra multicapa igual que logs */
+        box-shadow: 
+            0 10px 15px -3px rgba(0, 0, 0, 0.1),
+            0 30px 60px -12px rgba(0, 0, 0, 0.25),
+            0 50px 100px -20px rgba(0, 0, 0, 0.2);
+        border: none;
     }
     
     .terminal-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 20px;
-        border-radius: 10px 10px 0 0;
-        color: white;
+        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); /* Azul premium */
+        padding: 22px 30px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        border-bottom: none;
+        color: white;
+    }
+    
+    .terminal-title-area {
+        display: flex;
+        align-items: center;
+        gap: 15px;
     }
     
     .terminal-header h3 {
         margin: 0;
+        font-size: 1.25rem;
         font-weight: 600;
-    }
-    
-    .terminal-info {
-        font-size: 0.9em;
-        opacity: 0.9;
-    }
-    
-    .terminal-actions {
+        letter-spacing: 0.5px;
         display: flex;
+        align-items: center;
         gap: 10px;
     }
     
+    .status-badge {
+        font-size: 0.75rem;
+        padding: 4px 10px;
+        border-radius: 20px;
+        background: rgba(0,0,0,0.3);
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    
+    .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+    }
+    
+    .status-connected .status-dot { background-color: #4ade80; box-shadow: 0 0 10px #4ade80; }
+    .status-connecting .status-dot { background-color: #fbbf24; box-shadow: 0 0 10px #fbbf24; }
+    .status-disconnected .status-dot { background-color: #f87171; box-shadow: 0 0 10px #f87171; }
+    
+    .terminal-actions {
+        display: flex;
+        gap: 12px;
+    }
+    
+    .btn-terminal {
+        padding: 8px 18px;
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 0.9rem;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+    }
+    
+    .btn-back-premium {
+        background: rgba(255, 255, 255, 0.1);
+        color: white !important;
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        padding: 8px 24px;
+        border-radius: 50px;
+        font-weight: 600;
+        text-decoration: none !important;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.85rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-back-premium:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    .btn-reconnect {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        border: none;
+        color: white;
+        padding: 8px 24px;
+        border-radius: 50px;
+        font-weight: 600;
+        box-shadow: 0 4px 15px rgba(37, 99, 235, 0.3);
+    }
+
+    .btn-reconnect:hover:not(:disabled) {
+        background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(37, 99, 235, 0.4);
+    }
+
+    .btn-reconnect:disabled {
+        background: rgba(255, 255, 255, 0.1);
+        box-shadow: none;
+        opacity: 0.5;
+    }
+    
     .terminal-container {
+        padding: 10px;
         background-color: #000;
-        border-radius: 0 0 10px 10px;
-        padding: 20px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-        height: calc(100vh - 200px);
+        height: calc(100vh - 180px); /* Ocupa casi toda la pantalla disponible */
         min-height: 500px;
+        position: relative;
     }
     
     #terminal {
         height: 100%;
         width: 100%;
     }
-    
-    .status-indicator {
-        display: inline-block;
+
+    /* Custom Scrollbar for Xterm */
+    .xterm-viewport::-webkit-scrollbar {
         width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        margin-right: 8px;
-        animation: pulse 2s infinite;
     }
-    
-    .status-connected {
-        background-color: #4caf50;
+    .xterm-viewport::-webkit-scrollbar-track {
+        background: #000;
     }
-    
-    .status-connecting {
-        background-color: #ff9800;
-    }
-    
-    .status-disconnected {
-        background-color: #f44336;
-    }
-    
-    @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
-    }
-    
-    .btn-reconnect {
-        background-color: #4caf50;
-        border: none;
-        color: white;
-        padding: 8px 16px;
+    .xterm-viewport::-webkit-scrollbar-thumb {
+        background: #333;
         border-radius: 5px;
-        cursor: pointer;
-        transition: all 0.3s;
     }
-    
-    .btn-reconnect:hover {
-        background-color: #45a049;
-        transform: translateY(-2px);
-    }
-    
-    .btn-reconnect:disabled {
-        background-color: #ccc;
-        cursor: not-allowed;
-        transform: none;
+    .xterm-viewport::-webkit-scrollbar-thumb:hover {
+        background: #444;
     }
 </style>
 {% endblock %}
 
 {% block body %}
 <div class="terminal-page">
-    <div class="terminal-header">
-        <div>
-            <h3>
-                <span id="status-indicator" class="status-indicator status-connecting"></span>
-                Terminal - {{ container_name }}
-            </h3>
-            <div class="terminal-info">
-                <small id="status-text">Conectando...</small>
+    <div class="terminal-card">
+        <div class="terminal-header">
+            <div class="terminal-title-area">
+                <h3 class="mb-0 text-white">
+                    <i class="fas fa-terminal me-2" style="color: #4ade80;"></i>
+                    Terminal: {{ container_name }}
+                </h3>
+                <div id="status-badge" class="status-badge status-connecting">
+                    <span class="status-dot"></span>
+                    <span id="status-text">Conectando...</span>
+                </div>
+            </div>
+            
+            <div class="terminal-actions">
+                <button id="btn-reconnect" class="btn-terminal btn-reconnect" onclick="reconnect()" disabled>
+                    <i class="fas fa-sync-alt"></i> Reconectar
+                </button>
+                <a href="{{ return_url }}" class="btn-back-premium">
+                    <i class="fas fa-chevron-left"></i> Volver al panel
+                </a>
             </div>
         </div>
-        <div class="terminal-actions">
-            <button id="btn-reconnect" class="btn-reconnect" onclick="reconnect()" disabled>
-                🔄 Reconectar
-            </button>
-            <a href="{{ return_url }}" class="btn btn-secondary">
-                ← Volver
-            </a>
+        
+        <div class="terminal-container">
+            <div id="terminal"></div>
         </div>
-    </div>
-    
-    <div class="terminal-container">
-        <div id="terminal"></div>
     </div>
 </div>
 {% endblock %}
@@ -188,12 +277,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const MAX_RETRIES = 5;
     const RETRY_DELAY = 3000;
     
-    const statusIndicator = document.getElementById('status-indicator');
+    const statusBadge = document.getElementById('status-badge');
     const statusText = document.getElementById('status-text');
     const btnReconnect = document.getElementById('btn-reconnect');
     
     function updateStatus(status, text) {
-        statusIndicator.className = `status-indicator status-${status}`;
+        statusBadge.className = `status-badge status-${status}`;
         statusText.textContent = text;
         
         if (status === 'connected') {
@@ -205,8 +294,7 @@ document.addEventListener("DOMContentLoaded", () => {
     
     function connectSocket() {
         const scheme = window.location.protocol === "https:" ? "wss" : "ws";
-        const queryString = window.location.search;
-        const wsUrl = `${scheme}://${window.location.host}{{ ws_path }}${queryString}`;
+        const wsUrl = `${scheme}://${window.location.host}{{ ws_path|safe }}`;
         
         updateStatus('connecting', 'Conectando...');
         

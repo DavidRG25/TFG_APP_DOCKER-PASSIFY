@@ -1461,6 +1461,7 @@ def logs_page(request, pk):
     - Filtros por nivel (ERROR, WARN, INFO, DEBUG)
     - Búsqueda de texto
     - Selector de cantidad de líneas
+    - Selector de contenedor (para Compose)
     - Colorización con Rich
     - Caché de logs
     - Soporte para servicios Compose
@@ -1476,12 +1477,18 @@ def logs_page(request, pk):
     log_level = request.GET.get('level', 'ALL')
     tail = request.GET.get('tail', '1000')
     use_rich = request.GET.get('rich', 'true').lower() == 'true'
+    selected_container = request.GET.get('container', 'all')
     
     # Convertir tail a int (o None para 'all')
     try:
         tail_int = int(tail) if tail != 'all' else 10000
     except ValueError:
         tail_int = 1000
+    
+    # Obtener contenedores si es Compose
+    containers = []
+    if service.has_compose:
+        containers = list(service.containers.all())
     
     # Obtener logs
     from .utils import (
@@ -1492,7 +1499,17 @@ def logs_page(request, pk):
         filter_by_level
     )
     
-    logs_lines, from_cache = fetch_container_logs(service, tail=tail_int)
+    # Si se seleccionó un contenedor específico en Compose
+    if service.has_compose and selected_container != 'all':
+        try:
+            container_id = int(selected_container)
+            specific_container = service.containers.get(id=container_id)
+            # Obtener logs solo de ese contenedor
+            logs_lines, from_cache = fetch_container_logs(service, tail=tail_int, container_name=specific_container.name)
+        except (ValueError, ServiceContainer.DoesNotExist):
+            logs_lines, from_cache = fetch_container_logs(service, tail=tail_int)
+    else:
+        logs_lines, from_cache = fetch_container_logs(service, tail=tail_int)
     
     # Aplicar filtros
     if search_text:
@@ -1540,4 +1557,6 @@ def logs_page(request, pk):
         "total_lines": len(logs_lines),
         "from_cache": from_cache,
         "return_url": return_url,
+        "containers": containers,
+        "selected_container": selected_container,
     })
