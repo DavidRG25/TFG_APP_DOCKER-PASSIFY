@@ -1,3 +1,4 @@
+import os
 from django.conf import settings
 from django.db import models, transaction
 from django.db.utils import IntegrityError
@@ -29,6 +30,22 @@ class PortReservation(models.Model):
         return str(self.port)
 
 
+def get_service_upload_path(instance, filename):
+    """
+    Ruta centralizada: services/<id>/<filename>
+    Si no hay ID todavía, se guarda en services/tmp/ para ser movido luego.
+    Se usa basename para evitar anidamientos accidentales como services/1/services/1/file.
+    """
+    import os
+    sid = instance.id if instance.id else "tmp"
+    pure_filename = os.path.basename(filename)
+    return f"services/{sid}/{pure_filename}"
+
+# Aliases para compatibilidad con migraciones antiguas
+def get_dockerfile_path(instance, filename): return get_service_upload_path(instance, filename)
+def get_compose_path(instance, filename): return get_service_upload_path(instance, filename)
+def get_code_path(instance, filename): return get_service_upload_path(instance, filename)
+
 class Service(models.Model):
     """Servicio o contenedor desplegado por un usuario."""
 
@@ -58,12 +75,13 @@ class Service(models.Model):
     image = models.CharField("Imagen", max_length=200, blank=True)
     container_id = models.CharField("ID de contenedor", max_length=100, blank=True, null=True)
     assigned_port = models.PositiveIntegerField("Puerto asignado", null=True, blank=True)
+    assigned_ports = models.JSONField("Puertos asignados (compose)", blank=True, null=True, help_text="Lista de puertos para servicios docker-compose")
     internal_port = models.PositiveIntegerField("Puerto interno", default=80)
     status = models.CharField("Estado", max_length=20, default="stopped")
     logs = models.TextField("Logs", blank=True)
-    dockerfile = models.FileField("Dockerfile", upload_to="dockerfiles/", blank=True, null=True)
-    compose = models.FileField("docker-compose.yml", upload_to="compose_files/", blank=True, null=True)
-    code = models.FileField("Codigo fuente (zip)", upload_to="user_code/", blank=True, null=True)
+    dockerfile = models.FileField("Dockerfile", upload_to=get_service_upload_path, blank=True, null=True)
+    compose = models.FileField("docker-compose.yml", upload_to=get_service_upload_path, blank=True, null=True)
+    code = models.FileField("Codigo fuente (zip)", upload_to=get_service_upload_path, blank=True, null=True)
     volumes = models.JSONField("Volumenes", blank=True, null=True)
     env_vars = models.JSONField("Variables de entorno", blank=True, null=True)
     build_context_dir = models.CharField("Directorio de build (tmp)", max_length=300, blank=True, null=True)
@@ -86,18 +104,15 @@ class Service(models.Model):
     def has_compose(self) -> bool:
         """
         Indica si el servicio tiene docker-compose asociado.
-        Verifica que exista el archivo en media/services/<id>/docker-compose.yml
+        Verifica que tenga un archivo compose asignado O que tenga ServiceContainers asociados.
         """
-        if not self.compose:
-            return False
-        from django.core.files.storage import default_storage
-        from pathlib import Path
-        # Verificar que existe en la ruta esperada
-        expected_path = f"services/{self.pk}/docker-compose.yml"
-        try:
-            return default_storage.exists(expected_path) or default_storage.exists(self.compose.name)
-        except Exception:
-            return False
+        # Si tiene contenedores registrados, definitivamente es Compose
+        if self.containers.exists():
+            return True
+            
+        # Si tiene un archivo compose asignado, es Compose
+        # (incluso si el archivo aún no ha sido procesado)
+        return bool(self.compose)
     
     
     def get_compose_status_summary(self):
@@ -174,3 +189,22 @@ class AllowedImage(models.Model):
 
     def __str__(self) -> str:
         return f"{self.name}:{self.tag}"
+
+
+# ==================== SIGNALS PARA LIMPIEZA AUTOMÁTICA ====================
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
+import shutil
+from pathlib import Path
+
+@receiver(post_delete, sender=Service)
+def auto_cleanup_service_files(sender, instance, **kwargs):
+    """
+    Limpia todos los rastro físicos de un servicio al borrarlo de la BD.
+    Ahora centralizado en una única carpeta por servicio.
+    """
+    try:
+        from .services import cleanup_service_workspace
+        cleanup_service_workspace(instance)
+    except Exception:
+        pass

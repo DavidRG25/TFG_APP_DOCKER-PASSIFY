@@ -28,45 +28,51 @@
         </span>
     </div>
 
-    <div class="d-flex flex-wrap gap-1">
-        <button class="btn btn-sm btn-outline-success" {% if container.status == 'running' %}disabled{% endif %}
-            hx-post="{% url 'service-start-container' pk=service.id container_pk=container.id %}"
-            hx-target="#service-{{ service.id }}" hx-swap="outerHTML" title="Iniciar {{ container.name }}">
-            Iniciar
-        </button>
+    <div class="d-flex flex-wrap gap-1 align-items-center">
+        <div class="btn-group shadow-sm">
+            <button class="btn btn-success" {% if container.status == 'running' %}disabled{% endif %}
+                hx-post="{% url 'service-start-container' pk=service.id container_pk=container.id %}"
+                hx-swap="none" title="Iniciar {{ container.name }}">
+                <i class="fas fa-play"></i>
+            </button>
 
-        <button class="btn btn-sm btn-outline-warning" {% if container.status != 'running' %}disabled{% endif %}
-            hx-post="{% url 'service-stop-container-action' pk=service.id container_pk=container.id %}"
-            hx-target="#service-{{ service.id }}" hx-swap="outerHTML" title="Detener {{ container.name }}">
-            Detener
-        </button>
+            <button class="btn btn-warning" {% if container.status != 'running' %}disabled{% endif %}
+                hx-post="{% url 'service-stop-container-action' pk=service.id container_pk=container.id %}"
+                hx-swap="none" title="Detener {{ container.name }}">
+                <i class="fas fa-stop"></i>
+            </button>
 
-        <button class="btn btn-sm btn-outline-secondary"
-            hx-get="{% url 'service-logs' service.id %}?container={{ container.id }}" hx-target="#genericModalContent"
-            hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#genericModal"
-            title="Ver logs de {{ container.name }}">
-            Logs
-        </button>
+            <button class="btn btn-secondary"
+                hx-get="{% url 'service-logs' service.id %}?container={{ container.id }}" hx-target="#genericModalContent"
+                hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#genericModal"
+                title="Logs de {{ container.name }}">
+                <i class="fas fa-history"></i>
+            </button>
+        </div>
 
-        {% if container.status == 'running' and container.container_id %}
-        <a href="{% url 'containers:terminal_view' service.id %}?container={{ container.id }}"
-            class="btn btn-sm btn-outline-dark" title="Terminal de {{ container.name }}">
-            Terminal
-        </a>
-        {% else %}
-        <button class="btn btn-sm btn-outline-dark" disabled>Terminal</button>
-        {% endif %}
+        <div class="btn-group shadow-sm ms-2">
+            {% if container.status == 'running' and container.container_id %}
+            <a href="{% url 'containers:terminal_view' service.id %}?container={{ container.id }}"
+                class="btn btn-dark" title="Terminal de {{ container.name }}">
+                <i class="fas fa-terminal"></i>
+            </a>
+            {% else %}
+            <button class="btn btn-dark" disabled title="Terminal requiere que el contenedor esté en ejecución">
+                <i class="fas fa-terminal"></i>
+            </button>
+            {% endif %}
 
-        {# Botón Acceder si tiene puertos #}
-        {% if container.assigned_ports and host %}
-        {% with first_port=container.assigned_ports.0.external %}
-        {% if first_port %}
-        <a href="http://{{ host }}:{{ first_port }}" class="btn btn-sm btn-outline-primary" target="_blank"
-            rel="noopener" title="Acceder a {{ container.name }}">
-            Acceder
-        </a>
-        {% endif %}
-        {% endwith %}
-        {% endif %}
+            {# Botón Acceder si tiene puertos #}
+            {% if container.assigned_ports and host %}
+            {% with first_port=container.assigned_ports.0.external %}
+            {% if first_port %}
+            <a href="http://{{ host }}:{{ first_port }}" class="btn btn-primary" target="_blank"
+                rel="noopener" title="Acceder a {{ container.name }}">
+                <i class="fas fa-external-link-alt"></i>
+            </a>
+            {% endif %}
+            {% endwith %}
+            {% endif %}
+        </div>
     </div>
 </div>

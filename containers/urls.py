@@ -14,4 +14,24 @@ urlpatterns = [
     path("table-fragment/", views.service_table, name="service_table"),
     path("terminal/<int:pk>/", views.terminal_view, name="terminal_view"),
     path("edit/<int:pk>/", views.edit_service, name="edit_service"),
+    
+    # Nueva página dedicada para crear servicio
+    path("new/", views.new_service_page, name="new_service"),
+    
+    # Verificar imágenes de DockerHub
+    path("verify-dockerhub/", views.verify_dockerhub_image, name="verify_dockerhub"),
+    
+    # Verificar disponibilidad de puertos
+    path("check-port/", views.check_port_availability, name="check_port"),
+    
+    # Gestión de tokens API
+    path("api-token/", views.manage_api_token, name="api_token"),
+    
+    # Documentación dedicada de la API (Navegación por secciones)
+    path("api-docs/", views.api_documentation_view, name="api_docs"),
+    path("api-docs/<slug:section_slug>/", views.api_documentation_view, name="api_docs_section"),
+
+
+    # Generador interactivo de comandos API
+    path("api-generator/", views.api_command_generator_view, name="api_generator"),
 ]

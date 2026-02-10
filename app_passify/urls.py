@@ -4,10 +4,11 @@ app_passify URL Configuration
 from django.contrib import admin
 from django.urls import include, path
 from django.views.generic import RedirectView
+from django.contrib.admin.views.decorators import staff_member_required
 from django.conf import settings
 from django.conf.urls.static import static
 
-from containers.views import ServiceViewSet, AllowedImageViewSet
+from containers.views import ServiceViewSet, AllowedImageViewSet, SubjectViewSet, ProjectViewSet
 from containers import views as container_views
 from paasify.views import ProfileView
 
@@ -20,6 +21,8 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 router = routers.DefaultRouter()
 router.register(r'containers', ServiceViewSet, basename='service')
 router.register(r'images', AllowedImageViewSet, basename='allowed-image')
+router.register(r'subjects', SubjectViewSet, basename='subject')
+router.register(r'projects', ProjectViewSet, basename='project')
 
 urlpatterns = [
     # Vistas públicas / HTML
@@ -52,8 +55,10 @@ urlpatterns = [
     path('api/', include(router.urls)),
     path('api/token/',         TokenObtainPairView.as_view(), name='token_obtain'),
     path('api/token/refresh/', TokenRefreshView.as_view(),   name='token_refresh'),
-    path('api/schema/',  SpectacularAPIView.as_view(),        name='schema'),
-    path('api/docs/',    SpectacularSwaggerView.as_view(url_name='schema')),
+    
+    # Docs restringidas a STAFF (Admin)
+    path('api/schema/',  staff_member_required(SpectacularAPIView.as_view()),        name='schema'),
+    path('api/docs/',    staff_member_required(SpectacularSwaggerView.as_view(url_name='schema')), name='docs'),
 ]
 
 # Servir estáticos en desarrollo (DEBUG=True)

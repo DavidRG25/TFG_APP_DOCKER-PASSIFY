@@ -1,16 +1,18 @@
+# test comment
 # containers/views.py
 import json
+from django.db import models
 
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import FieldError
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils.html import escape
 
 from rest_framework import viewsets
 from rest_framework.decorators import action, api_view, permission_classes
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, NotFound as DRFNotFound
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response as DRF_Response
 from rest_framework.exceptions import ValidationError
@@ -35,78 +37,11 @@ from .services import (
     start_service_container_record,
     stop_service_container_record,
     fetch_container_logs,
+    sync_service_status
 )
 
 
 # ----------------------------- helpers -----------------------------
-
-def _sync_service(service: Service):
-    """
-    Sincroniza el estado del servicio con Docker.
-    
-    Mejorado para manejar estados transitorios correctamente:
-    - No marca error si el servicio está en "stopping", "pending", "deleting"
-    - Solo marca error si el contenedor está definitivamente muerto (exited, dead)
-    """
-    if not service.container_id:
-        return
-
-    docker_client = get_docker_client()
-    if docker_client is None:
-        return
-
-    try:
-        container = docker_client.containers.get(service.container_id)
-        container.reload()
-        docker_status = (container.status or "").lower()
-        
-        # Estados transitorios: no hacer nada, dejar que el proceso termine
-        if service.status in {"stopping", "pending", "deleting"}:
-            return
-        
-        # Si el servicio está stopped/error y el contenedor NO está running, sincronizar a stopped
-        # Esto evita marcar como error al reiniciar PaaSify con contenedores detenidos
-        # Docker puede reportar: exited, stopped, created, paused, dead
-        if service.status in {"stopped", "error"} and docker_status in {"exited", "stopped"}:
-            if service.status == "error":
-                # Recuperar de error si solo está detenido
-                service.status = "stopped"
-                service.save(update_fields=["status"])
-            return  # Todo OK
-        
-        # Si el servicio cree que está running pero Docker dice que no
-        if service.status == "running" and docker_status not in {"running"}:
-            # Solo marcar error si está definitivamente muerto
-            if docker_status in {"exited", "dead"}:
-                try:
-                    log_tail = container.logs(tail=200).decode(errors="replace")
-                except Exception:
-                    log_tail = "(logs no disponibles)"
-                service.status = "error"
-                service.logs = (service.logs or "") + f"\n[Docker] Contenedor en estado '{docker_status}'. Logs:\n{log_tail}".strip()
-                service.save(update_fields=["status", "logs"])
-            # Si está en otro estado (created, restarting), dar tiempo
-            elif docker_status in {"created", "restarting"}:
-                pass  # Esperar, puede estar arrancando
-            else:
-                # Estado desconocido, asumir stopped
-                service.status = "stopped"
-                service.save(update_fields=["status"])
-        
-        # Si el servicio cree que está stopped pero Docker dice running
-        elif service.status == "stopped" and docker_status == "running":
-            service.status = "running"
-            service.save(update_fields=["status"])
-            
-    except NotFound:
-        # Solo marcar como removed si no está en proceso de eliminación
-        if service.status != "deleting":
-            service.status = "removed"
-            service.save()
-    except DockerException:
-        # Si no podemos verificar el contenedor, conservamos el estado actual.
-        return
-
 
 def user_is_student(user) -> bool:
     if not getattr(user, "is_authenticated", False):
@@ -139,8 +74,22 @@ class ServiceViewSet(viewsets.ModelViewSet):
     serializer_class = ServiceSerializer
     permission_classes = [IsAuthenticated]
 
+    def get_serializer_class(self):
+        if self.action == "list":
+            from .serializers import ServiceSimpleSerializer
+            return ServiceSimpleSerializer
+        return ServiceSerializer
+
+    def get_object(self):
+        try:
+            return super().get_object()
+        except Http404:
+            raise DRFNotFound("No se encontró ningún servicio con esa consulta o no tienes permisos.")
+
     def _is_htmx(self, request) -> bool:
-        return request.headers.get("HX-Request") == "true"
+        # Algunos navegadores o proxys pueden variar la capitalización, comprobamos de forma más robusta
+        hx = request.headers.get("HX-Request", "").lower()
+        return hx == "true"
 
     def _render_table_fragment(self, request) -> str:
         services = self.get_queryset()
@@ -161,21 +110,27 @@ class ServiceViewSet(viewsets.ModelViewSet):
         extra_triggers=None,
     ):
         html = ""
+        # Si no es HTMX (raro pero posible), devolvemos el fragmento de la tabla
         if not self._is_htmx(request):
             html = self._render_table_fragment(request)
         response = DRF_Response(html, status=status)
+        
+        # Siempre incluimos el refresh de la tabla para asegurar que el pooling se active/actualice
         trigger = dict(extra_triggers or {})
-        trigger.setdefault("service:table-refresh", {})
+        trigger["service:table-refresh"] = {}
+        
         if message:
             trigger["service:toast"] = {"message": message, "variant": level}
-        if trigger:
-            response["HX-Trigger"] = json.dumps(trigger)
+            
+        # Siempre enviar como JSON para que HTMX lo procese consistentemente
+        response["HX-Trigger"] = json.dumps(trigger)
+            
         return response
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
         user = request.user
-        if user.is_superuser or user_is_admin(user):
+        if user.is_superuser or user_is_admin(user) or user_is_teacher(user):
             return
         if not user_is_student(user):
             raise PermissionDenied("Solo los alumnos pueden gestionar contenedores.")
@@ -187,8 +142,25 @@ class ServiceViewSet(viewsets.ModelViewSet):
         else:
             qs = Service.objects.filter(owner=user)
         
+        # Filtros adicionales por API (GET params)
+        project_id = self.request.query_params.get('project')
+        if project_id:
+            if not project_id.isdigit():
+                raise ValidationError({"project": "El ID del proyecto debe ser un numero entero."})
+            qs = qs.filter(project_id=project_id)
+            
+        subject_id = self.request.query_params.get('subject')
+        if subject_id:
+            if not subject_id.isdigit():
+                raise ValidationError({"subject": "El ID de la asignatura debe ser un numero entero."})
+            qs = qs.filter(subject_id=subject_id)
+            
+        status = self.request.query_params.get('status')
+        if status:
+            qs = qs.filter(status=status)
+
         for s in qs:
-            _sync_service(s)
+            sync_service_status(s)
         return qs.exclude(status="removed")
 
     def create(self, request, *args, **kwargs):
@@ -207,7 +179,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
             raise
 
         mode = (request.data.get("mode") or "default").lower()
-        if mode not in ("default", "custom"):
+        if mode not in ("default", "custom", "dockerhub"):
             mode = "default"
 
         custom_port = request.data.get("custom_port")
@@ -223,8 +195,6 @@ class ServiceViewSet(viewsets.ModelViewSet):
             project = get_object_or_404(UserProject, pk=project_id, user_profile__user=request.user)
 
         service = serializer.save(owner=request.user, status="creating", project=project)
-
-        self._attach_uploaded_files(service, request, mode)
 
         try:
             run_container(service, custom_port=custom_port)
@@ -259,17 +229,31 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
     def _validation_error_response(self, exc: ValidationError):
         """Devuelve un fragmento HTML con errores de validación para HTMX."""
+        
+        # Construir mensaje de error simple y legible
         if isinstance(exc.detail, dict):
-            items = []
+            errors = []
             for field, messages in exc.detail.items():
-                text = ", ".join(messages) if isinstance(messages, (list, tuple)) else str(messages)
-                items.append(f"<li><strong>{field}:</strong> {text}</li>")
-            html = "<div class='alert alert-danger'><ul class='mb-0'>" + "".join(items) + "</ul></div>"
+                # Extraer el mensaje limpio
+                if isinstance(messages, (list, tuple)):
+                    msg_text = ", ".join(str(m) for m in messages)
+                elif isinstance(messages, str):
+                    msg_text = messages
+                else:
+                    msg_text = str(messages)
+                
+                # Formatear el campo de forma legible
+                field_name = field.replace("_", " ").title()
+                errors.append(f"<strong>{field_name}:</strong> {msg_text}")
+            error_message = "<br>".join(errors)
         else:
-            html = f"<div class='alert alert-danger'>{exc.detail}</div>"
-        response = DRF_Response(html, status=400)
-        response["HX-Retarget"] = "#form-errors"
-        response["HX-Reswap"] = "innerHTML"
+            error_message = str(exc.detail)
+        
+        # Usar HX-Trigger para disparar evento que muestre el error
+        response = DRF_Response("", status=400)
+        response["HX-Trigger"] = json.dumps({
+            "showValidationError": error_message
+        })
         return response
 
     def _attach_uploaded_files(self, service: Service, request, mode: str):
@@ -302,17 +286,19 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
         if self._is_htmx(request):
             return self._htmx_response(
-                request,
-                message="Servicio encolado para iniciar.",
-                level="text-bg-success",
+                request, 
+                message=f"Servicio '{service.name}' iniciado correctamente.",
+                level="text-bg-success"
             )
         return DRF_Response({"status": "queued", "message": "Servicio encolado para iniciar."})
 
     @action(detail=True, methods=["post"])
     def stop(self, request, pk=None):
         service = self.get_object()
+        
         try:
-            stop_container(service)
+            from .services import stop_container_async
+            stop_container_async(service)
         except Exception as exc:
             if self._is_htmx(request):
                 return self._htmx_response(
@@ -326,18 +312,18 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if self._is_htmx(request):
             return self._htmx_response(
                 request,
-                message="Servicio detenido.",
-                level="text-bg-warning",
+                message=f"Servicio '{service.name}' deteniendo...",
+                level="text-bg-warning"
             )
-        return DRF_Response({"status": "stopped", "message": "Servicio detenido."})
+        return DRF_Response({"status": "stopping", "message": "Servicio deteniendo."})
 
     @action(detail=True, methods=["post"], url_path="remove")
     def remove(self, request, pk=None):
         service = self.get_object()
-        service.status = "deleting"
-        service.save(update_fields=["status", "updated_at"])
+        
         try:
-            remove_container(service)
+            from .services import remove_container_async
+            remove_container_async(service)
         except Exception as exc:
             if self._is_htmx(request):
                 return self._htmx_response(
@@ -351,10 +337,10 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if self._is_htmx(request):
             return self._htmx_response(
                 request,
-                message="Servicio eliminado.",
-                level="text-bg-danger",
+                message="El servicio está siendo eliminado...",
+                level="text-bg-success",
             )
-        return DRF_Response({"status": "removed", "message": "Servicio eliminado."})
+        return DRF_Response({"status": "deleting", "message": "Servicio eliminando."})
 
     @action(detail=True, methods=["get"])
     def logs(self, request, pk=None):
@@ -391,13 +377,26 @@ class ServiceViewSet(viewsets.ModelViewSet):
             title = f"Logs de {service.name}"
         
         if self._is_htmx(request):
+            # Determinamos si hace falta polling (si está operando o si está corriendo para ver logs frescos)
+            is_transient = service.status in ["pending", "starting", "building", "pulling", "deleting", "creating", "stopping"]
+            polling_attr = ""
+            if is_transient or service.status == "running":
+                # Si pasamos container_id, mantenerlo en el polling
+                poll_url = request.path
+                if container_id_param:
+                    poll_url += f"?container={container_id_param}"
+                polling_attr = f'hx-get="{poll_url}" hx-trigger="load delay:2s" hx-target="#genericModalContent" hx-swap="innerHTML"'
+
             html = f"""
                 <div class="modal-header">
                     <h5 class="modal-title">{title}</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
                 </div>
-                <div class="modal-body">
-                    <pre><code class="language-plaintext">{escape(log_content)}</code></pre>
+                <div class="modal-body" {polling_attr}>
+                    <pre class="bg-dark text-light p-3 rounded shadow-sm" style="max-height: 400px; overflow-y: auto;">
+                        <code class="language-plaintext">{escape(log_content)}</code>
+                    </pre>
+                    {f'<div class="text-center mt-2"><div class="spinner-border spinner-border-sm text-primary" role="status"></div><small class="ms-2 text-muted">Actualizando logs...</small></div>' if polling_attr else ""}
                 </div>
             """
             return HttpResponse(html)
@@ -507,10 +506,284 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
 
 
+
+
+
+
 class AllowedImageViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AllowedImage.objects.all()
     serializer_class = AllowedImageSerializer
     permission_classes = [IsAuthenticated]
+
+
+class SubjectViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Lista las asignaturas en las que el alumno está matriculado.
+    """
+    serializer_class = None  # Se define dinámicamente o importando
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_serializer_class(self):
+        from .api_serializers import SubjectSerializer
+        return SubjectSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user_is_admin(user) or user.is_superuser:
+            return Subject.objects.all()
+        # Si es profesor, sus asignaturas
+        if user_is_teacher(user):
+            return Subject.objects.filter(teacher_user=user)
+        # Si es alumno, donde está matriculado
+        return Subject.objects.filter(students=user).distinct()
+
+
+class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
+    """
+    Lista los proyectos asignados al alumno.
+    """
+    serializer_class = None
+    permission_classes = [IsAuthenticated]
+    pagination_class = None
+
+    def get_serializer_class(self):
+        from .api_serializers import ProjectSerializer
+        return ProjectSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        if user_is_admin(user) or user.is_superuser:
+            qs = UserProject.objects.all()
+        # Si es profesor, proyectos de sus asignaturas
+        elif user_is_teacher(user):
+            qs = UserProject.objects.filter(subject__teacher_user=user)
+        # Si es alumno, sus proyectos personales
+        else:
+            qs = UserProject.objects.filter(user_profile__user=user)
+            
+        # Filtro opcional por asignatura
+        subject_id = self.request.query_params.get('subject')
+        if subject_id:
+            qs = qs.filter(subject_id=subject_id)
+            
+        return qs
+
+
+
+@login_required
+def verify_dockerhub_image(request):
+    """
+    Verifica si una imagen existe en DockerHub y extrae información útil.
+    Soluciona el problema de CORS al hacer la petición desde el backend.
+    """
+    import requests
+    from django.http import JsonResponse
+    
+    image_name = request.GET.get('image', '').strip()
+    
+    if not image_name:
+        return JsonResponse({
+            'success': False,
+            'error': 'No se especificó ninguna imagen'
+        }, status=400)
+    
+    try:
+        # Parsear nombre de imagen (usuario/imagen:tag o imagen:tag)
+        parts = image_name.split(':')
+        repo = parts[0]
+        tag = parts[1] if len(parts) > 1 else 'latest'
+        
+        # Construir URL de la API de DockerHub
+        if '/' in repo:
+            # Imagen de usuario: usuario/imagen
+            url = f'https://hub.docker.com/v2/repositories/{repo}/tags/{tag}'
+        else:
+            # Imagen oficial: library/imagen
+            url = f'https://hub.docker.com/v2/repositories/library/{repo}/tags/{tag}'
+        
+        # Hacer petición a DockerHub
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Extraer puerto expuesto si existe
+            exposed_port = None
+            try:
+                # Los puertos están en images[0].architecture (normalmente)
+                if 'images' in data and len(data['images']) > 0:
+                    # Buscar en la metadata de la imagen
+                    for img_data in data['images']:
+                        # DockerHub no siempre expone esta info en la API pública
+                        # Intentamos extraerla si está disponible
+                        pass
+                
+                # Puertos comunes por nombre de imagen (fallback)
+                common_ports = {
+                    'nginx': 80,
+                    'apache': 80,
+                    'httpd': 80,
+                    'postgres': 5432,
+                    'postgresql': 5432,
+                    'mysql': 3306,
+                    'mariadb': 3306,
+                    'redis': 6379,
+                    'mongodb': 27017,
+                    'mongo': 27017,
+                    'elasticsearch': 9200,
+                }
+                
+                # Intentar detectar por nombre
+                repo_name = repo.split('/')[-1].lower()
+                for key, port in common_ports.items():
+                    if key in repo_name:
+                        exposed_port = port
+                        break
+                        
+            except Exception:
+                pass
+            
+            return JsonResponse({
+                'success': True,
+                'image': image_name,
+                'last_updated': data.get('last_updated'),
+                'full_size': data.get('full_size'),
+                'exposed_port': exposed_port,
+                'repo': repo,
+                'tag': tag,
+            })
+            
+        elif response.status_code == 404:
+            return JsonResponse({
+                'success': False,
+                'error': 'Imagen no encontrada en DockerHub. Verifica el nombre y el tag.'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'error': f'Error al consultar DockerHub (código {response.status_code})'
+            })
+            
+    except requests.exceptions.Timeout:
+        return JsonResponse({
+            'success': False,
+            'error': 'Timeout al consultar DockerHub. Intenta de nuevo.'
+        })
+    except requests.exceptions.RequestException as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error de conexión: {str(e)}'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error inesperado: {str(e)}'
+        })
+
+
+@login_required
+def check_port_availability(request):
+    """
+    Verifica si un puerto está disponible y sugiere alternativas si está ocupado.
+    """
+    import random
+    from .models import Service
+    
+    port = request.GET.get('port', '').strip()
+    
+    if not port:
+        return JsonResponse({
+            'success': False,
+            'error': 'Por favor, ingresa un puerto'
+        })
+    
+    try:
+        port = int(port)
+        
+        # Validar rango
+        if port < 40000 or port > 50000:
+            return JsonResponse({
+                'success': False,
+                'error': 'El puerto debe estar entre 40000 y 50000'
+            })
+        
+        # 1. Puertos en Service (Contenedores simples y lista de puertos de compose)
+        services_with_ports = Service.objects.filter(models.Q(assigned_port__isnull=False) | models.Q(assigned_ports__isnull=False))
+        
+        # 2. Puertos en ServiceContainer (Docker Compose - Ejecutándose)
+        from .models import ServiceContainer, PortReservation
+        compose_running_ports = []
+        for sc in ServiceContainer.objects.filter(assigned_ports__isnull=False):
+            if isinstance(sc.assigned_ports, list):
+                for p_info in sc.assigned_ports:
+                    ext_port = p_info.get('external')
+                    if ext_port:
+                        compose_running_ports.append((f"{sc.service.name} ({sc.name})", int(ext_port)))
+        
+        # 3. Puertos en PortReservation (Reservas activas en Docker)
+        reserved_ports = list(PortReservation.objects.all().values_list('port', flat=True))
+        
+        # Consolidar todos los puertos en uso
+        used_ports_map = {} # port -> owner_name
+        for s in services_with_ports:
+            if s.assigned_port:
+                used_ports_map[int(s.assigned_port)] = s.name
+            if s.assigned_ports: # Lista de puertos del compose
+                for p in s.assigned_ports:
+                    used_ports_map[int(p)] = f"{s.name} (Compose)"
+        
+        for owner, p in compose_running_ports:
+            used_ports_map[int(p)] = owner
+        for p in reserved_ports:
+            if p not in used_ports_map:
+                used_ports_map[int(p)] = "Reserva activa"
+        
+        port_in_use = port in used_ports_map
+        
+        if not port_in_use:
+            return JsonResponse({
+                'success': True,
+                'available': True,
+                'port': port,
+                'message': f'✅ Puerto {port} disponible'
+            })
+        else:
+            # Puerto ocupado, generar 3 sugerencias aleatorias
+            # Usamos los puertos que ya calculamos en used_ports_map
+            all_used_ports = set(used_ports_map.keys())
+            
+            available_ports = [p for p in range(40000, 50001) if p not in all_used_ports]
+            
+            if len(available_ports) == 0:
+                return JsonResponse({
+                    'success': False,
+                    'available': False,
+                    'error': 'No hay puertos disponibles en el rango 40000-50000'
+                })
+            
+            # Seleccionar 3 puertos aleatorios disponibles
+            suggestions = random.sample(available_ports, min(3, len(available_ports)))
+            suggestions.sort()
+            
+            return JsonResponse({
+                'success': True,
+                'available': False,
+                'port': port,
+                'message': f'⚠️ Puerto {port} ya está en uso',
+                'suggestions': suggestions
+            })
+            
+    except ValueError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Puerto inválido'
+        })
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': f'Error al verificar puerto: {str(e)}'
+        })
 
 
 # ------------------------------ HTML -------------------------------
@@ -596,6 +869,10 @@ def student_services_in_subject(request, subject_id):
         .exclude(status="removed")
     )
     
+    # Sincronizar estado de servicios con Docker
+    for service in services:
+        sync_service_status(service)
+    
     # Calcular estadísticas locales para esta asignatura
     running_count = services.filter(status="running").count()
     stopped_count = services.filter(status="stopped").count()
@@ -633,24 +910,52 @@ def student_services_in_subject(request, subject_id):
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def service_table(request):
-    if not (request.user.is_superuser or user_is_student(request.user)):
+    user = request.user
+    if not (user.is_superuser or user_is_admin(user) or user_is_teacher(user) or user_is_student(user)):
         return HttpResponse("No tienes permiso para consultar servicios.", status=403)
 
-    qs = Service.objects.filter(owner=request.user).exclude(status="removed")
+    if user.is_superuser or user_is_admin(user) or user_is_teacher(user):
+        qs = Service.objects.all()
+        is_supervisor = True
+    else:
+        qs = Service.objects.filter(owner=user)
+        is_supervisor = False
+        
+    qs = qs.exclude(status="removed")
     subject_id = request.GET.get("subject")
+    project_id = request.GET.get("project")
 
-    # Si el modelo tiene FK a subject, filtramos; si no, lo ignoramos (evita FieldError)
-    try:
-        if subject_id:
-            qs = qs.filter(subject_id=subject_id)
-    except FieldError:
-        pass
+    if subject_id:
+        qs = qs.filter(subject_id=subject_id)
+    if project_id:
+        qs = qs.filter(project_id=project_id)
 
+    # Sincronizar estados con Docker antes de renderizar
     for s in qs:
-        _sync_service(s)
+        sync_service_status(s)
 
     host = request.get_host().split(":")[0]
-    html = render_to_string("containers/_service_rows.html", {"services": qs, "host": host})
+    
+    # Evaluar si algún servicio está en estado transitorio para forzar polling en el cliente
+    transient_states = ["pending", "starting", "stopping", "building", "pulling", "deleting", "creating"]
+    has_transient = qs.filter(status__in=transient_states).exists()
+    
+    if not has_transient:
+        # Tambien considerar transitorios los contenedores individuales de Compose
+        # (ej: si estan en 'created', 'restarting', 'removing')
+        has_transient = ServiceContainer.objects.filter(
+            service__in=qs,
+            status__in=["created", "restarting", "removing"]
+        ).exists()
+
+    html = render_to_string("containers/_service_rows.html", {
+        "services": qs, 
+        "host": host, 
+        "is_supervisor": is_supervisor,
+        "has_transient": has_transient,
+        "subject_id": subject_id,
+        "project_id": project_id
+    }, request=request)
     return HttpResponse(html)
 
 
@@ -682,9 +987,23 @@ def terminal_view(request, pk):
         return HttpResponse(f"No se pudo acceder al contenedor: {exc}", status=400)
 
     ws_path = f"/ws/terminal/{service.id}/"
+    
+    # Capturar URL de retorno para volver al contexto correcto
+    return_url = request.GET.get('return_url')
+    if not return_url:
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'subjects/' in referer:
+            # Si viene de una asignatura, volver ahí
+            return_url = referer
+        else:
+            # Por defecto, panel principal
+            from django.urls import reverse
+            return_url = reverse('containers:student_panel')
+    
     return render(request, "containers/terminal.html", {
         "service": service,
         "ws_path": ws_path,
+        "return_url": return_url,
     })
 
 
@@ -718,17 +1037,31 @@ def professor_dashboard(request):
     if request.user.is_superuser:
         subjects = Subject.objects.all()
 
-    projects = (
+    projects_qs = (
         UserProject.objects.filter(subject__teacher_user=request.user)
         if not request.user.is_superuser
         else UserProject.objects.all()
-    ).select_related("subject", "user_profile")
-
-    return render(
-        request,
-        "professor/dashboard.html",
-        {"subjects": subjects, "projects": projects},
     )
+    projects = projects_qs.select_related("subject", "user_profile")
+
+    # Estadísticas para el profesor
+    total_students = subjects.values('students').distinct().count()
+    total_services = Service.objects.filter(subject__in=subjects).exclude(status="removed").count()
+    active_services = Service.objects.filter(subject__in=subjects, status="running").count()
+
+    context = {
+        "subjects": subjects,
+        "projects": projects,
+        "stats": {
+            "subjects": subjects.count(),
+            "projects": projects.count(),
+            "students": total_students,
+            "total_services": total_services,
+            "active_services": active_services,
+        }
+    }
+
+    return render(request, "professor/dashboard.html", context)
 
 
 @login_required
@@ -747,11 +1080,18 @@ def professor_subject_detail(request, subject_id):
         .order_by("owner__username", "name")
     )
     projects = subject.projects.select_related("user_profile")
+    host = request.get_host().split(":")[0]
 
     return render(
         request,
         "professor/subject_detail.html",
-        {"subject": subject, "students": students, "services": services, "projects": projects},
+        {
+            "subject": subject,
+            "students": students,
+            "services": services,
+            "projects": projects,
+            "host": host,
+        },
     )
 
 
@@ -774,11 +1114,12 @@ def professor_project_detail(request, project_id):
             .exclude(status="removed")
             .select_related("owner", "subject")
         )
+    host = request.get_host().split(":")[0]
 
     return render(
         request,
         "professor/project_detail.html",
-        {"project": project, "related_services": related_services},
+        {"project": project, "related_services": related_services, "host": host},
     )
 
 
@@ -801,13 +1142,15 @@ def edit_service(request, pk):
 
         try:
             env_vars = _parse_optional_json(request.POST.get("env_vars", ""), "Variables de entorno")
-            volumes = _parse_optional_json(request.POST.get("volumes", ""), "Volumenes")
+            # SEGURIDAD CRÍTICA: Volúmenes deshabilitados completamente
+            # volumes = _parse_optional_json(request.POST.get("volumes", ""), "Volumenes")
         except ValueError as exc:
             return HttpResponse(str(exc), status=400)
 
         service.env_vars = env_vars or None
-        service.volumes = volumes or None
-        service.save(update_fields=["env_vars", "volumes", "updated_at"])
+        # SEGURIDAD: No permitir modificación de volúmenes
+        # service.volumes = volumes or None
+        service.save(update_fields=["env_vars", "updated_at"])
 
         try:
             remove_container(service)
@@ -827,3 +1170,209 @@ def subjects_list(request):
     else:
         subjects = Subject.objects.filter(students=request.user)
     return render(request, "containers/subjects.html", {"subjects": subjects})
+
+
+@login_required
+def new_service_page(request):
+    """
+    Página dedicada para crear nuevo servicio.
+    Proporciona mejor UX que el modal con más espacio y ayuda contextual.
+    """
+    # Obtener datos necesarios para el formulario
+    images = AllowedImage.objects.all().order_by('name')
+    subjects = Subject.objects.filter(students=request.user)
+    user_projects = UserProject.objects.filter(
+        user_profile__user=request.user
+    ).select_related('subject')
+    
+    # Obtener host para preview
+    host = request.get_host().split(':')[0]
+    
+    # Capturar URL de retorno para redirigir correctamente después de crear servicio
+    # Prioridad: 1) Query param 'return_url', 2) HTTP_REFERER, 3) student_panel por defecto
+    return_url = request.GET.get('return_url')
+    selected_subject_id = None
+    
+    if not return_url:
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'subjects/' in referer:
+            # Si viene de una asignatura, extraer la URL y el ID
+            return_url = referer
+            # Extraer ID de asignatura de la URL (ej: /subjects/1/)
+            import re
+            match = re.search(r'/subjects/(\d+)/', referer)
+            if match:
+                selected_subject_id = int(match.group(1))
+        else:
+            # Por defecto, panel principal
+            from django.urls import reverse
+            return_url = reverse('containers:student_panel')
+    
+    context = {
+        'images': images,
+        'available_subjects': subjects,
+        'user_projects': user_projects,
+        'host': host,
+        'return_url': return_url,  # Pasar URL de retorno al template
+        'selected_subject_id': selected_subject_id,  # ID de asignatura pre-seleccionada
+    }
+    
+    return render(request, 'containers/new_service.html', context)
+
+
+
+@login_required
+def manage_api_token(request):
+    """
+    Gestionar token API del usuario con caducidad de 30 días.
+    Permite generar, regenerar y visualizar el Bearer Token para acceso a la API.
+    """
+    from paasify.models.TokenModel import ExpiringToken
+    from django.contrib import messages
+    
+    if request.method == "POST":
+        # Regenerar token (eliminar el anterior y crear uno nuevo)
+        ExpiringToken.objects.filter(user=request.user).delete()
+        token = ExpiringToken.objects.create(user=request.user)
+        messages.success(request, 'Token regenerado exitosamente. Válido por 30 días.')
+    else:
+        # Obtener o crear token
+        token, created = ExpiringToken.objects.get_or_create(user=request.user)
+        if created:
+            messages.success(request, 'Token creado exitosamente. Válido por 30 días.')
+        elif token.is_expired():
+            messages.warning(request, 'Tu token ha expirado. Por favor, regenera un nuevo token.')
+    
+    context = {
+        'token': token.key,
+        'created': token.created,
+        'expires_at': token.expires_at,
+        'days_remaining': token.days_until_expiration(),
+        'is_expired': token.is_expired(),
+    }
+    
+    return render(request, 'containers/api_token.html', context)
+
+@login_required
+def api_documentation_view(request, section_slug="introduccion"):
+    """
+    Pagina dedicada de documentacion de la API REST para los alumnos.
+    Ahora soporta navegacion por secciones independientes.
+    """
+    from paasify.models.TokenModel import ExpiringToken
+    import os
+    from django.conf import settings
+    from django.shortcuts import redirect
+    from django.http import Http404
+
+    # Definicion del orden fijo de secciones
+    SECTIONS = [
+        {"slug": "introduccion",    "title": "Introducción",          "file": "01_introduction.md"},
+        {"slug": "autenticacion",   "title": "Autenticación",          "file": "02_authentication.md"},
+        {"slug": "gets",            "title": "Consultas (GETs)",      "file": "03_gets.md"},
+        {"slug": "crear",           "title": "Crear Servicio",        "file": "04_create.md"},
+        {"slug": "acciones",        "title": "Acciones del Servicio", "file": "05_actions.md"},
+        {"slug": "logs",            "title": "Logs del Servicio",     "file": "06_logs.md"},
+        {"slug": "ci-cd",           "title": "Integración CI/CD",     "file": "07_cicd.md"},
+        {"slug": "errores",         "title": "Códigos de Error",      "file": "08_errors.md"},
+    ]
+
+    # Buscar la seccion actual
+    current_index = -1
+    for i, s in enumerate(SECTIONS):
+        if s["slug"] == section_slug:
+            current_index = i
+            break
+    
+    if current_index == -1:
+        raise Http404("Sección de documentación no encontrada")
+
+    # Leer el archivo Markdown de la seccion actual y extraer H3 de todas
+    partials_dir = os.path.join(settings.BASE_DIR, "templates", "api_docs", "partials")
+    
+    # Enriquecer SECTIONS con sus sub-encabezados (H3)
+    for section in SECTIONS:
+        section["subsections"] = []
+        path = os.path.join(partials_dir, section["file"])
+        if os.path.exists(path):
+            with open(path, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+                for line in lines:
+                    if line.startswith("### "):
+                        title = line.replace("### ", "").strip()
+                        # Generar slug para el link
+                        import unicodedata
+                        import re
+                        slug = unicodedata.normalize('NFD', title).encode('ascii', 'ignore').decode('utf-8')
+                        slug = re.sub(r'[^a-z0-9]+', '-', slug.lower()).strip('-')
+                        section["subsections"].append({"title": title, "slug": slug})
+
+    current_section = SECTIONS[current_index]
+    
+    # Navegacion (Siguiente / Anterior)
+    prev_section = SECTIONS[current_index - 1] if current_index > 0 else None
+    next_section = SECTIONS[current_index + 1] if current_index < len(SECTIONS) - 1 else None
+
+    # Obtener el token del usuario e imágenes del catálogo
+    from paasify.models.TokenModel import ExpiringToken
+    from containers.models import AllowedImage
+    
+    token, _ = ExpiringToken.objects.get_or_create(user=request.user)
+    images = AllowedImage.objects.all().order_by('name')
+    
+    file_path = os.path.join(partials_dir, current_section["file"])
+    
+    md_content = ""
+    if os.path.exists(file_path):
+        with open(file_path, "r", encoding="utf-8") as f:
+            md_content = f.read()
+    else:
+        md_content = f"# {current_section['title']}\n\nContenido en preparación..."
+
+    context = {
+        'token': token.key,
+        'user_token': token.key,
+        'markdown_content': md_content,
+        'sections': SECTIONS,
+        'current_slug': section_slug,
+        'current_index': current_index + 1,
+        'total_sections': len(SECTIONS),
+        'prev_section': prev_section,
+        'next_section': next_section,
+        'images': images,
+        'title': f"{current_section['title']} - API Docs",
+    }
+    
+    return render(request, 'containers/api_documentation.html', context)
+
+
+@login_required
+def api_command_generator_view(request):
+    """
+    Generador interactivo de comandos API.
+    Permite al alumno configurar un servicio visualmente y obtener el comando curl.
+    """
+    from paasify.models.TokenModel import ExpiringToken
+    
+    token, _ = ExpiringToken.objects.get_or_create(user=request.user)
+    images = AllowedImage.objects.all().order_by('name')
+    subjects = Subject.objects.filter(students=request.user)
+    user_projects = UserProject.objects.filter(
+        user_profile__user=request.user
+    ).select_related('subject')
+    
+    # URL de retorno
+    return_url = request.GET.get('return_url')
+    if not return_url:
+        from django.urls import reverse
+        return_url = reverse('containers:student_panel')
+        
+    context = {
+        'token': token.key,
+        'images': images,
+        'available_subjects': subjects,
+        'user_projects': user_projects,
+        'return_url': return_url,
+    }
+    
+    return render(request, 'containers/api_command_generator.html', context)

@@ -135,11 +135,13 @@ class UserProfile(models.Model):
         """
         Obtiene el usuario asociado a un token JWT.
         
+        SEGURIDAD: Valida el token contra la base de datos para permitir revocación efectiva.
+        
         Args:
             token (str): Token JWT a validar
         
         Returns:
-            User: Usuario asociado al token, o None si el token es invalido
+            User: Usuario asociado al token, o None si el token es inválido o revocado
         """
         try:
             secret_key = settings.SECRET_KEY
@@ -149,7 +151,24 @@ class UserProfile(models.Model):
             if user_id:
                 from django.contrib.auth import get_user_model
                 User = get_user_model()
-                return User.objects.get(id=user_id)
+                user = User.objects.get(id=user_id)
+                
+                # SEGURIDAD CRÍTICA: Validar que el token coincida con el almacenado en BD
+                # Esto permite revocación efectiva de tokens
+                try:
+                    user_profile = UserProfile.objects.get(user=user)
+                    stored_token = user_profile.bearer_token
+                    
+                    # Comparar token recibido con el almacenado
+                    if stored_token != token:
+                        # Token no coincide = fue revocado/regenerado
+                        return None
+                    
+                except UserProfile.DoesNotExist:
+                    # Usuario sin perfil = no autenticado
+                    return None
+                
+                return user
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, Exception):
             return None
         

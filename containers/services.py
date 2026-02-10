@@ -30,7 +30,7 @@ COMPOSE_EXTENSIONS = {".yml", ".yaml"}
 CODE_EXTENSIONS = {".zip", ".rar"}
 
 EXECUTOR = ThreadPoolExecutor(
-    max_workers=int(os.environ.get("SERVICE_WORKERS", "2"))
+    max_workers=int(os.environ.get("SERVICE_WORKERS", "10"))
 )
 
 SERVICE_WORKSPACES_ROOT = Path(getattr(settings, "SERVICE_WORKSPACES_ROOT", Path(settings.MEDIA_ROOT) / "services"))
@@ -49,19 +49,44 @@ def ensure_service_workspace(service: Service) -> Path:
 
 
 def cleanup_service_workspace(service: Service) -> None:
-    """Elimina completamente el workspace del servicio"""
-    workspace = SERVICE_WORKSPACES_ROOT / str(service.pk)
+    """Elimina completamente el workspace y cualquier rastro del servicio en media/"""
+    import time
+    import stat
+    import os
+    import shutil
+    from pathlib import Path
+
+    sid = str(service.id)
+    workspace = SERVICE_WORKSPACES_ROOT / sid
+    
     if workspace.exists():
-        shutil.rmtree(workspace, ignore_errors=True)
+        for attempt in range(3):
+            try:
+                # En Windows a veces hay problemas de permisos con archivos de solo lectura dentro de .git o similares
+                if os.name == 'nt':
+                    for root, dirs, files in os.walk(workspace):
+                        for d in dirs:
+                            try: os.chmod(os.path.join(root, d), stat.S_IRWXU)
+                            except: pass
+                        for f in files:
+                            try: os.chmod(os.path.join(root, f), stat.S_IRWXU)
+                            except: pass
+                
+                shutil.rmtree(workspace)
+                break
+            except Exception:
+                if attempt < 2: 
+                    time.sleep(1)
+                else: 
+                    # Último intento: forzar borrado ignorando errores
+                    shutil.rmtree(workspace, ignore_errors=True)
 
 
 def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> Path:
     """
     Prepara el workspace del servicio asegurando que:
     1. Todos los archivos (Dockerfile, docker-compose.yml) estén en services/<id>/
-    2. El código fuente esté descomprimido según el modo:
-       - Dockerfile: descomprime en services/<id>/ (mismo nivel que Dockerfile)
-       - Compose: descomprime en services/<id>/src/
+    2. El código fuente esté descomprimido en services/<id>/
     
     Retorna el Path del workspace.
     """
@@ -73,46 +98,77 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> 
         "compose": "docker-compose.yml",
     }
     updated_fields = []
+    from django.core.files.storage import default_storage
+    from django.core.files.base import ContentFile
     
     for field, filename in mapping.items():
         ff = getattr(service, field, None)
         if not ff:
             continue
         
-        # Ruta esperada en el workspace
-        desired_rel = f"services/{service.pk}/{filename}"
-        
-        # Si el FileField no apunta a la ruta correcta, moverlo
-        if ff.name != desired_rel:
-            with ff.open("rb") as fh:
-                getattr(service, field).save(desired_rel, fh, save=False)
-            updated_fields.append(field)
-        
-        # Asegurar que existe una copia física en el workspace
+        # Ruta física deseada
         dest = workspace / filename
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        with ff.open("rb") as source, open(dest, "wb") as target:
-            shutil.copyfileobj(source, target)
-    
+        desired_rel = f"services/{service.id}/{filename}"
+        
+        # Caso A: El archivo ya está en el sitio correcto y existe físicamente
+        if ff.name == desired_rel and dest.exists():
+            continue
+            
+        # Caso B: El archivo necesita ser movido o copiado
+        try:
+            # Si el archivo está en 'tmp/', lo leemos y movemos
+            content = ff.read()
+            
+            # 1. Si el nombre en DB está mal (ej. apunta a 'tmp/'), actualizarlo
+            if ff.name != desired_rel:
+                old_path = ff.name
+                ff.save(desired_rel, ContentFile(content), save=False)
+                updated_fields.append(field)
+                
+                # Intentar borrar el rastro viejo (especialmente útil para limpiar services/tmp/)
+                if old_path and old_path != desired_rel:
+                    try: 
+                        if default_storage.exists(old_path):
+                            default_storage.delete(old_path)
+                    except: pass
+            
+            # 2. Asegurar que el archivo existe físicamente en el workspace
+            if not dest.exists():
+                with open(dest, "wb") as f_out:
+                    f_out.write(content)
+                    
+        except Exception as e:
+            print(f"[warning] Error preparando {field}: {e}")
+            continue
+
     if updated_fields:
         service.save(update_fields=updated_fields)
     
     # Descomprimir código si existe
     if unpack_code and service.code:
         code_ext = os.path.splitext(service.code.name or "")[1] or ".zip"
-        code_rel = f"services/{service.pk}/source{code_ext}"
-        if service.code.name != code_rel:
-            with service.code.open("rb") as fh:
-                service.code.save(code_rel, fh, save=False)
+        code_rel = f"services/{service.id}/source{code_ext}"
+        code_dest_phys = workspace / f"source{code_ext}"
+        
+        # Si el código no está en su sitio o es un temporal, moverlo
+        if service.code.name != code_rel or not code_dest_phys.exists():
+            old_code_path = service.code.name
+            with service.code.open("rb") as f_in:
+                content = f_in.read()
+                service.code.save(code_rel, ContentFile(content), save=False)
             service.save(update_fields=["code"])
+            
+            if old_code_path and old_code_path != code_rel:
+                try: 
+                    if default_storage.exists(old_code_path):
+                        default_storage.delete(old_code_path)
+                except: pass
+            
+            # Asegurar copia física para descompresión
+            with open(code_dest_phys, "wb") as f_out:
+                f_out.write(content)
         
-        # SIEMPRE descomprimir en la raíz del workspace
-        # Esto funciona para:
-        # - Dockerfile: COPY requirements.txt funciona
-        # - Compose: build context "." encuentra Dockerfile y archivos
-        code_target = workspace
-        
-        # Limpiar archivos de código previos pero mantener Dockerfile/compose
+        # Limpiar archivos previos pero mantener los estructurales
         for item in workspace.iterdir():
             if item.name not in ["Dockerfile", "docker-compose.yml", "source.zip", "source.rar"]:
                 if item.is_file():
@@ -120,7 +176,8 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> 
                 elif item.is_dir() and item.name not in [".vs"]:
                     shutil.rmtree(item)
         
-        _unpack_code_archive_to(str(code_target), service.code)
+        # Descomprimir usando la ruta física para evitar errores de reapertura
+        _unpack_code_archive_to(str(workspace), archive_path=str(code_dest_phys))
     
     return workspace
 
@@ -140,6 +197,45 @@ def _compose_cmd() -> list[str]:
         except Exception:
             continue
     raise RuntimeError("No se encontró 'docker compose' (v2) ni 'docker-compose' (v1).")
+
+
+def _get_compose_project_name(service) -> str:
+    """
+    Genera un nombre de proyecto descriptivo para Docker Compose.
+    Formato: usuario_proyecto_servicio (o svc{id} como fallback)
+    
+    Reglas de Docker:
+    - Solo letras minúsculas, números, guiones y guiones bajos
+    - No puede empezar con guión
+    - No puede tener guiones consecutivos o al final
+    """
+    try:
+        # Intentar construir nombre descriptivo
+        username = service.owner.username if service.owner else "user"
+        project_name = service.project.place if service.project else "project"
+        service_name = service.name or f"svc{service.id}"
+        
+        # Sanitizar cada parte
+        def sanitize(text):
+            # Convertir a minúsculas
+            text = text.lower()
+            # Reemplazar espacios y caracteres especiales por guión bajo
+            text = re.sub(r'[^a-z0-9_-]', '_', text)
+            # Eliminar guiones/guiones bajos al inicio y final
+            text = text.strip('_-')
+            # Reemplazar múltiples guiones/guiones bajos consecutivos por uno solo
+            text = re.sub(r'[-_]+', '_', text)
+            return text or "unnamed"
+        
+        username = sanitize(username)
+        project_name = sanitize(project_name)
+        service_name = sanitize(service_name)
+        
+        # Formato: usuario_proyecto_servicio
+        return f"{username}_{project_name}_{service_name}"
+    except Exception:
+        # Fallback al formato antiguo si algo falla
+        return f"svc{service.id}"
 
 
 def _extract_container_port_info(container):
@@ -320,6 +416,139 @@ def _ensure_compose_ports(data: dict, previous_map: dict[str, dict[tuple[int, st
     return reserved_now
 
 
+def sync_service_status(service: Service):
+    """
+    Sincroniza el estado del servicio con Docker de forma proactiva.
+    
+    Rescata servicios estancados en estados transitorios (pending, starting, etc.)
+    si Docker ya informa de un estado estable.
+    """
+    # Ignorar servicios eliminados - no deben ser "resucitados"
+    if service.status == "removed":
+        return
+        
+    # Ignorar servicios en estados transitorios críticos (stopping, deleting)
+    # para evitar sobrescribirlos con el estado actual de Docker durante la operación asíncrona
+    if service.status in ["stopping", "deleting"]:
+        return
+
+    docker_client = get_docker_client()
+    if docker_client is None:
+        return
+
+    if service.has_compose:
+        # ===== SINCRONIZACIÓN COMPOSE =====
+        project = _get_compose_project_name(service)
+        
+        try:
+            containers = docker_client.containers.list(
+                all=True, 
+                filters={"label": f"com.docker.compose.project={project}"}
+            )
+            
+
+            
+            if not containers:
+
+                return
+
+            all_running = True
+            any_running = False
+            for ctr in containers:
+                ctr.reload()
+                status = (ctr.status or "").lower()
+                
+                # Un contenedor está "listo" si está corriendo O si ha terminado con éxito (exit code 0)
+                exit_code = ctr.attrs.get('State', {}).get('ExitCode', 0)
+                is_ready = (status == "running") or (status == "exited" and exit_code == 0)
+                
+
+                
+                if status == "running":
+                    any_running = True
+                
+                if not is_ready:
+                    all_running = False
+                
+                svc_name = ctr.labels.get("com.docker.compose.service") or ctr.name
+                if svc_name == "principal": continue
+                
+                internal_ports, assigned_ports = _extract_container_port_info(ctr)
+                
+                # Sincronizar ServiceContainer records
+                ServiceContainer.objects.update_or_create(
+                    service=service,
+                    name=svc_name,
+                    defaults={
+                        "container_id": ctr.id,
+                        "status": status,
+                        "internal_ports": internal_ports,
+                        "assigned_ports": assigned_ports,
+                    }
+                )
+
+
+
+            # Si PaaSify cree que no corre pero Docker dice que TODO corre, rescatarlo.
+            # Solo pasamos a 'running' si ABSOLUTAMENTE TODOS los contenedores están listos.
+            if any_running and all_running and service.status != "running":
+
+                service.status = "running"
+                if not service.container_id:
+                    service.container_id = containers[0].id
+                service.save(update_fields=["status", "container_id"])
+            elif not any_running and service.status == "running":
+                # Si PaaSify cree que corre pero Docker dice que no hay ninguno
+
+                service.status = "stopped"
+                service.save(update_fields=["status"])
+            else:
+                pass
+                
+        except Exception as e:
+            print(f"[sync_service_status] Error sincronizando servicio Compose {service.id}: {e}")
+            import traceback
+            traceback.print_exc()
+    else:
+        # ===== SINCRONIZACIÓN SIMPLE =====
+        if not service.container_id:
+            return
+
+        try:
+            container = docker_client.containers.get(service.container_id)
+            container.reload()
+            docker_status = (container.status or "").lower()
+            
+            # RESCATE: Si está running, forzar estado running
+            if docker_status == "running" and service.status != "running":
+                service.status = "running"
+                # Intentar recuperar puerto si se perdió
+                if not service.assigned_port:
+                    _, assigned = _extract_container_port_info(container)
+                    if assigned:
+                        service.assigned_port = assigned[0].get("external")
+                service.save()
+                return
+
+            # CIERRE: Si está muerto, forzar estado stopped/error
+            if docker_status in {"exited", "dead", "stopped"}:
+                if service.status not in {"stopped", "error", "removed", "deleting"}:
+                    service.status = "stopped"
+                    service.save(update_fields=["status"])
+                return
+
+            # Respetar estados transitorios de PaaSify si Docker no dice lo contrario
+            if service.status in {"building", "pulling", "deleting", "creating"}:
+                return
+                
+        except NotFound:
+            if service.status != "deleting":
+                service.status = "removed"
+                service.save()
+        except DockerException:
+            pass
+
+
 # ==================== PORT MANAGEMENT ====================
 
 def _release_port(port: int | None):
@@ -361,6 +590,59 @@ def _append_log(service: Service, message: str) -> None:
         service.logs = f"{current.rstrip()}\n{message}"
     else:
         service.logs = message
+
+
+def _run_command_stream_logs(service: Service, cmd: list[str], cwd: str = None):
+    """
+    Ejecuta un comando y va guardando la salida en los logs del servicio en tiempo real.
+    """
+    import subprocess
+    import sys
+    import os
+    import time
+    
+    _append_log(service, f"> {' '.join(cmd)}")
+    service.save(update_fields=["logs"])
+    
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            cwd=cwd,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            bufsize=1,
+            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+        )
+        
+        last_save = time.time()
+        line_count = 0
+        
+        # Leer línea a línea
+        for line in process.stdout:
+            if line:
+                _append_log(service, line.strip())
+                line_count += 1
+                
+                # Guardar cada segundo o cada 15 líneas para no saturar DB
+                now = time.time()
+                if now - last_save > 1.0 or line_count >= 15:
+                    service.save(update_fields=["logs"])
+                    last_save = now
+                    line_count = 0
+                
+        process.wait()
+        service.save(update_fields=["logs"]) # Asegurar guardado final
+        
+        if process.returncode != 0:
+            raise RuntimeError(f"El comando falló con código {process.returncode}")
+            
+    except Exception as e:
+        _append_log(service, f"ERROR al ejecutar comando: {str(e)}")
+        service.save(update_fields=["logs"])
+        raise
 
 
 def _service_slug(service: Service) -> str:
@@ -479,30 +761,39 @@ def _save_filefield_to(tmp_path: str, ff) -> str:
     return tmp_path
 
 
-def _unpack_code_archive_to(target_dir: str, ff) -> None:
+def _unpack_code_archive_to(target_dir: str, ff=None, archive_path=None) -> None:
     """
-    Descomprime un archivo de codigo (zip o rar) a 'target_dir'.
+    Descomprime un archivo de código (zip o rar) a 'target_dir'.
+    Puede recibir un FileField (ff) o una ruta física (archive_path).
     """
     os.makedirs(target_dir, exist_ok=True)
-    name = getattr(ff, "name", "") or ""
-    extension = os.path.splitext(name)[1].lower()
-    tmp_path = os.path.join(target_dir, f"_code{extension or '.tmp'}")
-    _save_filefield_to(tmp_path, ff)
-
-    if extension == ".rar":
-        try:
-            _extract_rar_with_tool(tmp_path, target_dir)
-        finally:
-            if os.path.exists(tmp_path):
-                os.remove(tmp_path)
-        return
+    
+    if archive_path and os.path.exists(archive_path):
+        tmp_path = archive_path
+        # No borraremos el archivo original si nos dan archive_path
+        should_delete_tmp = False
+        extension = os.path.splitext(archive_path)[1].lower()
+    elif ff:
+        name = getattr(ff, "name", "") or ""
+        extension = os.path.splitext(name)[1].lower()
+        tmp_path = os.path.join(target_dir, f"_code_tmp{extension or '.tmp'}")
+        _save_filefield_to(tmp_path, ff)
+        should_delete_tmp = True
+    else:
+        raise ValueError("Se debe proporcionar al menos 'ff' o 'archive_path'")
 
     try:
-        shutil.unpack_archive(tmp_path, target_dir)
-    except Exception as exc:
-        raise RuntimeError(f"No se pudo descomprimir el archivo: {exc}") from exc
+        if extension == ".rar":
+            _extract_rar_with_tool(tmp_path, target_dir)
+        else:
+            try:
+                shutil.unpack_archive(tmp_path, target_dir)
+            except Exception as exc:
+                raise RuntimeError(f"No se pudo descomprimir el archivo: {exc}") from exc
     finally:
-        os.remove(tmp_path)
+        if should_delete_tmp and os.path.exists(tmp_path):
+            try: os.remove(tmp_path)
+            except: pass
 
 
 def _extract_rar_with_tool(tmp_path: str, target_dir: str) -> None:
@@ -520,14 +811,14 @@ def _extract_rar_with_tool(tmp_path: str, target_dir: str) -> None:
     extract_cmd = [UNRAR_TOOL, "x", tmp_path, f"-o{target_dir}", "-y"]
 
     try:
-        proc_test = subprocess.run(test_cmd, capture_output=True, text=True, check=True)
+        proc_test = subprocess.run(test_cmd, capture_output=True, text=True, check=True, encoding='utf-8', errors='replace')
     except subprocess.CalledProcessError as exc:
         raise RuntimeError("El archivo RAR esta incompleto o dañado. Intentalo de nuevo.") from exc
     if proc_test.stdout:
         _ = proc_test.stdout  # silencio lint
 
     try:
-        subprocess.run(extract_cmd, capture_output=True, text=True, check=True)
+        subprocess.run(extract_cmd, capture_output=True, text=True, check=True, encoding='utf-8', errors='replace')
     except subprocess.CalledProcessError as exc:
         raise RuntimeError("El archivo RAR esta incompleto o dañado. Intentalo de nuevo.") from exc
 
@@ -589,14 +880,21 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool):
     Ejecuta un servicio docker-compose.
     Crea ServiceContainer records para cada contenedor.
     """
+    service.status = "starting"
+    _append_log(service, "--- Iniciando proceso de despliegue Compose ---")
+    service.save(update_fields=["status", "logs"])
+
     try:
+        # 1. Preparar workspace
+        _append_log(service, "[1/3] Preparando archivos y workspace...")
         workspace = prepare_service_workspace(service)
         compose_path = workspace / "docker-compose.yml"
         
         if not compose_path.exists():
             raise RuntimeError("No se encontró docker-compose.yml en el workspace del servicio.")
         
-        # Cargar y procesar puertos
+        # 2. Cargar y procesar puertos
+        _append_log(service, "[2/3] Validando configuración y reservando puertos...")
         data = _load_compose_data(compose_path)
         previous_ports = _previous_port_assignments(service)
         reserved_ports = _ensure_compose_ports(data, previous_ports)
@@ -605,39 +903,26 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool):
         with compose_path.open("w", encoding="utf-8") as fh:
             yaml.dump(data, fh)
         
-        # Ejecutar docker compose desde workspace
-        project = f"svc{service.id}"
+        # 3. Ejecutar docker compose
+        project = _get_compose_project_name(service)
         cmd = _compose_cmd() + ["-p", project, "-f", str(compose_path), "up", "--build", "-d"]
         
-        _append_log(service, f"Ejecutando: {' '.join(cmd)}")
-        _append_log(service, f"Workspace: {workspace}")
+        _append_log(service, f"[3/3] Ejecutando orquestación (Proyecto: {project})...")
         service.save(update_fields=["logs"])
         
-        proc = subprocess.run(
-            cmd, 
-            cwd=str(workspace),  # ← IMPORTANTE: ejecutar desde workspace
-            check=True, 
-            capture_output=True, 
-            text=True,
-            encoding='utf-8',  # ← FIX: Evitar UnicodeDecodeError en Windows
-            errors='replace'    # ← FIX: Reemplazar caracteres inválidos
-        )
-        stdout = proc.stdout or ""
-        stderr = proc.stderr or ""
+        # Limpiar registros previos de ServiceContainer para evitar duplicados/basura
+        service.containers.all().delete()
         
-        _append_log(service, f"STDOUT: {stdout}")
-        _append_log(service, f"STDERR: {stderr}")
-        service.save(update_fields=["logs"])
+        _run_command_stream_logs(service, cmd, cwd=str(workspace))
         
-    except subprocess.CalledProcessError as e:
+    except (subprocess.CalledProcessError, RuntimeError) as e:
         # Liberar puertos reservados si falla
         for port in reserved_ports:
             _release_port(port)
         service.status = "error"
-        error_msg = (e.stderr or e.stdout or str(e)).strip()
-        _append_log(service, f"ERROR subprocess: {error_msg}")
+        _append_log(service, f"ERROR: {str(e)}")
         service.save()
-        raise RuntimeError(f"Error al ejecutar docker compose:\n{error_msg}")
+        raise
     except Exception as e:
         service.status = "error"
         _append_log(service, f"ERROR general: {str(e)}")
@@ -683,9 +968,19 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool):
     
     # Actualizar Service
     service.container_id = containers[0].id  # Contenedor principal para compatibilidad
-    service.status = "running"
-    _append_log(service, "docker-compose up -d completado.")
+    
+    # Esperar 3 segundos para dar tiempo a que los contenedores se estabilicen
+    # antes de que sync_service_status los verifique
+    import time
+    _append_log(service, "Esperando 3 segundos para estabilización de contenedores...")
+    time.sleep(3)
+    
+    # Dejar en 'starting' para que sync_service_status haga la transición a 'running'
+    # cuando verifique que todos los contenedores están realmente listos.
+    # Esto evita condiciones de carrera donde marcamos como running antes de tiempo.
+    _append_log(service, "docker-compose up ejecutado. Verificando estado de contenedores...")
     service.save()
+
 
 
 def _run_simple_service(service: Service, docker_client, force_restart: bool, custom_port: int | None, command: list[str] | None):
@@ -713,13 +1008,19 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
         # Si ya existe y no es reinicio, asegurar que esté en marcha y salir
         if service.container_id and not force_restart:
             try:
+                _append_log(service, f"Intentando arrancar contenedor existente: {service.container_id}")
                 container = docker_client.containers.get(service.container_id)
                 if container.status != "running":
                     container.start()
                     service.status = "running"
-                    service.save()
+                    _append_log(service, "Contenedor arrancado (reutilizado).")
+                    service.save(update_fields=["status", "logs", "updated_at"])
+                else:
+                    service.status = "running"
+                    service.save(update_fields=["status", "updated_at"])
                 return
             except NotFound:
+                _append_log(service, "Contenedor previo no encontrado en Docker, se creará uno nuevo.")
                 service.container_id = None
             except DockerException as exc:
                 service.logs = f"Error al consultar el contenedor existente: {exc}"
@@ -748,27 +1049,26 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
                 raise RuntimeError("No se encontró Dockerfile en el workspace del servicio.")
             
             image_tag = f"svc_{service.id}_{slug}_image"
-            try:
-                proc = subprocess.run(
-                    ["docker", "build", "-t", image_tag, str(workspace)],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-                build_out = (proc.stdout or "") + "\n" + (proc.stderr or "")
-            except subprocess.CalledProcessError as e:
-                build_out = (e.stdout or "") + "\n" + (e.stderr or "")
-                service.status = "error"
-                service.logs = build_out.strip() or str(e)
-                service.save(update_fields=["status", "logs"])
-                raise RuntimeError(f"Error al construir la imagen:\n{service.logs}")
+            service.status = "building"
+            _append_log(service, "Construyendo imagen personalizada...")
+            service.save(update_fields=["status", "logs"])
+            
+            _run_command_stream_logs(service, ["docker", "build", "-t", image_tag, str(workspace)])
 
             image_to_run = image_tag
-            service.logs = ("docker build completado.\n" + build_out).strip()
+            _append_log(service, "Imagen construida correctamente.")
             service.save(update_fields=["logs"])
         else:
             # --------- Caso imagen directa del catálogo ---------
             image_to_run = service.image
+            service.status = "pulling"
+            _append_log(service, f"Descargando imagen: {image_to_run}...")
+            service.save(update_fields=["status", "logs"])
+            
+            # Usamos comandos docker directamente para tener streaming de logs
+            _run_command_stream_logs(service, ["docker", "pull", image_to_run])
+            _append_log(service, "Imagen descargada.")
+            service.save(update_fields=["logs"])
 
         try:
             image_attrs = docker_client.images.get(image_to_run).attrs
@@ -776,19 +1076,11 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
         except DockerException:
             image_cmd = None
 
-        # --------- Variables y volúmenes ---------
-        volume_name = service.volume_name or f"svc_{service.id}_{slug}_data"
-        try:
-            docker_client.volumes.create(name=volume_name)
-        except APIError as e:
-            if e.response.status_code != 409:  # 409 es 'conflicto', el volumen ya existe (OK)
-                raise RuntimeError(f"No se pudo crear el volumen '{volume_name}': {e}")
-        service.volume_name = volume_name
-        volumes = {volume_name: {"bind": "/data", "mode": "rw"}}
-
-        user_vols = service.volumes or {}
-        if isinstance(user_vols, dict):
-            volumes.update(user_vols)
+        # --------- Variables (volúmenes DESHABILITADOS por seguridad) ---------
+        # SEGURIDAD CRÍTICA: Los volúmenes están completamente deshabilitados en contenedores simples
+        # para prevenir escalada de privilegios mediante bind mounts.
+        # Solo se permiten volúmenes nombrados en Docker Compose con validación estricta.
+        volumes = None  # NO crear volúmenes automáticamente
 
         env_vars_raw = service.env_vars or {}
         if not isinstance(env_vars_raw, dict):
@@ -807,7 +1099,9 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
         
         # Nombre descriptivo: usar nombre del servicio o slug como fallback
         safe_name = re.sub(r'[^a-z0-9_-]', '_', (service.name or slug).lower())
-        container_name = f"{safe_name}_ctr"
+        container_name = f"{safe_name}_{service.id}_ctr"
+
+        _append_log(service, f"Arrancando nuevo contenedor: {container_name}")
 
         normalized_command = command
         if isinstance(normalized_command, (list, tuple)):
@@ -836,6 +1130,7 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
             volumes=volumes or None,
             environment=env_vars or None,
         )
+        _append_log(service, "Contenedor creado, esperando verificación...")
         _ensure_container_running(service, container, port)
 
         service.container_id = container.id
@@ -859,13 +1154,25 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
 def _run_container_worker(
     service_id: int, force_restart: bool, custom_port: int | None, command: list[str] | None
 ) -> None:
+    service = None
     try:
         service = Service.objects.get(pk=service_id)
+        _run_container_internal(
+            service, force_restart=force_restart, custom_port=custom_port, command=command
+        )
     except Service.DoesNotExist:
         return
-    _run_container_internal(
-        service, force_restart=force_restart, custom_port=custom_port, command=command
-    )
+    except Exception as exc:
+        if service:
+            try:
+                service.status = "error"
+                _append_log(service, f"Error crítico en el worker: {str(exc)}")
+                service.save(update_fields=["status", "logs", "updated_at"])
+            except:
+                pass
+        print(f"[error] Excepción no controlada en _run_container_worker: {exc}")
+        import traceback
+        traceback.print_exc()
 
 
 def run_container(
@@ -878,6 +1185,10 @@ def run_container(
     """
     Encola la ejecucion del contenedor para no bloquear el hilo que atiende la peticion.
     """
+    # Guardar contra ejecuciones duplicadas si ya está en cola o iniciándose
+    if service.status in ["pending", "starting"] and not force_restart:
+        return
+
     if not enqueue:
         _run_container_internal(
             service,
@@ -911,6 +1222,10 @@ def stop_container(service: Service):
     _append_log(service, "Deteniendo servicio...")
     service.save(update_fields=["status", "logs", "updated_at"])
     
+    # Pequeño delay para que el auto-refresh capture el estado 'stopping'
+    import time
+    time.sleep(1.5)
+    
     if service.has_compose:
         # ===== MODO COMPOSE: Usar docker compose stop =====
         try:
@@ -922,7 +1237,7 @@ def stop_container(service: Service):
                 service.save(update_fields=["status"])
                 raise RuntimeError("No se encontró docker-compose.yml")
             
-            project = f"svc{service.id}"
+            project = _get_compose_project_name(service)
             cmd = _compose_cmd() + ["-p", project, "-f", str(compose_path), "stop"]
             
             subprocess.run(
@@ -988,6 +1303,40 @@ def stop_container(service: Service):
             service.save()
 
 
+def _stop_container_worker(service_id: int) -> None:
+    """Worker que ejecuta stop_container en background."""
+    service = None
+    try:
+        service = Service.objects.get(pk=service_id)
+        stop_container(service)
+    except Service.DoesNotExist:
+        return
+    except Exception as exc:
+        if service:
+            try:
+                service.status = "error"
+                _append_log(service, f"Error al detener: {str(exc)}")
+                service.save(update_fields=["status", "logs", "updated_at"])
+            except:
+                pass
+        print(f"[error] Excepción en _stop_container_worker: {exc}")
+        import traceback
+        traceback.print_exc()
+
+
+def stop_container_async(service: Service) -> None:
+    """
+    Encola la detención del servicio para no bloquear el hilo HTTP.
+    """
+    # Cambiar estado a 'stopping' inmediatamente
+    service.status = "stopping"
+    _append_log(service, "Deteniendo servicio...")
+    service.save(update_fields=["status", "logs", "updated_at"])
+    
+    # Ejecutar en background
+    EXECUTOR.submit(_stop_container_worker, service.pk)
+
+
 def remove_container(service: Service):
     """
     Elimina el servicio completamente.
@@ -999,6 +1348,10 @@ def remove_container(service: Service):
     if docker_client is None:
         raise RuntimeError("Docker no está disponible para eliminar el servicio.")
 
+    # Pequeño delay para que el auto-refresh capture el estado 'deleting'
+    import time
+    time.sleep(1.5)
+
     if service.has_compose:
         # ===== MODO COMPOSE: Usar docker compose down =====
         try:
@@ -1006,7 +1359,7 @@ def remove_container(service: Service):
             compose_path = workspace / "docker-compose.yml"
             
             if compose_path.exists():
-                project = f"svc{service.id}"
+                project = _get_compose_project_name(service)
                 cmd = _compose_cmd() + [
                     "-p", project,
                     "-f", str(compose_path),
@@ -1034,6 +1387,22 @@ def remove_container(service: Service):
             
             # Eliminar registros de ServiceContainer
             service.containers.all().delete()
+            
+            # Limpiar volúmenes huérfanos (anónimos no eliminados por --volumes)
+            try:
+                prune_cmd = ["docker", "volume", "prune", "-f"]
+                subprocess.run(
+                    prune_cmd,
+                    check=False,  # No fallar si no hay volúmenes que limpiar
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace'
+                )
+                _append_log(service, "Volúmenes huérfanos limpiados")
+            except Exception as e:
+                # No es crítico si falla
+                _append_log(service, f"Advertencia al limpiar volúmenes: {str(e)}")
             
         except subprocess.CalledProcessError as e:
             error_msg = (e.stderr or e.stdout or str(e)).strip()
@@ -1094,6 +1463,40 @@ def remove_container(service: Service):
     service.volume_name = None
     service.status = "removed"
     service.save()
+
+
+def _remove_container_worker(service_id: int) -> None:
+    """Worker que ejecuta remove_container en background."""
+    service = None
+    try:
+        service = Service.objects.get(pk=service_id)
+        remove_container(service)
+    except Service.DoesNotExist:
+        return
+    except Exception as exc:
+        if service:
+            try:
+                service.status = "error"
+                _append_log(service, f"Error al eliminar: {str(exc)}")
+                service.save(update_fields=["status", "logs", "updated_at"])
+            except:
+                pass
+        print(f"[error] Excepción en _remove_container_worker: {exc}")
+        import traceback
+        traceback.print_exc()
+
+
+def remove_container_async(service: Service) -> None:
+    """
+    Encola la eliminación del servicio para no bloquear el hilo HTTP.
+    """
+    # Cambiar estado a 'deleting' inmediatamente
+    service.status = "deleting"
+    _append_log(service, "Eliminando servicio...")
+    service.save(update_fields=["status", "logs", "updated_at"])
+    
+    # Ejecutar en background
+    EXECUTOR.submit(_remove_container_worker, service.pk)
 
 
 # ==================== SERVICE CONTAINER OPERATIONS ====================

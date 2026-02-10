@@ -1,0 +1,109 @@
+# Consultas (GET)
+
+Endpoints para obtener información sobre tus recursos en PaaSify de forma clara y concisa.
+
+---
+
+### Proyectos
+
+#### 1. Listar todos mis proyectos
+
+Recupera la lista de proyectos que tienes asignados.
+
+**Endpoint:** `GET /api/projects/`
+
+**Ejemplo de respuesta:**
+
+```json
+[
+  {
+    "id": 5,
+    "name": "Proyecto Final Docker",
+    "subject": 1,
+    "subject_name": "Asignatura1",
+    "date": "2026-06-15"
+  }
+]
+```
+
+```bash
+curl -X GET "{{ PAASIFY_API_URL }}/projects/" \
+  -H "Authorization: Bearer <TU_API_TOKEN>"
+```
+
+#### 2. Listar servicios de un proyecto específico
+
+Filtra tus despliegues para ver solo los servicios asociados a un proyecto concreto.
+
+**Endpoint:** `GET /api/containers/?project={id}`
+
+---
+
+### Asignaturas
+
+#### 1. Listar todas mis asignaturas
+
+Muestra las asignaturas en las que estás matriculado.
+
+**Endpoint:** `GET /api/subjects/`
+
+**Ejemplo de respuesta:**
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Asignatura1",
+    "category": "Asignatura obligatorias",
+    "year": "2026"
+  }
+]
+```
+
+#### 2. Listar servicios de una asignatura específica
+
+Filtra tus despliegues para ver solo los servicios asociados a una asignatura.
+
+**Endpoint:** `GET /api/containers/?subject={id}`
+
+---
+
+### Servicios
+
+#### 1. Listar todos mis servicios
+
+Recupera la lista completa de todos tus servicios activos y sus estados. No incluye logs ni detalles pesados.
+
+**Endpoint:** `GET /api/containers/`
+
+#### 2. Consultar información de un servicio
+
+Obtén toda la información técnica y de red de un único servicio.
+
+> 💡 **Nota**: Este endpoint devuelve la configuración e información de estado. Para ver la salida de consola (logs), usa el endpoint específico de Logs en la sección de [Acciones](#logs).
+
+**Endpoint:** `GET /api/containers/{id}/`
+
+```bash
+curl -X GET "{{ PAASIFY_API_URL }}/containers/{id}/" \
+  -H "Authorization: Bearer <TU_API_TOKEN>"
+```
+
+---
+
+### Códigos de Respuesta Comunes
+
+<details class="api-errors">
+<summary>Posibles respuestas en consultas de obtención (GET)</summary>
+<div class="api-error-content">
+    <strong>200 OK:</strong> Consulta exitosa. Se devuelve el recurso o listado solicitado.<br>
+    <strong>400 Bad Request:</strong> Parátmetros de filtrado incorrectos (ej: ID de proyecto no numérico).<br>
+    <strong>401 Unauthorized:</strong> Permiso denegado. Token faltante, inválido o expirado.<br>
+    <strong>404 Not Found:</strong> El recurso específico (ej: `/api/containers/999/`) no existe.<br>
+    <strong>405 Method Not Allowed:</strong> Estás intentando hacer un POST, PUT o DELETE en un endpoint que solo permite GET.<br>
+    <strong>415 Unsupported Media Type:</strong> No has especificado `Content-Type: application/json` en el caso de querer enviar datos.<br>
+    <strong>500 Internal Server Error:</strong> Error interno del servidor.
+</div>
+</details>
+
+> 💡 **Tratamiento de Datos**: Cuando realizas una petición incorrecta (GET con filtros inválidos o POST con datos mal formados), la API te devolverá un JSON con el detalle del error en el campo `error` o campos específicos de validación, facilitando así la depuración de tu cliente o script.

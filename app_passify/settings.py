@@ -62,21 +62,22 @@ INSTALLED_APPS = [
     'colorfield',
     'rest_framework',
     'rest_framework_simplejwt',
+    # 'rest_framework.authtoken',  # DESHABILITADO: Ahora usamos ExpiringToken (paasify.models.TokenModel)
     'drf_spectacular',
     'channels',
 ]
 
 # ---------------------------------------------------------------------
-# Middleware (añadimos WhiteNoise para estáticos en prod)
+# Middleware (aÃ±adimos WhiteNoise para estÃ¡ticos en prod)
 # ---------------------------------------------------------------------
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # <— IMPORTANTE
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # <â€” IMPORTANTE
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'paasify.middleware.TokenAuthMiddleware',  # <— Token JWT para API
+    'paasify.middleware.TokenAuthMiddleware',  # <â€” Token JWT para API
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -104,6 +105,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'paasify.context_processors.role_flags',
+                'paasify.context_processors.global_settings',
             ],
         },
     },
@@ -139,12 +141,20 @@ USE_L10N = True
 USE_TZ = True
 
 # ---------------------------------------------------------------------
-# Archivos estáticos (CSS/JS/Imágenes)
+# ConfiguraciÃ³n de URL Base (para API y DocumentaciÃ³n)
 # ---------------------------------------------------------------------
-# URL pública
+# Permite fijar el dominio/IP de la plataforma (ej: https://passify-urjc.es)
+# Si se deja vacÃ­o, se detectarÃ¡ dinÃ¡micamente desde la peticiÃ³n.
+PAASIFY_BASE_URL = os.environ.get("PAASIFY_BASE_URL", "").rstrip("/")
+
+
+# ---------------------------------------------------------------------
+# Archivos estÃ¡ticos (CSS/JS/ImÃ¡genes)
+# ---------------------------------------------------------------------
+# URL pÃºblica
 STATIC_URL = '/static/'
 
-# Carpeta real donde tienes "assets" (paasify/static/assets/…)
+# Carpeta real donde tienes "assets" (paasify/static/assets/â€¦)
 STATICFILES_DIRS = [
     BASE_DIR / "paasify" / "static",
 ]
@@ -152,11 +162,11 @@ STATICFILES_DIRS = [
 # Carpeta a la que colecta en despliegue
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# WhiteNoise: compresión y versionado (recomendado)
+# WhiteNoise: compresiÃ³n y versionado (recomendado)
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-WHITENOISE_USE_FINDERS = True  # útil en dev para localizar estáticos dentro de apps
+WHITENOISE_USE_FINDERS = True  # Ãºtil en dev para localizar estÃ¡ticos dentro de apps
 
-# Silenciar warnings de archivos estáticos duplicados (no afectan funcionalidad)
+# Silenciar warnings de archivos estÃ¡ticos duplicados (no afectan funcionalidad)
 SILENCED_SYSTEM_CHECKS = ['staticfiles.W004']
 
 # ---------------------------------------------------------------------
@@ -167,9 +177,6 @@ _default_media_root = BASE_DIR / "media"
 MEDIA_ROOT = Path(os.environ.get("DJANGO_MEDIA_ROOT", _default_media_root))
 MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
-USER_UPLOADS_DIR = MEDIA_ROOT / "user_code"
-USER_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-
 # ---------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------
@@ -179,6 +186,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # DRF / JWT / Schema
 # ---------------------------------------------------------------------
 REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+    ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
@@ -199,3 +209,8 @@ LOGOUT_REDIRECT_URL = '/paasify/login/'
 JAZZMIN_SETTINGS = {
     "welcome_sign": "Bienvenido"
 }
+APPEND_SLASH=False
+
+APPEND_SLASH = False
+
+APPEND_SLASH = False
