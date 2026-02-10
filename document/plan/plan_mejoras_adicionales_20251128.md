@@ -296,6 +296,34 @@ Agregar columna con última conexión del usuario del perfil.
 
 ---
 
+#### Mejora 5.4: Imagen de Perfil (Avatar)
+**Prioridad:** Baja  
+**Complejidad:** Media
+
+**Descripción:**
+Permitir a los alumnos cargar una imagen de perfil personalizada que reemplace el círculo de iniciales.
+
+**Implementación:**
+- Campo `ImageField` en `UserProfile`.
+- Validación de tamaño y formato.
+- Redimensionado automático.
+
+---
+
+#### Mejora 5.5: Contraseña Temporal (One-time use)
+**Prioridad:** Baja  
+**Complejidad:** Alta
+
+**Descripción:**
+Permitir a un administrador establecer una contraseña temporal que obligue al alumno a cambiarla en su primer login, exigiendo complejidad (Mayus/Minus/Num/Simbolo).
+
+**Implementación:**
+- Flag `must_change_password` en `UserProfile`.
+- Middleware de redirección forzosa.
+- Validadores de complejidad de Django.
+
+---
+
 ### 📁 UserProject Admin (Fase 6)
 
 #### Mejora 6.1: Filtro por Estado del Proyecto
@@ -459,6 +487,8 @@ Implementar permisos más específicos:
 5. Filtro por estado del proyecto
 6. Auditoría de cambios
 7. Confirmación de acciones críticas
+8. Imagen de perfil (UserProfile)
+9. Contraseña temporal y forzado de cambio
 
 ### Media Prioridad (Considerar):
 1. Exportación de usuarios

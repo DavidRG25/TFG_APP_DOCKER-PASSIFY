@@ -49,6 +49,48 @@ class UserProjectInlineForProfile(admin.TabularInline):
     fk_name = "user_profile"
     extra = 0  # No crear formularios vacíos automáticamente
     autocomplete_fields = ("subject",)
+    readonly_fields = ('get_services_deployed',)
+    
+    def get_services_deployed(self, obj):
+        """Muestra los servicios desplegados en este proyecto"""
+        if not obj or not obj.pk:
+            return "-"
+        
+        from containers.models import Service
+        from django.utils.html import format_html
+        
+        # Obtener servicios del proyecto (mismo usuario y asignatura)
+        services = Service.objects.filter(
+            owner=obj.user_profile.user,
+            subject=obj.subject
+        ).exclude(status='removed')
+        
+        count = services.count()
+        
+        if count == 0:
+            return format_html('<span style="color: gray;">Sin servicios</span>')
+        
+        # Crear lista de servicios con iconos de estado
+        services_html = []
+        for service in services:
+            if service.status == 'running':
+                icon = '🟢'
+                color = 'green'
+            elif service.status == 'stopped':
+                icon = '🔴'
+                color = 'red'
+            else:
+                icon = '🟡'
+                color = 'orange'
+            
+            services_html.append(
+                f'<span style="color: {color};">{icon} {service.name}</span>'
+            )
+        
+        return format_html('<br>'.join(services_html))
+    
+    get_services_deployed.short_description = 'Servicios Desplegados'
+
 
 
 #  Subject (Asignaturas)
@@ -1252,4 +1294,82 @@ class UserProjectAdmin(admin.ModelAdmin):
 # Desregistrar el UserAdmin por defecto y registrar el personalizado
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)
+
+# Desregistrar el admin de DRF Token (usamos ExpiringToken en su lugar)
+from rest_framework.authtoken.models import Token as DRFToken
+try:
+    admin.site.unregister(DRFToken)
+except admin.sites.NotRegistered:
+    pass  # Si no está registrado, no hacer nada
+
+
+# =====================================================================
+# ExpiringToken Admin (Tokens de API con expiración)
+# =====================================================================
+
+from paasify.models.TokenModel import ExpiringToken
+
+@admin.register(ExpiringToken)
+class ExpiringTokenAdmin(admin.ModelAdmin):
+    """
+    Admin para gestión de tokens de API con expiración de 30 días.
+    """
+    list_display = [
+        'user',
+        'key_preview',
+        'created',
+        'expires_at',
+        'status_display',
+        'days_remaining'
+    ]
+    list_filter = ['created', 'expires_at']
+    search_fields = ['user__username', 'key']
+    readonly_fields = ['key', 'created', 'expires_at']
+    ordering = ['-created']
+    
+    def key_preview(self, obj):
+        """Mostrar preview del token (primeros 10 caracteres)"""
+        return f"{obj.key[:10]}..."
+    key_preview.short_description = 'Token (preview)'
+    
+    def status_display(self, obj):
+        """Mostrar estado del token (activo/expirado)"""
+        if obj.is_expired():
+            return format_html(
+                '<span style="color: red; font-weight: bold;">❌ Expirado</span>'
+            )
+        else:
+            return format_html(
+                '<span style="color: green; font-weight: bold;">✅ Activo</span>'
+            )
+    status_display.short_description = 'Estado'
+    
+    def days_remaining(self, obj):
+        """Mostrar días restantes hasta expiración"""
+        if obj.is_expired():
+            return format_html('<span style="color: red;">0 días</span>')
+        days = obj.days_until_expiration()
+        if days is None:
+            return 'Sin expiración'
+        
+        # Color según días restantes
+        if days <= 7:
+            color = 'red'
+        elif days <= 15:
+            color = 'orange'
+        else:
+            color = 'green'
+        
+        return format_html(
+            f'<span style="color: {color}; font-weight: bold;">{days} días</span>'
+        )
+    days_remaining.short_description = 'Días restantes'
+    
+    def has_add_permission(self, request):
+        """Permitir crear tokens desde admin"""
+        return True
+    
+    def has_delete_permission(self, request, obj=None):
+        """Permitir eliminar tokens (revocar)"""
+        return True
 

@@ -23,6 +23,22 @@ def profile_view(request):
     except UserProfile.DoesNotExist:
         profile = None
     
+    # Obtener token de API (ExpiringToken)
+    api_token_data = None
+    try:
+        from paasify.models.TokenModel import ExpiringToken
+        token = ExpiringToken.objects.get(user=user)
+        api_token_data = {
+            'key': token.key,
+            'masked': f"...{token.key[-8:]}",
+            'created': token.created,
+            'expires_at': token.expires_at,
+            'days_remaining': token.days_until_expiration(),
+            'is_expired': token.is_expired(),
+        }
+    except ExpiringToken.DoesNotExist:
+        pass
+    
     # Obtener asignaturas segun rol
     subjects_as_student = []
     subjects_as_teacher = []
@@ -36,6 +52,7 @@ def profile_view(request):
     context = {
         'user': user,
         'profile': profile,
+        'api_token': api_token_data,
         'subjects_as_student': subjects_as_student,
         'subjects_as_teacher': subjects_as_teacher,
         'is_student': user.groups.filter(name__iexact='student').exists(),
@@ -67,30 +84,30 @@ def change_password_view(request):
 @login_required
 def generate_token_view(request):
     """
-    Genera un nuevo token JWT para el usuario.
+    Genera un nuevo token de API con expiración de 30 días.
     Retorna el token completo en JSON.
     """
     if request.method == 'POST':
         user = request.user
         
-        # Verificar que el usuario tenga UserProfile
-        try:
-            profile = user.user_profile
-        except UserProfile.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'error': 'No tienes un perfil asociado. Contacta al administrador.'
-            }, status=400)
+        # Importar ExpiringToken
+        from paasify.models.TokenModel import ExpiringToken
         
-        # Generar token
+        # Generar token (eliminar el anterior si existe y crear uno nuevo)
         try:
-            token = profile.generate_token(expiration_days=365)
+            # Eliminar token anterior si existe
+            ExpiringToken.objects.filter(user=user).delete()
+            
+            # Crear nuevo token
+            token = ExpiringToken.objects.create(user=user)
+            
             return JsonResponse({
                 'success': True,
-                'token': token,
-                'masked_token': profile.get_masked_token(),
-                'created_at': profile.token_created_at.isoformat() if profile.token_created_at else None,
-                'message': 'Token generado exitosamente. Copialo ahora, no podras verlo completo despues.'
+                'token': token.key,
+                'created_at': token.created.isoformat(),
+                'expires_at': token.expires_at.isoformat(),
+                'days_remaining': token.days_until_expiration(),
+                'message': 'Token generado exitosamente. Válido por 30 días. Cópialo ahora, no podrás verlo completo después.'
             })
         except Exception as e:
             return JsonResponse({
@@ -104,30 +121,27 @@ def generate_token_view(request):
 @login_required
 def refresh_token_view(request):
     """
-    Regenera el token JWT del usuario (invalida el anterior).
+    Regenera el token de API del usuario con caducidad de 30 días.
     Retorna el nuevo token completo en JSON.
     """
     if request.method == 'POST':
         user = request.user
         
-        # Verificar que el usuario tenga UserProfile
-        try:
-            profile = user.user_profile
-        except UserProfile.DoesNotExist:
-            return JsonResponse({
-                'success': False,
-                'error': 'No tienes un perfil asociado. Contacta al administrador.'
-            }, status=400)
+        # Importar ExpiringToken
+        from paasify.models.TokenModel import ExpiringToken
         
-        # Refrescar token
+        # Refrescar token (eliminar el anterior y crear uno nuevo)
         try:
-            token = profile.refresh_token(expiration_days=365)
+            ExpiringToken.objects.filter(user=user).delete()
+            token = ExpiringToken.objects.create(user=user)
+            
             return JsonResponse({
                 'success': True,
-                'token': token,
-                'masked_token': profile.get_masked_token(),
-                'created_at': profile.token_created_at.isoformat() if profile.token_created_at else None,
-                'message': 'Token refrescado exitosamente. El token anterior ya no es valido.'
+                'token': token.key,
+                'created_at': token.created.isoformat(),
+                'expires_at': token.expires_at.isoformat(),
+                'days_remaining': token.days_until_expiration(),
+                'message': 'Token refrescado exitosamente. Válido por 30 días. El token anterior ya no es válido.'
             })
         except Exception as e:
             return JsonResponse({
@@ -146,24 +160,17 @@ def copy_token_view(request):
     if request.method == 'GET':
         user = request.user
         
-        # Verificar que el usuario tenga UserProfile
         try:
-            profile = user.user_profile
-        except UserProfile.DoesNotExist:
+            from paasify.models.TokenModel import ExpiringToken
+            token = ExpiringToken.objects.get(user=user)
+            return JsonResponse({
+                'success': True,
+                'token': token.key
+            })
+        except ExpiringToken.DoesNotExist:
             return JsonResponse({
                 'success': False,
-                'error': 'No tienes un perfil asociado.'
-            }, status=400)
-        
-        if not profile.api_token:
-            return JsonResponse({
-                'success': False,
-                'error': 'No tienes un token generado. Genera uno primero.'
-            }, status=400)
-        
-        return JsonResponse({
-            'success': True,
-            'token': profile.api_token
-        })
+                'error': 'No tienes un token generado. Por favor, genera uno nuevo.'
+            }, status=404)
     
     return JsonResponse({'success': False, 'error': 'Metodo no permitido'}, status=405)

@@ -1,0 +1,644 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} | PaaSify{% endblock %}
+
+{% block extrahead %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+{% if next_section %}
+<link rel="prefetch" href="{% url 'containers:api_docs_section' next_section.slug %}">
+{% endif %}
+{% if prev_section %}
+<link rel="prefetch" href="{% url 'containers:api_docs_section' prev_section.slug %}">
+{% endif %}
+<style>
+    :root {
+        --api-primary: #0069ff;
+        /* DigitalOcean Blue */
+        --api-success: #1cc88a;
+        --api-sidebar-bg: #f8f9fa;
+        --api-content-bg: #ffffff;
+        --api-text: #2e384d;
+        --api-muted: #64748b;
+        --api-border: #e2e8f0;
+    }
+
+    .api-docs-container {
+        display: flex;
+        min-height: calc(100vh - 70px);
+        background-color: var(--api-content-bg);
+    }
+
+    /* Sidebar Navigation (DigitalOcean Style) */
+    .api-sidebar {
+        width: 280px;
+        background-color: var(--api-sidebar-bg);
+        border-right: 1px solid var(--api-border);
+        padding: 2rem 1rem;
+        position: sticky;
+        top: 70px;
+        height: calc(100vh - 70px);
+        overflow-y: auto;
+        z-index: 100;
+        transition: transform 0.3s ease;
+    }
+
+    .api-sidebar h6 {
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: var(--api-muted);
+        margin: 1.5rem 1rem 1rem;
+        font-weight: 700;
+    }
+
+    .api-nav {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .api-nav-item {
+        margin-bottom: 2px;
+    }
+
+    .api-nav-link {
+        color: var(--api-text);
+        text-decoration: none !important;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        padding: 0.6rem 1rem;
+        border-radius: 6px;
+        transition: all 0.2s;
+        font-weight: 500;
+    }
+
+    .api-nav-link:hover {
+        background-color: #edf2f7;
+        color: var(--api-primary);
+    }
+
+    .api-nav-link.active {
+        background-color: #0069ff15;
+        color: var(--api-primary) !important;
+        font-weight: 600;
+    }
+
+    .api-nav-link i {
+        width: 20px;
+        font-size: 0.85rem;
+        margin-right: 0.5rem;
+        opacity: 0.7;
+    }
+
+    .api-subnav-link {
+        transition: all 0.2s;
+        border-radius: 4px;
+    }
+
+    .api-subnav-link:hover {
+        color: var(--api-primary) !important;
+        background-color: #f1f5f9;
+    }
+
+    .api-subnav {
+        display: none;
+        /* Colapsado por defecto */
+        list-style: none;
+        padding-left: 1.5rem;
+        border-left: 2px solid var(--api-border);
+        margin: 5px 0 10px 1.5rem;
+    }
+
+    .api-nav-item.open .api-subnav,
+    .api-nav-item.active-parent .api-subnav {
+        display: block;
+    }
+
+    .expand-toggle {
+        cursor: pointer;
+        font-size: 0.7rem;
+        padding: 4px 8px;
+        border-radius: 4px;
+        background: #eee;
+        color: #666;
+        transition: all 0.2s;
+    }
+
+    .expand-toggle:hover {
+        background: #ddd;
+    }
+
+    /* Main Content */
+    .api-content-wrapper {
+        flex: 1;
+        padding: 4rem 10% 6rem;
+        max-width: 1200px;
+        position: relative;
+    }
+
+    #markdown-render {
+        max-width: 800px;
+        margin: 0 auto;
+        transition: opacity 0.2s ease;
+    }
+
+    .nav-loading {
+        opacity: 0.5;
+        pointer-events: none;
+    }
+
+    /* Navigation Spinner Overly */
+    #nav-spinner {
+        display: none;
+        position: absolute;
+        top: 200px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 1000;
+    }
+
+    /* Markdown Styles */
+    #markdown-render h1 {
+        font-size: 2.25rem;
+        font-weight: 800;
+        color: var(--api-text);
+        margin-bottom: 2.5rem;
+    }
+
+    #markdown-render h2 {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--api-text);
+        margin-top: 3.5rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid var(--api-border);
+    }
+
+    #markdown-render h3 {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #475569;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+    }
+
+    #markdown-render p {
+        color: #4b5563;
+        line-height: 1.75;
+        font-size: 1rem;
+        margin-bottom: 1.25rem;
+    }
+
+    #markdown-render ul,
+    #markdown-render ol {
+        color: #4b5563;
+        margin-bottom: 1.5rem;
+        padding-left: 1.5rem;
+    }
+
+    #markdown-render li {
+        margin-bottom: 0.5rem;
+    }
+
+    #markdown-render table {
+        width: 100%;
+        margin: 2rem 0;
+        border-collapse: collapse;
+        font-size: 0.9rem;
+    }
+
+    #markdown-render th {
+        background-color: #f8fafc;
+        padding: 0.75rem 1rem;
+        text-align: left;
+        border-bottom: 2px solid var(--api-border);
+        color: #64748b;
+        font-weight: 600;
+    }
+
+    #markdown-render td {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--api-border);
+        color: #334155;
+    }
+
+    /* Accordion / Details for Errors (Custom Style) */
+    details.api-errors {
+        margin: -1rem 0 2rem;
+        border: 1px solid var(--api-border);
+        border-radius: 8px;
+        background: #fafafa;
+        overflow: hidden;
+    }
+
+    details.api-errors summary {
+        padding: 0.75rem 1rem;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: #64748b;
+        background: #f1f5f9;
+        list-style: none;
+        display: flex;
+        align-items: center;
+    }
+
+    details.api-errors summary::before {
+        content: '\f078';
+        font-family: 'Font Awesome 5 Free';
+        font-weight: 900;
+        margin-right: 10px;
+        font-size: 0.7rem;
+        transition: transform 0.2s;
+    }
+
+    details[open].api-errors summary::before {
+        transform: rotate(-180deg);
+    }
+
+    .api-error-content {
+        padding: 1rem;
+        border-top: 1px solid var(--api-border);
+        font-size: 0.85rem;
+    }
+
+    /* Code Blocks */
+    .code-wrapper {
+        position: relative;
+        margin: 1.5rem 0;
+    }
+
+    .copy-btn-api {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #cbd5e1;
+        padding: 0.35rem 0.6rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        cursor: pointer;
+        transition: all 0.2s;
+        visibility: hidden;
+        opacity: 0;
+    }
+
+    .code-wrapper:hover .copy-btn-api {
+        visibility: visible;
+        opacity: 1;
+    }
+
+    .copy-btn-api:hover {
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+    }
+
+    pre {
+        border-radius: 8px !important;
+        padding: 1.25rem !important;
+        background: #0f172a !important;
+        margin-bottom: 1.5rem !important;
+    }
+
+    code {
+        font-family: 'Fira Code', monospace !important;
+    }
+
+    /* Navigation Footer */
+    .api-footer-nav {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 5rem;
+        padding-top: 2rem;
+        border-top: 1px solid var(--api-border);
+    }
+
+    .btn-api-nav {
+        display: flex;
+        flex-direction: column;
+        text-decoration: none !important;
+        max-width: 45%;
+    }
+
+    .btn-api-nav .label {
+        font-size: 0.75rem;
+        color: var(--api-muted);
+        margin-bottom: 0.25rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .btn-api-nav .title {
+        font-weight: 700;
+        color: var(--api-primary);
+        font-size: 1.1rem;
+        display: flex;
+        align-items: center;
+    }
+
+    .btn-api-nav.prev {
+        text-align: left;
+    }
+
+    .btn-api-nav.next {
+        text-align: right;
+    }
+
+    .btn-api-nav.next .title {
+        justify-content: flex-end;
+    }
+
+    .btn-api-nav.disabled {
+        opacity: 0.3;
+        pointer-events: none;
+    }
+
+    .step-indicator {
+        font-size: 0.85rem;
+        color: var(--api-muted);
+        font-weight: 500;
+        background: #f1f5f9;
+        padding: 4px 12px;
+        border-radius: 20px;
+    }
+
+    /* Mobile Toggle */
+    .api-mobile-header {
+        display: none;
+        padding: 1rem;
+        background: white;
+        border-bottom: 1px solid var(--api-border);
+        justify-content: space-between;
+        align-items: center;
+        position: sticky;
+        top: 0;
+        z-index: 101;
+    }
+
+    @media (max-width: 992px) {
+        .api-sidebar {
+            position: fixed;
+            left: 0;
+            top: 70px;
+            bottom: 0;
+            transform: translateX(-100%);
+        }
+
+        .api-sidebar.open {
+            transform: translateX(0);
+        }
+
+        .api-content-wrapper {
+            padding: 2rem 1.5rem;
+        }
+
+        .api-mobile-header {
+            display: flex;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="api-mobile-header">
+    <span class="fw-bold"><i class="fas fa-book me-2"></i> API Reference</span>
+    <button class="btn btn-sm btn-outline-primary" id="sidebar-toggle">
+        <i class="fas fa-bars"></i> Menú
+    </button>
+</div>
+
+<div class="api-docs-container">
+    <aside class="api-sidebar" id="api-sidebar">
+        <div class="d-flex justify-content-between align-items-center mb-1 pe-2">
+            <h6>Guía de Inicio</h6>
+            <span class="expand-toggle" id="toggle-all-sections" title="Expandir/Agrupar todo">
+                <i class="fas fa-expand-alt"></i>
+            </span>
+        </div>
+        <ul class="api-nav">
+            {% for section in sections %}
+            <li class="api-nav-item {% if current_slug == section.slug %}active-parent{% endif %}"
+                data-slug="{{ section.slug }}">
+                <a href="{% url 'containers:api_docs_section' section.slug %}"
+                    class="api-nav-link nav-link-item {% if current_slug == section.slug %}active{% endif %}">
+                    <i
+                        class="fas fa-{% if section.slug == 'introduccion' %}home{% elif section.slug == 'autenticacion' %}key{% elif section.slug == 'gets' %}search{% elif section.slug == 'crear' %}plus-circle{% elif section.slug == 'acciones' %}cogs{% elif section.slug == 'ci-cd' %}terminal{% else %}exclamation-triangle{% endif %}"></i>
+                    {{ section.title }}
+                </a>
+
+                {% if section.subsections %}
+                <ul class="api-subnav">
+                    {% for sub in section.subsections %}
+                    <li class="api-subnav-item py-1">
+                        <a href="{% url 'containers:api_docs_section' section.slug %}#{{ sub.slug }}"
+                            class="api-subnav-link text-muted text-decoration-none small d-block ps-4 {% if current_slug == section.slug %}internal-link{% endif %}"
+                            data-target="{{ sub.slug }}">
+                            <i class="fas fa-angle-right me-1 small"></i> {{ sub.title }}
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+
+        <div class="mt-auto px-3 py-4 text-center">
+            <div class="step-indicator">Sección {{ current_index }} de {{ total_sections }}</div>
+        </div>
+    </aside>
+
+    <main class="api-content-wrapper">
+        <!-- Spinner Overlay -->
+        <div id="nav-spinner">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Cargando...</span>
+            </div>
+        </div>
+
+        <div id="markdown-render">
+            <!-- Loader inicial -->
+            <div class="text-center py-5" id="md-loader">
+                <div class="spinner-border text-primary" role="status"></div>
+            </div>
+        </div>
+
+        <nav class="api-footer-nav">
+            {% if prev_section %}
+            <a href="{% url 'containers:api_docs_section' prev_section.slug %}" class="btn-api-nav prev nav-link-item"
+                id="btn-prev">
+                <span class="label">Anterior</span>
+                <span class="title"><i class="fas fa-arrow-left me-2"></i> {{ prev_section.title }}</span>
+            </a>
+            {% else %}
+            <div class="btn-api-nav prev disabled" id="btn-prev">
+                <span class="label">Anterior</span>
+                <span class="title"><i class="fas fa-arrow-left me-2"></i> Anterior</span>
+            </div>
+            {% endif %}
+
+            <div class="d-none d-md-block step-indicator">
+                {{ current_index }} / {{ total_sections }}
+            </div>
+
+            {% if next_section %}
+            <a href="{% url 'containers:api_docs_section' next_section.slug %}" class="btn-api-nav next nav-link-item"
+                id="btn-next">
+                <span class="label">Siguiente</span>
+                <span class="title">{{ next_section.title }} <i class="fas fa-arrow-right ms-2"></i></span>
+            </a>
+            {% else %}
+            <div class="btn-api-nav next disabled" id="btn-next">
+                <span class="label">Siguiente</span>
+                <span class="title">Siguiente <i class="fas fa-arrow-right ms-2"></i></span>
+            </div>
+            {% endif %}
+        </nav>
+    </main>
+</div>
+
+<!-- Source data -->
+<script id="markdown-source" type="text/markdown" style="display:none;">{{ markdown_content|safe }}</script>
+
+<!-- Rendered Images List (Hidden, for injection) -->
+<div id="catalog-images-list" style="display:none;">
+    <div class="d-flex flex-wrap gap-2 mt-3">
+        {% for img in images %}
+        <span class="badge bg-white border text-dark p-2 shadow-sm" style="font-size: 0.8rem; border-color: var(--api-border) !important;">
+            <i class="fas fa-check-circle text-success me-1"></i>{{ img.name }}:{{ img.tag }}
+        </span>
+        {% empty %}
+        <p class="small text-muted italic">No hay imágenes disponibles en el catálogo en este momento.</p>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-bash.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-yaml.min.js"></script>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // 1. Render Markdown
+        const source = document.getElementById('markdown-source').textContent;
+        const apiUrl = "{{ PAASIFY_API_URL }}";
+        const imagesListHtml = document.getElementById('catalog-images-list').innerHTML;
+
+        let processedMd = source
+            .replace(/\{\{\s*PAASIFY_API_URL\s*\}\}/g, apiUrl)
+            .replace(/\{\{\s*TU_API_TOKEN\s*\}\}/g, '<TU_API_TOKEN>')
+            .replace(/<TU_API_TOKEN>/g, '<TU_API_TOKEN>');
+
+        const container = document.getElementById('markdown-render');
+        let htmlContent = marked.parse(processedMd);
+        
+        // Inyectar la lista de imágenes en el HTML ya renderizado
+        container.innerHTML = htmlContent.replace(/\[\[IMAGENES_CATALOGO\]\]/g, imagesListHtml);
+
+        // 2. Sincronizar IDs de H3 con el Sidebar y Manejar Navegación
+        const h3Headers = container.querySelectorAll('h3');
+        const slugify = (text) => {
+            return text.toString().toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .replace(/[^a-z0-9]+/g, '-')
+                .replace(/^-+|-+$/g, '');
+        };
+
+        h3Headers.forEach(h3 => {
+            h3.id = slugify(h3.innerText);
+        });
+
+        // 3. Manejadores de Click Interiores (smooth scroll)
+        document.querySelectorAll('.internal-link').forEach(link => {
+            link.onclick = (e) => {
+                const targetId = link.getAttribute('data-target');
+                const targetEl = document.getElementById(targetId);
+                if (targetEl) {
+                    e.preventDefault();
+                    const offset = targetEl.getBoundingClientRect().top + window.pageYOffset - 80;
+                    window.scrollTo({ top: offset, behavior: "smooth" });
+                    history.pushState(null, null, `#${targetId}`);
+                }
+            };
+        });
+
+        // 4. Toggle Expandir Todo
+        const toggleAllBtn = document.getElementById('toggle-all-sections');
+        let allExpanded = false;
+        toggleAllBtn.onclick = () => {
+            allExpanded = !allExpanded;
+            const items = document.querySelectorAll('.api-nav-item');
+            items.forEach(item => {
+                if (allExpanded) item.classList.add('open');
+                else item.classList.remove('open');
+            });
+            toggleAllBtn.innerHTML = allExpanded ? '<i class="fas fa-compress-alt"></i>' : '<i class="fas fa-expand-alt"></i>';
+        };
+
+        // 5. Post-process code blocks & copy buttons
+        container.querySelectorAll('pre').forEach(pre => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'code-wrapper';
+            pre.parentNode.insertBefore(wrapper, pre);
+            wrapper.appendChild(pre);
+
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'copy-btn-api';
+            copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+            copyBtn.title = "Copiar comando";
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(pre.innerText).then(() => {
+                    copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                    setTimeout(() => { copyBtn.innerHTML = '<i class="fas fa-copy"></i>'; }, 2000);
+                });
+            };
+            wrapper.appendChild(copyBtn);
+        });
+
+        if (window.Prism) Prism.highlightAll();
+
+        // 3. Sidebar Toggle Mobile
+        const btnToggle = document.getElementById('sidebar-toggle');
+        const sidebar = document.getElementById('api-sidebar');
+        btnToggle.onclick = () => sidebar.classList.toggle('open');
+
+        // 4. Keyboard Navigation
+        document.addEventListener('keydown', (e) => {
+            if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+
+            if (e.key === 'ArrowLeft') {
+                const prev = document.getElementById('btn-prev');
+                if (prev && prev.tagName === 'A' && !prev.classList.contains('disabled')) prev.click();
+            } else if (e.key === 'ArrowRight') {
+                const next = document.getElementById('btn-next');
+                if (next && next.tagName === 'A' && !next.classList.contains('disabled')) next.click();
+            }
+        });
+
+        // 5. Navigation Spinner / Loader Feedback
+        const allNavLinks = document.querySelectorAll('.nav-link-item');
+        const spinner = document.getElementById('nav-spinner');
+
+        allNavLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                // Solo si es un click normal (izquierdo, sin ctrl/meta)
+                if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+                    spinner.style.display = 'block';
+                    container.classList.add('nav-loading');
+                    // Deshabilitar links para evitar doble click
+                    allNavLinks.forEach(l => l.style.pointerEvents = 'none');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

@@ -6,101 +6,165 @@
 {% endblock %}
 
 {% block body %}
-<div class="container py-4">
-  <div class="dashboard-hero-band">
-    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between">
+<div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh;">
+  {# Header con degradado Premium #}
+  <div class="rounded-3 p-4 mb-4 shadow-sm" style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+    <div class="d-flex justify-content-between align-items-center">
       <div>
-        <div class="dashboard-hero-title">Panel de Profesor</div>
-        <p class="dashboard-hero-subtitle">Gestiona asignaturas y proyectos asociados.</p>
+        <h1 class="h3 mb-1 text-white fw-bold"><i class="fas fa-chalkboard-teacher me-2"></i>Panel de Control Docente</h1>
+        <p class="text-white-50 mb-0">Supervisión de asignaturas, proyectos y actividad de contenedores.</p>
       </div>
-      <div class="d-flex gap-2 mt-3 mt-lg-0">
+      <div class="d-flex gap-2">
         {% if user.is_superuser or user.is_staff %}
-          <a class="btn btn-light" href="/admin/">Ir al admin</a>
+          <a class="btn btn-outline-light d-flex align-items-center" href="/admin/">
+            <i class="fas fa-user-shield me-2"></i>Admin Global
+          </a>
         {% endif %}
-        <a class="btn btn-outline-light" href="{% url 'professor_dashboard' %}">Actualizar panel</a>
+        <a class="btn btn-light shadow-sm" href="{% url 'professor_dashboard' %}">
+          <i class="fas fa-sync-alt me-2"></i>Sincronizar
+        </a>
       </div>
     </div>
   </div>
 
-  <!-- Mis asignaturas -->
-  <div class="card mb-4">
-    <div class="card-header">
-      <strong>Mis asignaturas</strong>
+  {# 1. Estadísticas Globales del Profesor #}
+  <div class="row g-3 mb-4 row-cols-2 row-cols-md-5">
+    <div class="col">
+      <div class="card border-0 shadow-sm border-start border-4 border-primary h-100">
+        <div class="card-body bg-white py-3">
+          <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-book me-1"></i> Asignaturas</h6>
+          <h3 class="mb-0 text-primary fw-bold">{{ stats.subjects }}</h3>
+        </div>
+      </div>
     </div>
-    <div class="card-body p-0">
+    <div class="col">
+      <div class="card border-0 shadow-sm border-start border-4 border-info h-100">
+        <div class="card-body bg-white py-3">
+          <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-users me-1"></i> Alumnos</h6>
+          <h3 class="mb-0 text-info fw-bold">{{ stats.students }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card border-0 shadow-sm border-start border-4 border-dark h-100">
+        <div class="card-body bg-white py-3">
+          <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-project-diagram me-1"></i> Proyectos</h6>
+          <h3 class="mb-0 text-dark fw-bold">{{ stats.projects }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card border-0 shadow-sm border-start border-4 border-success h-100">
+        <div class="card-body bg-white py-3">
+          <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-play-circle me-1"></i> Activos</h6>
+          <h3 class="mb-0 text-success fw-bold">{{ stats.active_services }}</h3>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card border-0 shadow-sm border-start border-4 border-secondary h-100">
+        <div class="card-body bg-white py-3">
+          <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-layer-group me-1"></i> Totales</h6>
+          <h3 class="mb-0 text-secondary fw-bold">{{ stats.total_services }}</h3>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4">
+    {# Columna Izquierda: Mis Asignaturas #}
+    <div class="col-lg-12">
+      <h5 class="fw-bold mb-3"><i class="fas fa-graduation-cap text-primary me-2"></i>Mis Asignaturas</h5>
       {% if subjects %}
-        <div class="list-group list-group-flush">
+        <div class="row row-cols-1 row-cols-md-3 g-3 mb-4">
           {% for s in subjects %}
-            <a
-              class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-              href="{% url 'professor_subject_detail' s.id %}">
-              <div>
-                <div class="fw-semibold">{{ s.name }}</div>
-                <small class="text-muted">
-                  {{ s.get_category_display|default:s.category }}
-                   Curso {{ s.genero }}
-                   Alumnos: {{ s.students.count }}
-                </small>
+          <div class="col">
+            <div class="card h-100 border-0 shadow-sm hover-elevate">
+              <div class="card-body">
+                <div class="d-flex align-items-center mb-3">
+                  <div class="rounded-circle bg-primary bg-opacity-10 p-3 me-3">
+                    <i class="fas fa-university text-primary fa-lg"></i>
+                  </div>
+                  <div>
+                    <h6 class="fw-bold mb-0 text-dark">{{ s.name }}</h6>
+                    <small class="text-muted text-uppercase" style="font-size: 0.7rem;">{{ s.get_category_display|default:s.category }}</small>
+                  </div>
+                </div>
+                <div class="d-flex justify-content-between small text-muted mb-3 border-bottom pb-2">
+                  <span><i class="fas fa-users me-1"></i>{{ s.students.count }} Estudiantes</span>
+                  <span><i class="fas fa-calendar-alt me-1"></i>{{ s.genero|default:'2026' }}</span>
+                </div>
+                <a href="{% url 'professor_subject_detail' s.id %}" class="btn btn-primary btn-sm w-100 rounded-pill shadow-sm">
+                  Gestionar Asignatura <i class="fas fa-arrow-right ms-1"></i>
+                </a>
               </div>
-              <span class="ms-3">&rsaquo;</span>
-            </a>
+            </div>
+          </div>
           {% endfor %}
         </div>
       {% else %}
-        <div class="p-3">
-          <div class="alert alert-info mb-0">
-            Aun no tienes asignaturas asignadas. Pide a un administrador que te asigne como profesor.
-          </div>
+        <div class="alert alert-info border-0 shadow-sm">
+          <i class="fas fa-info-circle me-2"></i>Aún no tienes asignaturas asignadas. Contacta con administración.
         </div>
       {% endif %}
     </div>
-  </div>
 
-  <!-- Proyectos de mis asignaturas -->
-  <div class="card">
-    <div class="card-header">
-      <strong>Proyectos de mis asignaturas</strong>
-    </div>
-    <div class="card-body p-0">
-      {% if projects %}
-        <div class="table-responsive">
-          <table class="table table-striped mb-0 align-middle">
-            <thead>
-              <tr>
-                <th style="width: 28%">Proyecto</th>
-                <th style="width: 22%">Alumno</th>
-                <th style="width: 25%">Asignatura</th>
-                <th style="width: 15%">Fecha</th>
-                <th style="width: 10%">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for g in projects %}
-              <tr>
-                <td>{{ g.place }}</td>
-                <td>{{ g.user_profile.nombre }}</td>
-                <td>{{ g.subject.name }}</td>
-                <td>
-                  {{ g.date|date:"Y-m-d" }} {{ g.time|time:"H:i" }}
-                </td>
-                <td>
-                  <a class="btn btn-sm btn-outline-primary"
-                     href="{% url 'professor_project_detail' g.id %}">
-                    Abrir
-                  </a>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+    {# Proyectos y Actividad Reciente #}
+    <div class="col-lg-12">
+      <div class="card border-0 shadow-sm overflow-hidden">
+        <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
+          <h5 class="mb-0 fw-bold"><i class="fas fa-tasks text-primary me-2"></i>Proyectos Desarrollados</h5>
+          <span class="badge bg-light text-primary rounded-pill px-3">{{ projects.count }} Proyectos</span>
         </div>
-      {% else %}
-        <div class="p-3">
-          <div class="alert alert-secondary mb-0">
-            No hay proyectos creados todavia en tus asignaturas.
-          </div>
+        <div class="card-body p-0">
+          {% if projects %}
+            <div class="table-responsive">
+              <table class="table table-hover align-middle mb-0">
+                <thead style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+                  <tr class="text-white small text-uppercase">
+                    <th class="py-3 ps-4">Nombre del Proyecto</th>
+                    <th class="py-3">Estudiante</th>
+                    <th class="py-3">Asignatura</th>
+                    <th class="py-3">Fecha Registro</th>
+                    <th class="py-3 pe-4 text-end">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody class="bg-white">
+                  {% for g in projects %}
+                  <tr>
+                    <td class="ps-4">
+                      <div class="fw-semibold text-dark">{{ g.place }}</div>
+                    </td>
+                    <td>
+                      <div class="d-flex align-items-center">
+                        <div class="avatar-sm me-2 bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                          {{ g.user_profile.nombre|slice:":1" }}
+                        </div>
+                        {{ g.user_profile.nombre }}
+                      </div>
+                    </td>
+                    <td><span class="badge bg-light text-muted border">{{ g.subject.name }}</span></td>
+                    <td class="text-muted small">
+                      <i class="far fa-clock me-1"></i>{{ g.date|date:"d M Y" }}
+                    </td>
+                    <td class="pe-4 text-end">
+                      <a class="btn btn-sm btn-outline-primary rounded-pill px-3" href="{% url 'professor_project_detail' g.id %}">
+                        Supervisar <i class="fas fa-eye ms-1"></i>
+                      </a>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="p-5 text-center">
+              <i class="fas fa-folder-open fa-3x text-light mb-3"></i>
+              <p class="text-muted">No hay proyectos registrados en tus asignaturas.</p>
+            </div>
+          {% endif %}
         </div>
-      {% endif %}
+      </div>
     </div>
   </div>
 </div>

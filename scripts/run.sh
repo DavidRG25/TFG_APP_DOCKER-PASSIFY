@@ -16,7 +16,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_DIR="${ROOT_DIR}/venv"
-USE_PRODUCTION="false"
+USE_PRODUCTION="true"  # Cambiado a true para usar Daphne por defecto (soporte WebSockets)
 PORT_OVERRIDE=""
 HOST_OVERRIDE=""
 
@@ -33,19 +33,18 @@ usage() {
 Uso: bash scripts/run.sh [opciones]
 
 Ejecuta el servidor rapidamente. Asume que el entorno ya esta configurado.
-Por defecto usa runserver (desarrollo). Usa --production para Daphne (ASGI).
+Por defecto usa Daphne (ASGI) para soporte de WebSockets.
 
 Opciones:
-  --production      Usa Daphne (ASGI) en lugar de runserver.
+  --production      Usa Daphne (ASGI) - MODO POR DEFECTO.
   --port <numero>   Puerto personalizado (default: 8000).
-  --host <ip>       Host personalizado (default: 127.0.0.1 en dev, 0.0.0.0 en prod).
+  --host <ip>       Host personalizado (default: 0.0.0.0).
   --help, -h        Muestra esta ayuda y termina.
 
 Ejemplos:
-  bash scripts/run.sh                    # Desarrollo (runserver)
-  bash scripts/run.sh --production       # Produccion (Daphne)
+  bash scripts/run.sh                    # Daphne (ASGI) - WebSockets habilitados
   bash scripts/run.sh --port 9000        # Puerto personalizado
-  bash scripts/run.sh --production --host 0.0.0.0 --port 8080
+  bash scripts/run.sh --host 0.0.0.0 --port 8080
 
 Para inicializacion completa (primera vez), usa: bash scripts/start.sh
 EOF
@@ -124,9 +123,9 @@ fi
 
 echo "=========================================="
 if [[ "${USE_PRODUCTION}" == "true" ]]; then
-  echo "  PaaSify - Modo Produccion (Daphne)"
+  echo "  PaaSify - Servidor ASGI (Daphne + WebSockets)"
 else
-  echo "  PaaSify - Modo Desarrollo (runserver)"
+  echo "  PaaSify - Modo Desarrollo (runserver - sin WebSockets)"
 fi
 echo "=========================================="
 echo ""
@@ -145,9 +144,9 @@ echo "    âœ“ Archivos estaticos recolectados"
 echo ""
 echo "=========================================="
 if [[ "${USE_PRODUCTION}" == "true" ]]; then
-  echo "  Arrancando Daphne (ASGI)"
+  echo "  Arrancando Daphne (ASGI + WebSockets)"
 else
-  echo "  Arrancando runserver (desarrollo)"
+  echo "  Arrancando runserver (solo HTTP)"
 fi
 echo "=========================================="
 echo "  Host: ${HOST}"

@@ -3,16 +3,14 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="newServiceModalLabel">Nuevo servicio</h5>
+        <h5 class="modal-title" id="newServiceModalLabel">Despliegue Web</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
       </div>
 
       <form id="newServiceForm" method="POST" enctype="multipart/form-data" hx-post="/api/containers/"
         hx-target="#service-table" hx-swap="none">
-        {% csrf_token %}
-        <div id="form-errors"></div>
-        {% if current_subject %}
-        <input type="hidden" name="subject" value="{{ current_subject.id }}">
+        {% csrf_token %} {% if current_subject %}
+        <input type="hidden" name="subject" value="{{ current_subject.id }}" />
         {% else %}
         <div class="mb-3">
           <label class="form-label">Asignatura</label>
@@ -35,35 +33,44 @@
         {% endif %}
 
         <div class="modal-body">
+          <!-- Contenedor de errores de validación -->
+          <div id="form-errors" class="mb-3"></div>
+
           <div class="mb-3">
             <label class="form-label">Proyecto</label>
             {% if user_projects %}
             <select name="project" class="form-select" required>
-                <option value="" disabled selected>-- Selecciona un proyecto --</option>
-                {% for p in user_projects %}
-                <option value="{{ p.id }}">{{ p.place }} ({{ p.subject.name }})</option>
-                {% endfor %}
+              <option value="" disabled selected>
+                -- Selecciona un proyecto --
+              </option>
+              {% for p in user_projects %}
+              <option value="{{ p.id }}">
+                {{ p.place }} ({{ p.subject.name }})
+              </option>
+              {% endfor %}
             </select>
             {% else %}
             <div class="alert alert-warning mb-0">
-                No tienes proyectos asignados. Pide a tu profesor que te asigne uno para crear servicios.
+              No tienes proyectos asignados. Pide a tu profesor que te asigne
+              uno para crear servicios.
             </div>
             {% endif %}
           </div>
           <div class="mb-3">
             <label class="form-label">Nombre</label>
-            <input name="name" class="form-control" required placeholder="p.ej. mi-nginx">
+            <input name="name" class="form-control" required placeholder="p.ej. mi-nginx" />
           </div>
 
           <div class="mb-3">
             <label class="form-label">Tipo de despliegue</label>
             <div class="form-check">
-              <input class="form-check-input" type="radio" name="mode" id="mode_default" value="default" checked>
+              <input class="form-check-input" type="radio" name="mode" id="mode_default" value="default" checked />
               <label class="form-check-label" for="mode_default">Imagen por defecto (recomendada)</label>
             </div>
             <div class="form-check">
-              <input class="form-check-input" type="radio" name="mode" id="mode_custom" value="custom">
-              <label class="form-check-label" for="mode_custom">Configuracion personalizada (Dockerfile o docker-compose)</label>
+              <input class="form-check-input" type="radio" name="mode" id="mode_custom" value="custom" />
+              <label class="form-check-label" for="mode_custom">Configuracion personalizada (Dockerfile o
+                docker-compose)</label>
             </div>
           </div>
 
@@ -90,7 +97,7 @@
               </button>
             </label>
             <input name="custom_port" class="form-control" type="number" min="40000" max="50000"
-              placeholder="Ej: 49123">
+              placeholder="Ej: 49123" />
             <small class="text-muted">Debe estar entre 40000 y 50000.</small>
           </div>
 
@@ -104,8 +111,9 @@
                 <i class="bi bi-info-circle" aria-hidden="true"></i>
               </button>
             </label>
-            <input name="internal_port" class="form-control" type="number" min="1" max="65535" placeholder="Ej: 5000">
-            <small class="text-muted">Ejemplos: Flask 5000, Django 8000, Node 3000. Por defecto 80.</small>
+            <input name="internal_port" class="form-control" type="number" min="1" max="65535" placeholder="Ej: 5000" />
+            <small class="text-muted">Ejemplos: Flask 5000, Django 8000, Node 3000. Por defecto
+              80.</small>
           </div>
 
           <div class="mb-3 custom-block" id="block-dockerfile">
@@ -119,8 +127,10 @@
               </button>
             </label>
             <div class="input-group">
-              <input type="file" name="dockerfile" accept="*/*" class="form-control">
-              <button type="button" class="btn btn-outline-secondary" onclick="clearFile('dockerfile')">Limpiar</button>
+              <input type="file" name="dockerfile" accept="*/*" class="form-control" />
+              <button type="button" class="btn btn-outline-secondary" onclick="clearFile('dockerfile')">
+                Limpiar
+              </button>
             </div>
           </div>
 
@@ -135,8 +145,10 @@
               </button>
             </label>
             <div class="input-group">
-              <input type="file" name="compose" accept=".yml,.yaml" class="form-control">
-              <button type="button" class="btn btn-outline-secondary" onclick="clearFile('compose')">Limpiar</button>
+              <input type="file" name="compose" accept=".yml,.yaml" class="form-control" />
+              <button type="button" class="btn btn-outline-secondary" onclick="clearFile('compose')">
+                Limpiar
+              </button>
             </div>
           </div>
 
@@ -146,20 +158,27 @@
               <button type="button" class="btn btn-sm btn-outline-info ms-1 p-0 px-1 align-baseline"
                 aria-label="Instrucciones ZIP" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-html="true"
                 data-bs-title="Contenido del ZIP"
-                data-bs-content="Sube un ZIP con el codigo y dependencias minimas. Evita carpetas venv. Puedes incluir Dockerfile o compose dentro del ZIP si lo prefieres.">
+                data-bs-content="Sube un ZIP que contenga, como minimo, el Dockerfile o docker-compose.yml. Tambien debe incluir el codigo fuente y dependencias minimas. Evita carpetas como venv o node_modules.">
                 <i class="bi bi-info-circle" aria-hidden="true"></i>
               </button>
             </label>
             <div class="input-group">
-              <input type="file" name="code" accept=".zip,.rar" class="form-control">
-              <button type="button" class="btn btn-outline-secondary" onclick="clearFile('code')">Limpiar</button>
+              <input type="file" name="code" accept=".zip,.rar" class="form-control" />
+              <button type="button" class="btn btn-outline-secondary" onclick="clearFile('code')">
+                Limpiar
+              </button>
             </div>
           </div>
-
         </div>
 
+
+        <div class="px-3" id="modal-form-errors"></div>
+
         <div class="modal-footer">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+            Cancelar
+          </button>
           <button type="submit" class="btn btn-primary">Crear servicio</button>
         </div>
       </form>

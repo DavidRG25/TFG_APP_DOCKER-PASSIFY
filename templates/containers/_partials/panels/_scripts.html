@@ -1,247 +1,417 @@
-<script src="https://unpkg.com/htmx.org@1.9.12"></script>
+﻿<script src="https://unpkg.com/htmx.org@1.9.12"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
   function copyToClipboard(elementSelector) {
     const element = document.querySelector(elementSelector);
     if (!element) return;
     element.select();
-    document.execCommand('copy');
-    showToast('¡Copiado!');
+    document.execCommand("copy");
+    showToast("Copiado!");
   }
 
-  htmx.on('htmx:configRequest', (e) => {
-    const token = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
-    if (token) {
-      e.detail.headers['X-CSRFToken'] = token;
+  function showToast(message, variant = "text-bg-success", title = null) {
+    const variantMap = {
+      "text-bg-success": "success",
+      "text-bg-danger": "error",
+      "text-bg-warning": "warning",
+      "text-bg-info": "info",
+      "text-bg-primary": "info"
+    };
+    const icon = variantMap[variant] || "success";
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 4000,
+      timerProgressBar: true,
+      didOpen: (toast) => {
+        toast.addEventListener('mouseenter', Swal.stopTimer)
+        toast.addEventListener('mouseleave', Swal.resumeTimer)
+      }
+    });
+
+    Toast.fire({
+      icon: icon,
+      title: title ? `<strong>${title}</strong>` : null,
+      html: message,
+      background: '#fff',
+      color: '#2d3748',
+      padding: '1rem',
+      borderRadius: '1rem',
+      customClass: {
+        popup: 'shadow-lg border-0'
+      }
+    });
+  }
+
+  // Sincronizacion de eventos para asegurar el refresh
+  document.body.addEventListener("htmx:afterRequest", (evt) => {
+    const xhr = evt.detail.xhr;
+    // Si la respuesta indica un refresh de tabla o es una accion de control con exito
+    if (xhr.status >= 200 && xhr.status < 300) {
+      const triggers = JSON.parse(xhr.getResponseHeader("HX-Trigger") || "{}");
+      const isTableFragment = evt.detail.pathInfo.path.includes("table-fragment");
+      if (triggers["service:table-refresh"] || (evt.detail.pathInfo.path.includes("/containers/") && !isTableFragment)) {
+        // Provocamos un trigger manual en el cuerpo por si acaso el fragmento tarda
+        setTimeout(() => {
+          htmx.trigger("body", "service:table-refresh");
+        }, 500);
+      }
     }
   });
 
-  function showToast(message, extraClass = 'text-bg-success') {
-    const box = document.getElementById('toast-container');
-    if (!box) return;
-    const el = document.createElement('div');
-    el.className = `toast align-items-center ${extraClass} border-0 show`;
-    el.role = 'alert';
-    el.innerHTML = `
-      <div class="d-flex">
-        <div class="toast-body">${message}</div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto"
-                data-bs-dismiss="toast" aria-label="Cerrar"></button>
-      </div>`;
-    box.appendChild(el);
-    setTimeout(() => el.remove(), 2500);
-  }
+  // Confirmacion de eliminacion
+  window.confirmDelete = function (elt) {
+    if (!elt) return;
+    const name = elt.getAttribute("data-service-name") || "este servicio";
+    const deleteUrl = elt.getAttribute("hx-post");
+    const targetId = elt.getAttribute("hx-target");
+    
+    const executeDelete = () => {
+      if (!window.htmx) return;
+      htmx.ajax("POST", deleteUrl, {
+        target: targetId,
+        swap: "outerHTML",
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
+        }
+      });
+    };
 
-  function resetNewServiceForm() {
-    const form = document.getElementById('newServiceForm');
-    if (!form) return;
-    form.reset();
-    const errors = document.getElementById('form-errors');
-    if (errors) errors.innerHTML = '';
-    ['dockerfile', 'compose', 'code'].forEach((name) => {
-      const input = document.querySelector(`input[name="${name}"]`);
-      if (input) {
-        input.value = '';
-        input.disabled = false;
-        input.dispatchEvent(new Event('change'));
+    Swal.fire({
+      title: '<h4 class="fw-bold mb-0">Eliminar servicio?</h4>',
+      html: `<p class="text-muted mt-2 mb-0">Vas a eliminar <strong>${name}</strong> de forma permanente. Esta accion no se puede deshacer.</p>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: '<i class="fas fa-trash-alt me-2"></i>Si, eliminar',
+      cancelButtonText: 'Cancelar',
+      reverseButtons: true,
+      confirmButtonColor: '#e74a3b',
+      cancelButtonColor: '#858796',
+      customClass: {
+        confirmButton: 'btn btn-danger px-4 py-2 fw-bold',
+        cancelButton: 'btn btn-light px-4 py-2 fw-bold'
+      },
+      buttonsStyling: false
+    }).then((result) => {
+      if (result.isConfirmed) {
+        executeDelete();
       }
     });
-    applyMode();
-    syncExclusion();
+  };
+
+  htmx.on("htmx:configRequest", (e) => {
+    const token = document.querySelector('input[name="csrfmiddlewaretoken"]')?.value;
+    if (token) {
+      e.detail.headers["X-CSRFToken"] = token;
+    }
+  });
+
+
+  function resetNewServiceForm() {
+    const form = document.getElementById("newServiceForm");
+    if (!form) return;
+    form.reset();
+    const errors = document.getElementById("form-errors");
+    if (errors) {
+      errors.innerHTML = "";
+      errors.style.display = "none";
+    }
+    const modalErrors = document.getElementById("modal-form-errors");
+    if (modalErrors) {
+      modalErrors.innerHTML = "";
+      modalErrors.style.display = "none";
+    }
+    ["dockerfile", "compose", "code"].forEach((name) => {
+      const input = document.querySelector(`input[name="${name}"]`);
+      if (input) {
+        input.value = "";
+        input.disabled = false;
+      }
+    });
+    if (typeof applyMode === 'function') applyMode();
+    if (typeof syncExclusion === 'function') syncExclusion();
     document.querySelectorAll('[data-bs-toggle="popover"]').forEach((el) => {
       const inst = bootstrap.Popover.getInstance(el);
       if (inst) inst.hide();
     });
   }
 
-  document.body.addEventListener('service:modal-close', (evt) => {
-    const modalId = evt.detail?.modalId || 'newServiceModal';
+  document.body.addEventListener("service:modal-close", (evt) => {
+    const modalId = evt.detail?.modalId || "newServiceModal";
     const modalEl = document.getElementById(modalId);
     if (!modalEl) return;
-    (bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl)).hide();
+    const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+    modal.hide();
     resetNewServiceForm();
   });
 
-  document.body.addEventListener('service:toast', (evt) => {
+  document.addEventListener("service:toast", (evt) => {
     const detail = evt.detail || {};
-    showToast(detail.message || 'Operacion completada', detail.variant || 'text-bg-success');
+    showToast(
+      detail.message || "Operacion completada",
+      detail.variant || "text-bg-success",
+      detail.title || null
+    );
   });
 
-  const newServiceModal = document.getElementById('newServiceModal');
-  if (newServiceModal) {
-    newServiceModal.addEventListener('hidden.bs.modal', () => {
-      resetNewServiceForm();
-    });
-  }
-
-  htmx.on('htmx:afterRequest', (evt) => {
-    if (evt.detail?.requestConfig?.elt?.id === 'newServiceForm') {
-      const status = evt.detail.xhr?.status || 0;
-      if (status < 400) {
-        resetNewServiceForm();
-        if (newServiceModal) {
-          (bootstrap.Modal.getInstance(newServiceModal) || new bootstrap.Modal(newServiceModal)).hide();
-        }
+  document.body.addEventListener("showValidationError", (evt) => {
+    let message = "";
+    if (evt.detail) {
+      if (typeof evt.detail === "string") {
+        message = evt.detail;
+      } else if (evt.detail.showValidationError) {
+        message = evt.detail.showValidationError;
+      } else if (evt.detail.value) {
+        message = evt.detail.value;
+      } else {
+        message = JSON.stringify(evt.detail);
       }
+    }
+    if (!message || message === "{}") {
+      message = "Error desconocido al crear el servicio";
+    }
+    const modalErrorContainer = document.getElementById("modal-form-errors");
+    const pageErrorContainer = document.getElementById("form-errors");
+    const errorHTML = `
+      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <div class="d-flex align-items-start">
+          <i class="fas fa-exclamation-triangle fs-4 me-3 mt-1" style="color: #dc3545;"></i>
+          <div class="flex-grow-1">
+            <strong class="d-block mb-1">No se pudo crear el servicio</strong>
+            <div class="small">${message}</div>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    `;
+    if (modalErrorContainer) {
+      modalErrorContainer.innerHTML = errorHTML;
+      modalErrorContainer.style.display = "block";
+    } else if (pageErrorContainer) {
+      pageErrorContainer.innerHTML = errorHTML;
+      pageErrorContainer.style.display = "block";
+      pageErrorContainer.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      alert("Error de Validacion\n\n" + message);
     }
   });
 
-  htmx.on('htmx:responseError', (evt) => {
-    const xhr = evt.detail.xhr;
-    const status = xhr?.status ?? 0;
-    const msg = xhr?.responseText || 'Se produjo un error inesperado';
-    showToast(`Error (${status}): ${msg}`, 'text-bg-danger');
-  });
-
   function applyMode() {
-    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'default';
-    const imgSel = document.querySelector('select[name="image"]');
+    const mode = document.querySelector('input[name="mode"]:checked')?.value || "default";
+    const imgSel = document.getElementById("service-image");
+    const dockerhubInput = document.getElementById("service-dockerhub");
     const dockerfile = document.querySelector('input[name="dockerfile"]');
     const compose = document.querySelector('input[name="compose"]');
     const code = document.querySelector('input[name="code"]');
     const internalPort = document.querySelector('input[name="internal_port"]');
-    const customBlocks = document.querySelectorAll('.custom-block');
+    const imageContainer = document.getElementById("block-default-image");
+    const customBlocks = document.querySelectorAll(".custom-block");
+    const dockerhubBlock = document.getElementById("block-dockerhub-mode");
 
-    if (mode === 'default') {
-      imgSel.disabled = false;
-      customBlocks.forEach((b) => b.classList.add('opacity-50'));
-      [dockerfile, compose, code].forEach((input) => {
-        if (!input) return;
-        input.disabled = true;
-        input.value = '';
-        input.dispatchEvent(new Event('change'));
-      });
-      if (internalPort) {
-        internalPort.value = '';
-        internalPort.disabled = true;
+    if (mode === "default") {
+      if (imageContainer) imageContainer.style.display = "block";
+      if (dockerhubBlock) dockerhubBlock.style.display = "none";
+      if (imgSel) imgSel.disabled = false;
+      if (dockerhubInput) {
+        dockerhubInput.disabled = true;
+        dockerhubInput.removeAttribute("required");
       }
-    } else {
-      imgSel.disabled = true;
-      customBlocks.forEach((b) => b.classList.remove('opacity-50'));
-      [dockerfile, compose, code].forEach((input) => {
-        if (input) input.disabled = false;
-      });
-      if (internalPort) {
-        internalPort.disabled = false;
+      customBlocks.forEach(b => b.style.display = "none");
+      [dockerfile, compose, code].forEach(input => { if (input) input.disabled = true; });
+    } else if (mode === "dockerhub") {
+      if (imageContainer) imageContainer.style.display = "none";
+      if (dockerhubBlock) dockerhubBlock.style.display = "block";
+      if (imgSel) imgSel.disabled = true;
+      if (dockerhubInput) {
+        dockerhubInput.disabled = false;
+        dockerhubInput.required = true;
       }
+      customBlocks.forEach(b => b.style.display = "none");
+      [dockerfile, compose, code].forEach(input => { if (input) input.disabled = true; });
+    } else if (mode === "custom") {
+      if (imageContainer) imageContainer.style.display = "none";
+      if (dockerhubBlock) dockerhubBlock.style.display = "none";
+      if (imgSel) imgSel.disabled = true;
+      if (dockerhubInput) {
+        dockerhubInput.disabled = true;
+        dockerhubInput.removeAttribute("required");
+      }
+      customBlocks.forEach(b => b.style.display = "block");
+      [dockerfile, compose, code].forEach(input => { if (input) input.disabled = false; });
     }
-    syncExclusion();
+
+    const internalPortBlock = document.getElementById("block-internal-port");
+    if (internalPortBlock) {
+      internalPortBlock.style.display = (mode === "dockerhub" || mode === "custom") ? "block" : "none";
+    }
+    if (internalPort) internalPort.disabled = (mode === "default");
   }
 
   function syncExclusion() {
     const dockerfile = document.querySelector('input[name="dockerfile"]');
     const compose = document.querySelector('input[name="compose"]');
-    const mode = document.querySelector('input[name="mode"]:checked')?.value || 'default';
+    const dockerfileBlock = document.getElementById("block-dockerfile");
+    const composeBlock = document.getElementById("block-compose");
+    const mode = document.querySelector('input[name="mode"]:checked')?.value;
 
-    if (mode === 'default') {
-      const codeInput = document.querySelector('input[name="code"]');
-      if (dockerfile) {
-        dockerfile.disabled = true;
-      }
-      if (compose) {
-        compose.disabled = true;
-      }
-      if (codeInput) {
-        codeInput.disabled = true;
-      }
+    if (mode !== "custom") return;
+
+    if (dockerfile?.files?.length) {
+      if (composeBlock) composeBlock.style.display = "none";
+      if (compose) compose.value = "";
+    } else if (compose?.files?.length) {
+      if (dockerfileBlock) dockerfileBlock.style.display = "none";
+      if (dockerfile) dockerfile.value = "";
+    } else {
+      if (dockerfileBlock) dockerfileBlock.style.display = "block";
+      if (composeBlock) composeBlock.style.display = "block";
+    }
+  }
+
+  async function verifyDockerHubImage() {
+    const input = document.getElementById("service-dockerhub");
+    const feedback = document.getElementById("dockerhub-feedback");
+    const btn = document.getElementById("verify-dockerhub-btn");
+    const imageName = input.value.trim();
+
+    if (!imageName) {
+      feedback.innerHTML = '<div class="alert alert-warning mb-0"><i class="fas fa-exclamation-circle me-2"></i>Por favor, ingresa un nombre de imagen</div>';
+      feedback.style.display = "block";
       return;
     }
 
-    if (dockerfile.files?.length) {
-      compose.value = '';
-      compose.disabled = true;
-    } else if (compose.files?.length) {
-      dockerfile.value = '';
-      dockerfile.disabled = true;
-    } else {
-      dockerfile.disabled = false;
-      compose.disabled = false;
-    }
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Verificando...';
+    feedback.innerHTML = '<div class="alert alert-info mb-0"><i class="fas fa-spinner fa-spin me-2"></i>Consultando DockerHub...</div>';
+    feedback.style.display = "block";
 
-  }
-
-  function clearFile(name) {
-    const input = document.querySelector(`input[name="${name}"]`);
-    if (!input) return;
-    const newInput = input.cloneNode(true);
-    newInput.value = '';
-    input.parentNode.replaceChild(newInput, input);
-    newInput.addEventListener('change', syncExclusion);
-    syncExclusion();
-  }
-
-  document.addEventListener('DOMContentLoaded', () => {
-    applyMode();
-    document.querySelectorAll('input[name="mode"]').forEach((radio) => {
-      radio.addEventListener('change', applyMode);
-    });
-    ['dockerfile', 'compose', 'code'].forEach((name) => {
-      const input = document.querySelector(`input[name="${name}"]`);
-      if (input) input.addEventListener('change', syncExclusion);
-    });
-    const popoverTriggerList = Array.from(document.querySelectorAll('[data-bs-toggle="popover"]'));
-    popoverTriggerList.forEach((el) => new bootstrap.Popover(el));
-
-    // Función para refrescar la tabla
-    function refreshTable() {
-      const tableElement = document.getElementById('service-table');
-      if (tableElement && typeof htmx !== 'undefined') {
-        const url = tableElement.getAttribute('hx-get') || '{% url "containers:service_table" %}';
-        htmx.ajax('GET', url, {
-          target: '#service-table',
-          swap: 'innerHTML'
-        });
+    try {
+      const response = await fetch(`/paasify/containers/verify-dockerhub/?image=${encodeURIComponent(imageName)}`);
+      const data = await response.json();
+      if (data.success) {
+        const lastUpdated = data.last_updated ? new Date(data.last_updated).toLocaleDateString("es-ES") : "Desconocida";
+        const sizeInMB = data.full_size ? (data.full_size / (1024 * 1024)).toFixed(2) : "Desconocido";
+        let portInfo = "";
+        if (data.exposed_port) {
+          portInfo = `<br><strong>Puerto detectado:</strong> <code>${data.exposed_port}</code>
+                      <button type="button" class="btn btn-sm btn-outline-success ms-2" onclick="document.getElementById('service-internal-port').value = '${data.exposed_port}'">
+                        <i class="fas fa-magic me-1"></i> Usar este puerto
+                      </button>`;
+        }
+        feedback.innerHTML = `<div class="alert alert-success mb-0">
+                                <i class="fas fa-check-circle me-2"></i><strong>Imagen encontrada en DockerHub</strong><br>
+                                <small class="text-muted">
+                                  <strong>Nombre:</strong> <code>${imageName}</code><br>
+                                  <strong>Ultima actualizacion:</strong> ${lastUpdated}<br>
+                                  <strong>Tamaño:</strong> ${sizeInMB} MB ${portInfo}
+                                </small>
+                              </div>`;
+      } else {
+        feedback.innerHTML = `<div class="alert alert-danger mb-0"><i class="fas fa-times-circle me-2"></i><strong>${data.error}</strong></div>`;
       }
+    } catch (error) {
+      feedback.innerHTML = `<div class="alert alert-danger mb-0"><i class="fas fa-exclamation-triangle me-2"></i><strong>Error al verificar</strong><br><small>${error.message}</small></div>`;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-check-circle me-1"></i> Verificar';
     }
+  }
 
-    // Calcular estadísticas desde el DOM (sin recargar página)
-    function updateStatsFromTable() {
-      let running = 0;
-      let stopped = 0;
-      
-      // Seleccionar solo las filas directas de la tabla
-      const rows = document.querySelectorAll('#service-table > tr');
-      
-      rows.forEach(row => {
-        // La columna de estado es la 5ª (índice 4) ahora: Proyecto, Nombre, Imagen, Puerto, Estado, Acciones
-        const statusCell = row.children[4]; 
-        if (!statusCell) return;
+  function checkPortAvailability() {
+    const portInput = document.getElementById("service-port");
+    const feedback = document.getElementById("port-availability-feedback");
+    const port = portInput?.value.trim();
+    if (!port) return;
 
-        // Buscar badges solo dentro de la celda de estado
-        const badge = statusCell.querySelector('.badge');
-        if (badge) {
-          const text = badge.textContent.trim().toLowerCase();
-          if (text.includes('running')) {
-            running++;
-          } else if (text.includes('stopped') || text.includes('exited')) {
-            stopped++;
+    fetch(`/paasify/containers/check-port/?port=${encodeURIComponent(port)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && data.available) {
+          feedback.innerHTML = `<div class="alert alert-success mb-0"><strong>${data.message}</strong></div>`;
+        } else {
+          let suggestionsHTML = "";
+          if (data.suggestions?.length) {
+            suggestionsHTML = `<div class="mt-2"><strong>Sugerencias:</strong><div class="d-flex gap-2 mt-2">` +
+              data.suggestions.map(p => `<button type="button" class="btn btn-sm btn-outline-success" onclick="document.getElementById('service-port').value='${p}';checkPortAvailability();">${p}</button>`).join("") +
+              `</div></div>`;
+          }
+          feedback.innerHTML = `<div class="alert alert-warning mb-0">${data.message || data.error}${suggestionsHTML}</div>`;
+        }
+        feedback.style.display = "block";
+      });
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    document.querySelectorAll('input[name="mode"]').forEach(radio => {
+      radio.addEventListener("change", applyMode);
+    });
+    
+    const dockerfile = document.querySelector('input[name="dockerfile"]');
+    const compose = document.querySelector('input[name="compose"]');
+    if (dockerfile) dockerfile.addEventListener("change", syncExclusion);
+    if (compose) compose.addEventListener("change", syncExclusion);
+
+    const form = document.getElementById("newServiceForm");
+    if (form) {
+      form.addEventListener("submit", function (e) {
+        const mode = document.querySelector('input[name="mode"]:checked')?.value;
+        if (mode === "dockerhub") {
+          const dhInput = document.querySelector('input[name="dockerhub_image"]');
+          const imgSelect = document.querySelector('select[name="image"]');
+          if (dhInput && imgSelect && dhInput.value.trim()) {
+            const opt = document.createElement("option");
+            opt.value = dhInput.value.trim();
+            opt.selected = true;
+            imgSelect.appendChild(opt);
+            imgSelect.disabled = false;
           }
         }
       });
-
-      // Actualizar DOM
-      const statRunning = document.getElementById('stat-running');
-      const statStopped = document.getElementById('stat-stopped');
-      
-      if (statRunning) statRunning.textContent = running;
-      if (statStopped) statStopped.textContent = stopped;
     }
 
-    // Auto-refresh de la tabla cada 2 segundos
-    setInterval(refreshTable, 2000);
+    // Filtrar proyectos por asignatura
+    const subjectSelect = document.getElementById("service-subject");
+    const projectSelect = document.getElementById("service-project");
+    if (subjectSelect && projectSelect) {
+      const allProjectOptions = Array.from(projectSelect.options);
+      subjectSelect.addEventListener("change", function () {
+        const selectedId = this.value;
+        projectSelect.innerHTML = "";
+        const defOpt = document.createElement("option");
+        defOpt.value = "";
+        defOpt.disabled = true;
+        defOpt.selected = true;
+        defOpt.textContent = "Selecciona un proyecto";
+        projectSelect.appendChild(defOpt);
 
-    // Al terminar cualquier request HTMX (tabla actualizada o acción botón)
-    document.body.addEventListener('htmx:afterOnLoad', (evt) => {
-       // Recalcular estadísticas inmediatamente
-       setTimeout(updateStatsFromTable, 100);
-    });
+        allProjectOptions.forEach(opt => {
+          if (opt.dataset.subjectId === selectedId) {
+            projectSelect.appendChild(opt.cloneNode(true));
+          }
+        });
 
-    // Detectar cambios de estado y forzar refresh inmediato de tabla
-    document.body.addEventListener('htmx:afterRequest', (evt) => {
-      const url = evt.detail.pathInfo.requestPath;
-      if (url.includes('/start/') || url.includes('/stop/') || url.includes('/remove/')) {
-        setTimeout(refreshTable, 200); // Refresh tabla rápido
-      }
-    });
+        if (projectSelect.options.length === 1) {
+          const noOpt = document.createElement("option");
+          noOpt.value = "";
+          noOpt.disabled = true;
+          noOpt.textContent = "No hay proyectos en esta asignatura";
+          projectSelect.appendChild(noOpt);
+        }
+      });
+      if (subjectSelect.value) subjectSelect.dispatchEvent(new Event("change"));
+    }
+
+    // Notificacion de exito al crear
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("created")) {
+      showToast("El servicio se ha creado correctamente y se esta iniciando.", "text-bg-success", "Servicio Creado!");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Tooltips y Popovers
+    document.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => new bootstrap.Popover(el));
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
   });
 </script>

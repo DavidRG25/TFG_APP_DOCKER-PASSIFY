@@ -1,4 +1,4 @@
-{% load static %}
+﻿{% load static %}
 {% load security_tags %}
 
 <!DOCTYPE html>
@@ -12,7 +12,6 @@
     <link rel="stylesheet" href="{% static 'assets/fonts/fontawesome-all.min.css' %}">
     <link rel="stylesheet" href="{% static 'assets/fonts/font-awesome.min.css' %}">
     <link rel="stylesheet" href="{% static 'assets/fonts/fontawesome5-overrides.min.css' %}">
-    {# <link rel="stylesheet" href="{% static 'assets/bootstrap/css/chinchang-hint.css-9fa90f8/hint.min.css' %}"> #}
     <link rel="stylesheet" href="{% static 'assets/css/dashboard.css' %}">
 
     <!-- Bootstrap Icons: necesarios para mostrar los iconos de ayuda (bi-info-circle) en el formulario de Nuevo servicio -->
@@ -30,7 +29,7 @@
             height: 60px;
             z-index: 1030;
             background: linear-gradient(90deg, #4e73df 0%, #224abe 100%);
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -69,7 +68,8 @@
             list-style: none;
             margin: 0;
             padding: 0;
-            margin-right: auto; /* Empuja todo lo demas a la derecha */
+            margin-right: auto;
+            /* Empuja todo lo demas a la derecha */
         }
 
         .nav-item {
@@ -77,7 +77,7 @@
         }
 
         .nav-link {
-            color: rgba(255,255,255,0.8);
+            color: rgba(255, 255, 255, 0.8);
             padding: 0.5rem 1rem;
             display: flex;
             align-items: center;
@@ -86,12 +86,12 @@
 
         .nav-link:hover {
             color: white;
-            background-color: rgba(255,255,255,0.1);
+            background-color: rgba(255, 255, 255, 0.1);
         }
 
         .nav-link.active {
             color: white;
-            background-color: rgba(255,255,255,0.2);
+            background-color: rgba(255, 255, 255, 0.2);
         }
 
         .nav-link i {
@@ -124,7 +124,7 @@
         }
 
         .auth-button {
-            background-color: rgba(255,255,255,0.1);
+            background-color: rgba(255, 255, 255, 0.1);
             border: none;
             color: white;
             padding: 0.5rem 1rem;
@@ -136,7 +136,7 @@
         }
 
         .auth-button:hover {
-            background-color: rgba(255,255,255,0.2);
+            background-color: rgba(255, 255, 255, 0.2);
         }
 
         .user-status-indicator {
@@ -175,7 +175,7 @@
             background-color: white;
             padding: 1rem 0;
             margin-top: auto;
-            box-shadow: 0 -2px 5px rgba(0,0,0,0.05);
+            box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.05);
         }
 
         /* =============================================== */
@@ -268,83 +268,110 @@
 </head>
 
 <body>
-<!-- Barra superior unificada -->
-<nav class="top-navbar">
-    <!-- Boton de menu movil -->
-    <button class="mobile-menu-btn" id="mobileMenuBtn">
-        <i class="fas fa-bars"></i>
-    </button>
+    <!-- Barra superior unificada -->
+    <nav class="top-navbar">
+        <!-- Boton de menu movil -->
+        <button class="mobile-menu-btn" id="mobileMenuBtn">
+            <i class="fas fa-bars"></i>
+        </button>
 
-    <!-- Contenedor izquierdo (logo + menu) -->
-    <div class="navbar-left-container">
-        <!-- Logo (redirige segun rol si ya estas autenticado) -->
-        <a class="sidebar-brand"
-           href="{% if user.is_authenticated %}{% url 'post_login' %}{% else %}{% url 'index' %}{% endif %}">
-            <div class="sidebar-brand-icon"><i class="fas fa-cloud"></i></div>
-            <div class="sidebar-brand-text">PaaSify</div>
-        </a>
+        <!-- Contenedor izquierdo (logo + menu) -->
+        <div class="navbar-left-container">
+            <!-- Logo (redirige segun rol si ya estas autenticado) -->
+            <a class="sidebar-brand"
+                href="{% if user.is_authenticated %}{% url 'post_login' %}{% else %}{% url 'index' %}{% endif %}">
+                <div class="sidebar-brand-icon"><i class="fas fa-cloud"></i></div>
+                <div class="sidebar-brand-text">PaaSify</div>
+            </a>
 
-        <!-- Menu principal - ahora a la izquierda del todo -->
-        <ul class="sidebar-nav">
-            {# Mostrar "Inicio" SOLO si NO esta autenticado (pantalla de login) #}
-            {% if not user.is_authenticated %}
+            <!-- Menu principal - ahora a la izquierda del todo -->
+            <ul class="sidebar-nav">
+                {# Mostrar "Inicio" SOLO si NO esta autenticado (pantalla de login) #}
+                {% if not user.is_authenticated %}
                 <li class="nav-item">
                     <a class="nav-link {% if section == 'home' %} active {% endif %}" href="{% url 'index' %}">
                         <i class="fas fa-home"></i><span>Inicio</span>
                     </a>
                 </li>
-            {% endif %}
-
-            {% if user.is_authenticated %}
-                {# Mi Perfil #}
-
-                <li class="nav-item">
-
-                    <a class="nav-link" href="{% url 'profile' %}">
-
-                        <i class="fas fa-user"></i><span>Mi Perfil</span>
-
-                    </a>
-
-                </li>
-
-                {% if nav_is_admin or nav_is_student or user.is_superuser or user|has_group:'student' or user|has_group:'alumno' %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'containers:student_panel' %}">
-                            <i class="fas fa-table"></i><span>Proyectos</span>
-                        </a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'containers:student_subjects' %}">
-                            <i class="fas fa-book"></i><span>Mis asignaturas</span>
-                        </a>
-                    </li>
                 {% endif %}
 
-                {% if nav_is_admin or nav_is_teacher or user.is_superuser or user|has_group:'teacher' or user|has_group:'profesor' %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'professor_dashboard' %}">
-                            <i class="fas fa-chalkboard-teacher"></i><span>Panel profesor</span>
-                        </a>
-                    </li>
+                {% if user.is_authenticated %}
+                {# Mi Perfil #}
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'profile' %}">
+                        <i class="fas fa-user"></i><span>Mi Perfil</span>
+                    </a>
+                </li>
+
+                {% if nav_is_admin or nav_is_student or user.is_superuser %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'containers:student_panel' %}">
+                        <i class="fas fa-table"></i><span>Proyectos</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'containers:student_subjects' %}">
+                        <i class="fas fa-book"></i><span>Mis asignaturas</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'containers:api_docs' %}" data-bs-toggle="tooltip"
+                        data-bs-placement="bottom" title="Documentación técnica detallada de la API REST.">
+                        <i class="fas fa-code"></i><span>API Docs</span>
+                    </a>
+                </li>
+                {% elif user|has_group:'student' or user|has_group:'alumno' %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'containers:student_panel' %}">
+                        <i class="fas fa-table"></i><span>Proyectos</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'containers:student_subjects' %}">
+                        <i class="fas fa-book"></i><span>Mis asignaturas</span>
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'containers:api_docs' %}" data-bs-toggle="tooltip"
+                        data-bs-placement="bottom" title="Documentación técnica detallada de la API REST.">
+                        <i class="fas fa-code"></i><span>API Docs</span>
+                    </a>
+                </li>
+                {% endif %}
+
+                {% if nav_is_admin or nav_is_teacher or user.is_superuser %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'professor_dashboard' %}">
+                        <i class="fas fa-chalkboard-teacher"></i><span>Panel profesor</span>
+                    </a>
+                </li>
+                {% elif user|has_group:'teacher' or user|has_group:'profesor' %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'professor_dashboard' %}">
+                        <i class="fas fa-chalkboard-teacher"></i><span>Panel profesor</span>
+                    </a>
+                </li>
                 {% endif %}
 
                 {% if nav_is_admin or user.is_superuser %}
-                    <li class="nav-item">
-                        <a class="nav-link" href="/admin/">
-                            <i class="fas fa-cog"></i><span>Admin</span>
-                        </a>
-                    </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/admin/">
+                        <i class="fas fa-cog"></i><span>Admin</span>
+                    </a>
+                </li>
                 {% endif %}
-            {% endif %}
-        </ul>
-    </div>
+                {% endif %}
+            </ul>
+        </div>
 
-    <!-- Parte derecha - Solo boton de autenticacion -->
-    <div class="navbar-right">
-        <div class="auth-container">
-            {% if user.is_authenticated %}
+        <!-- Parte derecha - Solo boton de autenticacion -->
+        <div class="navbar-right">
+            <div class="auth-container">
+                {% if user.is_authenticated %}
                 <span class="auth-text">
                     <i class="fas fa-user-circle"></i> {{ user.get_username }}
                 </span>
@@ -354,52 +381,61 @@
                         Cerrar sesion <span class="user-status-indicator authenticated"></span>
                     </button>
                 </form>
-            {% else %}
+                {% else %}
                 <a href="{% url 'login' %}" class="auth-button">
                     Autenticarse <span class="user-status-indicator not-authenticated"></span>
                 </a>
-            {% endif %}
-        </div>
-    </div>
-</nav>
-
-<!-- Contenido principal -->
-<div id="content-wrapper">
-    <div id="main-content">
-        {% block body %}
-        <!-- Contenido especifico de cada pagina -->
-        {% endblock %}
-    </div>
-
-    <footer class="footer">
-        <div class="container">
-            <div class="text-center">
-                <span>Copyright  PaaSify 2025</span>
+                {% endif %}
             </div>
         </div>
-    </footer>
-</div>
+    </nav>
 
-<script src="{% static 'assets/bootstrap/js/bootstrap.min.js' %}"></script>
-<script src="{% static 'assets/js/chart.min.js' %}"></script>
-<script src="{% static 'assets/js/bs-init.js' %}"></script>
-<script src="{% static 'assets/js/theme.js' %}"></script>
+    <!-- Contenido principal -->
+    <div id="content-wrapper">
+        <div id="main-content">
+            <!-- Contenedor Maestro de Banners (Alineado bajo PaaSify) -->
+            <div id="global-alert-container" class="position-fixed p-0"
+                style="z-index: 10005; width: fit-content; max-width: 450px; top: 75px; left: 25px; pointer-events: none;">
+            </div>
 
-<script>
-    // Toggle del menu movil
-    document.getElementById('mobileMenuBtn').addEventListener('click', function() {
-        document.body.classList.toggle('mobile-menu-visible');
-    });
+            {% block body %}
+            <!-- Contenido especifico de cada pagina -->
+            {% endblock %}
+        </div>
 
-    // Cerrar menu al hacer clic en un enlace (solo movil)
-    if (window.innerWidth <= 768) {
-        document.querySelectorAll('.nav-link').forEach(function(link) {
-            link.addEventListener('click', function() {
-                document.body.classList.remove('mobile-menu-visible');
-            });
+        <footer class="footer">
+            <div class="container">
+                <div class="text-center">
+                    <span>Copyright PaaSify 2025</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="{% static 'assets/bootstrap/js/bootstrap.min.js' %}"></script>
+    <script src="{% static 'assets/js/chart.min.js' %}"></script>
+    <script src="{% static 'assets/js/bs-init.js' %}"></script>
+    <script src="{% static 'assets/js/theme.js' %}"></script>
+
+    <script>
+        // Toggle del menu movil
+        document.getElementById('mobileMenuBtn').addEventListener('click', function () {
+            document.body.classList.toggle('mobile-menu-visible');
         });
-    }
-</script>
-{% block extrascripts %}{% endblock %}
+
+        // Cerrar menu al hacer clic en un enlace (solo movil)
+        if (window.innerWidth <= 768) {
+            document.querySelectorAll('.nav-link').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    document.body.classList.remove('mobile-menu-visible');
+                });
+            });
+        }
+    </script>
+    <!-- Contenedor maestro de Toasts (Notificaciones) -->
+    <div id="toast-container" class="position-fixed top-0 start-50 translate-middle-x p-4"
+        style="z-index: 10000; display: flex; flex-direction: column; align-items: center;"></div>
+    {% block extrascripts %}{% endblock %}
 </body>
+
 </html>
