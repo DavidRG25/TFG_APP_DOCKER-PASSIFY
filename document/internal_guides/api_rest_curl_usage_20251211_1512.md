@@ -1,20 +1,21 @@
 # Guía de Uso del API REST de PaaSify con curl
 
-**Fecha:** 11/12/2025 15:12  
-**Versión:** 5.0  
-**Propósito:** Documentación interna para despliegue de contenedores vía API REST
+**Fecha:** 10/02/2026  
+**Versión:** 6.1.0  
+**Propósito:** Documentación interna actualizada para despliegue de contenedores vía API REST
 
 ---
 
 ## 📋 Tabla de Contenidos
 
 1. [Autenticación](#autenticación)
-2. [Despliegue con Imagen del Catálogo](#despliegue-con-imagen-del-catálogo)
-3. [Despliegue con Dockerfile Personalizado](#despliegue-con-dockerfile-personalizado)
-4. [Despliegue con Docker Compose](#despliegue-con-docker-compose)
-5. [Gestión de Servicios](#gestión-de-servicios)
-6. [Consulta de Imágenes Disponibles](#consulta-de-imágenes-disponibles)
-7. [Códigos de Respuesta](#códigos-de-respuesta)
+2. [Endpoints Disponibles](#endpoints-disponibles)
+3. [Despliegue con Imagen del Catálogo](#despliegue-con-imagen-del-catálogo)
+4. [Despliegue con Dockerfile Personalizado](#despliegue-con-dockerfile-personalizado)
+5. [Despliegue con Docker Compose](#despliegue-con-docker-compose)
+6. [Gestión de Servicios](#gestión-de-servicios)
+7. [Consulta de Recursos](#consulta-de-recursos)
+8. [Códigos de Respuesta](#códigos-de-respuesta)
 
 ---
 
@@ -23,7 +24,6 @@
 ### Obtener tu Bearer Token
 
 1. **Vía Web UI:**
-
    - Accede a `http://localhost:8000/profile/`
    - Copia tu token desde la sección "Bearer Token API"
 
@@ -54,8 +54,6 @@ curl --request GET \
 
 ### Ver Códigos de Estado HTTP
 
-Por defecto, curl solo muestra el cuerpo de la respuesta. Para ver el código de estado HTTP (200, 201, 400, etc.), usa una de estas opciones:
-
 **Opción 1: Mostrar código de estado con `-w`**
 
 ```bash
@@ -65,13 +63,6 @@ curl --request POST \
   --header 'Content-Type: application/json' \
   --data '{"name": "test", "image": "nginx:latest"}' \
   --write-out '\nHTTP Status: %{http_code}\n'
-```
-
-**Salida:**
-
-```json
-{"id":102,"name":"test",...}
-HTTP Status: 201
 ```
 
 **Opción 2: Mostrar headers completos con `-i`**
@@ -85,34 +76,29 @@ curl --request POST \
   --include
 ```
 
-**Salida:**
-
-```
-HTTP/1.1 201 Created
-Content-Type: application/json
-...
-
-{"id":102,"name":"test",...}
-```
-
-**Opción 3: Solo el código de estado con `-s` y `-o`**
-
-```bash
-curl --request POST \
-  --url http://localhost:8000/api/containers/ \
-  --header 'Authorization: Bearer TOKEN' \
-  --header 'Content-Type: application/json' \
-  --data '{"name": "test", "image": "nginx:latest"}' \
-  --silent --output /dev/null --write-out '%{http_code}\n'
-```
-
-**Salida:**
-
-```
-201
-```
-
 > 💡 **Tip:** Para debugging, usa siempre `-w '\nHTTP Status: %{http_code}\n'` para ver el código de estado junto con la respuesta.
+
+---
+
+## 🌐 Endpoints Disponibles
+
+### **Base URL:** `http://localhost:8000/api/`
+
+| Endpoint                        | Métodos                 | Descripción                        |
+| ------------------------------- | ----------------------- | ---------------------------------- |
+| `/api/containers/`              | GET, POST               | Listar y crear servicios           |
+| `/api/containers/<id>/`         | GET, PUT, PATCH, DELETE | Detalles y gestión de servicio     |
+| `/api/containers/<id>/start/`   | POST                    | Iniciar servicio                   |
+| `/api/containers/<id>/stop/`    | POST                    | Detener servicio                   |
+| `/api/containers/<id>/restart/` | POST                    | Reiniciar servicio                 |
+| `/api/containers/<id>/remove/`  | POST                    | Eliminar servicio                  |
+| `/api/images/`                  | GET                     | Listar imágenes del catálogo       |
+| `/api/subjects/`                | GET                     | Listar asignaturas del usuario     |
+| `/api/subjects/<id>/`           | GET                     | Detalles de asignatura             |
+| `/api/projects/`                | GET                     | Listar proyectos del usuario       |
+| `/api/projects/<id>/`           | GET                     | Detalles de proyecto               |
+| `/api/docs/`                    | GET                     | Documentación Swagger (solo admin) |
+| `/api/schema/`                  | GET                     | Esquema OpenAPI (solo admin)       |
 
 ---
 
@@ -144,12 +130,13 @@ curl --request POST \
   "assigned_port": 45001,
   "internal_port": 80,
   "logs": "",
-  "has_compose": false
+  "has_compose": false,
+  "owner": 1,
+  "project": null,
+  "subject": null
 }
 HTTP Status: 201
 ```
-
-> ⚠️ **Nota importante:** Aunque técnicamente el campo `project` es opcional en el API, se **recomienda encarecidamente** incluirlo para mantener consistencia con la interfaz web. En futuras versiones (v6.0+) será obligatorio. Ver: `document/bugs_features/bug_inconsistencia_validacion_proyecto_20251211_1520.md`
 
 ### Caso 2: Con Proyecto Asignado
 
@@ -171,37 +158,47 @@ curl --request POST \
 
 **¿Cómo obtener los IDs de tus proyectos?**
 
-> ⚠️ **Limitación actual (v5.0):** No existe un endpoint del API para listar proyectos y asignaturas. Ver bug: `document/bugs_features/bug_falta_endpoint_listar_proyectos_20251211_1529.md`
-
-**Workarounds temporales:**
-
-**Opción 1 - Vía Web UI:**
-
-1. Accede a `http://localhost:8000/paasify/containers/`
-2. Abre el modal "Nuevo servicio"
-3. Inspecciona el selector de proyectos (F12 → Elements)
-4. Los IDs están en `<option value="1">Nombre Proyecto</option>`
-
-**Opción 2 - Vía consola del navegador:**
-
-```javascript
-// Abre cualquier página de PaaSify, presiona F12 y ejecuta:
-console.table(
-  Array.from(document.querySelectorAll('select[name="project"] option'))
-    .filter((o) => o.value)
-    .map((o) => ({ id: parseInt(o.value), proyecto: o.textContent.trim() }))
-);
-```
-
-**Opción 3 - Hardcodear temporalmente:**
-Si solo tienes un proyecto, probablemente su ID sea `1`. Puedes intentar:
+**✅ Ahora disponible (v6.0+):** Usa los endpoints del API:
 
 ```bash
-# Listar tus servicios para ver qué project_id tienen
+# Listar tus proyectos
 curl --request GET \
-  --url http://localhost:8000/api/containers/ \
-  --header 'Authorization: Bearer TOKEN'
-# Busca el campo "project" en la respuesta
+  --url http://localhost:8000/api/projects/ \
+  --header 'Authorization: Bearer TU_TOKEN'
+
+# Respuesta:
+[
+  {
+    "id": 1,
+    "name": "Proyecto Final",
+    "subject": 1,
+    "subject_name": "Desarrollo Web",
+    "date": "2026-01-15"
+  }
+]
+
+# Listar tus asignaturas
+curl --request GET \
+  --url http://localhost:8000/api/subjects/ \
+  --header 'Authorization: Bearer TU_TOKEN'
+
+# Respuesta:
+[
+  {
+    "id": 1,
+    "name": "Desarrollo Web",
+    "category": "Informática",
+    "year": "2025-2026"
+  }
+]
+```
+
+**Filtrar proyectos por asignatura:**
+
+```bash
+curl --request GET \
+  --url 'http://localhost:8000/api/projects/?subject=1' \
+  --header 'Authorization: Bearer TU_TOKEN'
 ```
 
 ### Caso 3: Con Puerto Personalizado
@@ -398,7 +395,11 @@ curl --request GET \
     "image": "nginx:latest",
     "status": "running",
     "assigned_port": 45001,
-    "has_compose": false
+    "internal_port": 80,
+    "has_compose": false,
+    "owner": 1,
+    "project": 1,
+    "subject": 1
   },
   {
     "id": 2,
@@ -411,6 +412,32 @@ curl --request GET \
     ]
   }
 ]
+```
+
+### Filtrar Servicios
+
+**Por proyecto:**
+
+```bash
+curl --request GET \
+  --url 'http://localhost:8000/api/containers/?project=1' \
+  --header 'Authorization: Bearer TU_TOKEN'
+```
+
+**Por asignatura:**
+
+```bash
+curl --request GET \
+  --url 'http://localhost:8000/api/containers/?subject=1' \
+  --header 'Authorization: Bearer TU_TOKEN'
+```
+
+**Por estado:**
+
+```bash
+curl --request GET \
+  --url 'http://localhost:8000/api/containers/?status=running' \
+  --header 'Authorization: Bearer TU_TOKEN'
 ```
 
 ### Obtener Detalles de un Servicio
@@ -437,6 +464,14 @@ curl --request POST \
   --header 'Authorization: Bearer TU_TOKEN'
 ```
 
+### Reiniciar un Servicio
+
+```bash
+curl --request POST \
+  --url http://localhost:8000/api/containers/1/restart/ \
+  --header 'Authorization: Bearer TU_TOKEN'
+```
+
 ### Eliminar un Servicio
 
 ```bash
@@ -455,7 +490,7 @@ curl --request POST \
 
 ---
 
-## 🖼️ Consulta de Imágenes Disponibles
+## 🔍 Consulta de Recursos
 
 ### Listar Catálogo de Imágenes
 
@@ -473,15 +508,68 @@ curl --request GET \
     "id": 1,
     "name": "nginx",
     "tag": "latest",
-    "description": "Servidor web de alto rendimiento"
+    "description": "Servidor web de alto rendimiento",
+    "internal_port": 80
   },
   {
     "id": 2,
     "name": "mysql",
     "tag": "8.0",
-    "description": "Base de datos relacional"
+    "description": "Base de datos relacional",
+    "internal_port": 3306
   }
 ]
+```
+
+### Listar tus Asignaturas
+
+```bash
+curl --request GET \
+  --url http://localhost:8000/api/subjects/ \
+  --header 'Authorization: Bearer TU_TOKEN'
+```
+
+**Respuesta:**
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Desarrollo Web",
+    "category": "Informática",
+    "year": "2025-2026"
+  }
+]
+```
+
+### Listar tus Proyectos
+
+```bash
+curl --request GET \
+  --url http://localhost:8000/api/projects/ \
+  --header 'Authorization: Bearer TU_TOKEN'
+```
+
+**Respuesta:**
+
+```json
+[
+  {
+    "id": 1,
+    "name": "Proyecto Final",
+    "subject": 1,
+    "subject_name": "Desarrollo Web",
+    "date": "2026-01-15"
+  }
+]
+```
+
+**Filtrar proyectos por asignatura:**
+
+```bash
+curl --request GET \
+  --url 'http://localhost:8000/api/projects/?subject=1' \
+  --header 'Authorization: Bearer TU_TOKEN'
 ```
 
 ---
@@ -564,27 +652,55 @@ def start_service(service_id):
     )
     return response.status_code == 200
 
+def list_projects():
+    response = requests.get(f"{BASE_URL}/projects/", headers=HEADERS)
+    return response.json()
+
+def list_subjects():
+    response = requests.get(f"{BASE_URL}/subjects/", headers=HEADERS)
+    return response.json()
+
 # Uso
 service = create_service("mi-app", "nginx:latest")
 print(f"Servicio creado: {service['id']}")
 
 services = list_services()
 print(f"Total servicios: {len(services)}")
+
+projects = list_projects()
+print(f"Proyectos disponibles: {projects}")
 ```
 
 ---
 
 ## 📝 Notas Importantes
 
-1. **Proyecto Obligatorio (v5.0+)**: Desde la versión 5.0, todos los servicios deben estar asociados a un proyecto. Asegúrate de incluir el campo `project` en tus requests.
+1. **Autenticación Obligatoria**: Todos los endpoints requieren autenticación con Bearer Token.
 
-2. **Límites de Puertos**: Los puertos disponibles están en el rango 40000-50000. Si no especificas `custom_port`, se asignará uno automáticamente.
+2. **Permisos por Rol**:
+   - **Alumnos**: Solo ven y gestionan sus propios servicios
+   - **Profesores**: Ven servicios de sus asignaturas
+   - **Administradores**: Acceso completo a todos los servicios
 
-3. **Tamaño de Archivos**: Los archivos ZIP/RAR no deben superar 100MB.
+3. **Límites de Puertos**: Los puertos disponibles están en el rango 40000-50000. Si no especificas `custom_port`, se asignará uno automáticamente.
 
-4. **Timeout**: Las operaciones de build pueden tardar varios minutos. El servicio quedará en estado `creating` hasta completarse.
+4. **Tamaño de Archivos**: Los archivos ZIP/RAR no deben superar 100MB.
 
-5. **Logs**: Puedes consultar los logs de build/ejecución en el campo `logs` del servicio.
+5. **Timeout**: Las operaciones de build pueden tardar varios minutos. El servicio quedará en estado `creating` hasta completarse.
+
+6. **Logs**: Puedes consultar los logs de build/ejecución en el campo `logs` del servicio.
+
+7. **Documentación Swagger**: Disponible en `/api/docs/` (solo para administradores).
+
+---
+
+## 🆕 Novedades en v6.0+
+
+- ✅ **Endpoints de Proyectos y Asignaturas**: Ya no necesitas workarounds para obtener IDs
+- ✅ **Filtros Avanzados**: Filtra servicios por proyecto, asignatura o estado
+- ✅ **Documentación Swagger**: Documentación interactiva del API
+- ✅ **Mejor Manejo de Errores**: Mensajes de error más descriptivos
+- ✅ **Soporte Compose Mejorado**: Mejor gestión de servicios multi-contenedor
 
 ---
 
@@ -597,9 +713,12 @@ Esta guía será ampliada en futuras versiones con:
 - [ ] Webhooks para notificaciones
 - [ ] CLI oficial de PaaSify
 - [ ] Integración con CI/CD
+- [ ] Acceso a terminal vía API
+- [ ] Streaming de logs en tiempo real
 
 ---
 
-**Última actualización:** 11/12/2025  
+**Última actualización:** 10/02/2026  
+**Versión:** 6.1.0  
 **Mantenedor:** Equipo PaaSify  
 **Feedback:** Reportar issues en el repositorio del proyecto
