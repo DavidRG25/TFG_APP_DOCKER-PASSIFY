@@ -962,6 +962,9 @@ def service_table(request):
 @login_required
 def terminal_view(request, pk):
     """
+    DEPRECATED: Usar terminal_v2_view en su lugar.
+    Se mantendrá hasta v6.2.0 para compatibilidad.
+    
     Muestra la terminal web para el servicio si el usuario es el propietario
     y el contenedor esta en ejecucion.
     """
@@ -1002,6 +1005,73 @@ def terminal_view(request, pk):
     
     return render(request, "containers/terminal.html", {
         "service": service,
+        "ws_path": ws_path,
+        "return_url": return_url,
+    })
+
+
+@login_required
+def terminal_v2_view(request, pk):
+    """
+    Terminal web mejorada con PyXtermJS.
+    
+    Características:
+    - Soporte para múltiples shells
+    - Mejor manejo de errores
+    - Soporte para servicios Compose (múltiples contenedores)
+    - Timeout configurable
+    """
+    user = request.user
+    if user_is_admin(user) or user_is_teacher(user):
+        service = get_object_or_404(Service, pk=pk)
+    else:
+        service = get_object_or_404(Service, pk=pk, owner=user)
+    
+    # Obtener parámetro de contenedor (para servicios Compose)
+    container_id = request.GET.get('container')
+    container_name = service.name
+    
+    # Verificar estado del servicio
+    if container_id:
+        # Modo Compose: verificar contenedor específico
+        try:
+            container_record = ServiceContainer.objects.get(pk=container_id, service=service)
+            if container_record.status != "running":
+                return HttpResponse(
+                    f"El contenedor '{container_record.name}' no está en ejecución.",
+                    status=400
+                )
+            container_name = container_record.name
+        except ServiceContainer.DoesNotExist:
+            return HttpResponse("Contenedor no encontrado.", status=404)
+    else:
+        # Modo simple: verificar servicio principal
+        if service.status != "running" or not service.container_id:
+            return HttpResponse("El servicio no está en ejecución.", status=400)
+    
+    # Verificar Docker disponible
+    docker_client = get_docker_client()
+    if docker_client is None:
+        return HttpResponse("Docker no está disponible actualmente.", status=503)
+    
+    # Construir WebSocket path
+    ws_path = f"/ws/terminal-v2/{service.id}/"
+    if container_id:
+        ws_path += f"?container={container_id}"
+    
+    # Capturar URL de retorno
+    return_url = request.GET.get('return_url')
+    if not return_url:
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'subjects/' in referer:
+            return_url = referer
+        else:
+            from django.urls import reverse
+            return_url = reverse('containers:student_panel')
+    
+    return render(request, "containers/terminal_v2.html", {
+        "service": service,
+        "container_name": container_name,
         "ws_path": ws_path,
         "return_url": return_url,
     })
@@ -1376,3 +1446,98 @@ def api_command_generator_view(request):
     }
     
     return render(request, 'containers/api_command_generator.html', context)
+
+
+# ============================================================================
+# LOGS PAGE - Página dedicada para visualización de logs
+# ============================================================================
+
+@login_required
+def logs_page(request, pk):
+    """
+    Página dedicada para visualización de logs con funcionalidades avanzadas.
+    
+    Características:
+    - Filtros por nivel (ERROR, WARN, INFO, DEBUG)
+    - Búsqueda de texto
+    - Selector de cantidad de líneas
+    - Colorización con Rich
+    - Caché de logs
+    - Soporte para servicios Compose
+    """
+    user = request.user
+    if user_is_admin(user) or user_is_teacher(user):
+        service = get_object_or_404(Service, pk=pk)
+    else:
+        service = get_object_or_404(Service, pk=pk, owner=user)
+    
+    # Parámetros de filtro
+    search_text = request.GET.get('search', '').strip()
+    log_level = request.GET.get('level', 'ALL')
+    tail = request.GET.get('tail', '1000')
+    use_rich = request.GET.get('rich', 'true').lower() == 'true'
+    
+    # Convertir tail a int (o None para 'all')
+    try:
+        tail_int = int(tail) if tail != 'all' else 10000
+    except ValueError:
+        tail_int = 1000
+    
+    # Obtener logs
+    from .utils import (
+        fetch_container_logs,
+        colorize_logs_rich,
+        colorize_logs_simple,
+        filter_logs,
+        filter_by_level
+    )
+    
+    logs_lines, from_cache = fetch_container_logs(service, tail=tail_int)
+    
+    # Aplicar filtros
+    if search_text:
+        logs_lines = filter_logs(logs_lines, search_text)
+    
+    if log_level != 'ALL':
+        logs_lines = filter_by_level(logs_lines, log_level)
+    
+    # Colorizar logs
+    try:
+        if use_rich:
+            logs_html = colorize_logs_rich(logs_lines)
+        else:
+            logs_html = colorize_logs_simple(logs_lines)
+    except Exception as e:
+        logger.error(f"Error colorizando logs: {e}")
+        logs_html = colorize_logs_simple(logs_lines)
+    
+    # Capturar URL de retorno
+    return_url = request.GET.get('return_url')
+    if not return_url:
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'subjects/' in referer:
+            return_url = referer
+        else:
+            from django.urls import reverse
+            return_url = reverse('containers:student_panel')
+    
+    # Si es request HTMX, solo devolver el fragmento de logs
+    if request.headers.get('HX-Request'):
+        return render(request, "containers/_partials/logs/_logs_content.html", {
+            "logs_html": logs_html,
+            "total_lines": len(logs_lines),
+            "from_cache": from_cache,
+        })
+    
+    # Request normal: página completa
+    return render(request, "containers/logs_page.html", {
+        "service": service,
+        "logs_html": logs_html,
+        "search_text": search_text,
+        "log_level": log_level,
+        "tail": tail,
+        "use_rich": use_rich,
+        "total_lines": len(logs_lines),
+        "from_cache": from_cache,
+        "return_url": return_url,
+    })

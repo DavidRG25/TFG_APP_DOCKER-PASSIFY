@@ -13,6 +13,8 @@ urlpatterns = [
 
     path("table-fragment/", views.service_table, name="service_table"),
     path("terminal/<int:pk>/", views.terminal_view, name="terminal_view"),
+    path("terminal-v2/<int:pk>/", views.terminal_v2_view, name="terminal_v2"),  # Terminal mejorada
+    path("logs/<int:pk>/", views.logs_page, name="logs_page"),  # Página de logs
     path("edit/<int:pk>/", views.edit_service, name="edit_service"),
     
     # Nueva página dedicada para crear servicio

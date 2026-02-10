@@ -28,11 +28,10 @@
             <i class="fas fa-trash"></i>
         </button>
 
-        <button class="btn btn-secondary" hx-get="{% url 'service-logs' service.id %}"
-            hx-target="#genericModalContent" hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#genericModal"
-            title="Ver logs del servicio">
+        <a href="{% url 'containers:logs_page' service.id %}" class="btn btn-secondary"
+            title="Ver logs del servicio Compose">
             <i class="fas fa-history"></i>
-        </button>
+        </a>
 
         {% if service.compose %}
         <button class="btn btn-info" hx-get="{% url 'service-compose' service.id %}" hx-target="#code-body"

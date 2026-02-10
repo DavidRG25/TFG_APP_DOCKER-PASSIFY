@@ -1,0 +1,458 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extrahead %}
+<style>
+    .logs-page {
+        background-color: #1e1e1e;
+        min-height: 100vh;
+        padding: 20px;
+    }
+    
+    .logs-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 20px;
+        border-radius: 10px 10px 0 0;
+        color: white;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    }
+    
+    .logs-header h3 {
+        margin: 0;
+        font-weight: 600;
+    }
+    
+    .logs-toolbar {
+        background-color: #2d2d2d;
+        padding: 15px 20px;
+        border-left: 1px solid #444;
+        border-right: 1px solid #444;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+    }
+    
+    .logs-toolbar input,
+    .logs-toolbar select {
+        background-color: #1e1e1e;
+        border: 1px solid #555;
+        color: #fff;
+        padding: 8px 12px;
+        border-radius: 5px;
+    }
+    
+    .logs-toolbar input:focus,
+    .logs-toolbar select:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+    }
+    
+    .logs-toolbar button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: all 0.3s;
+        font-weight: 500;
+    }
+    
+    .btn-copy {
+        background-color: #4caf50;
+        color: white;
+    }
+    
+    .btn-copy:hover {
+        background-color: #45a049;
+        transform: translateY(-2px);
+    }
+    
+    .btn-download {
+        background-color: #2196f3;
+        color: white;
+    }
+    
+    .btn-download:hover {
+        background-color: #0b7dda;
+        transform: translateY(-2px);
+    }
+    
+    .btn-refresh {
+        background-color: #ff9800;
+        color: white;
+    }
+    
+    .btn-refresh:hover {
+        background-color: #e68900;
+        transform: translateY(-2px);
+    }
+    
+    .btn-clear {
+        background-color: #f44336;
+        color: white;
+    }
+    
+    .btn-clear:hover {
+        background-color: #da190b;
+        transform: translateY(-2px);
+    }
+    
+    .btn-live {
+        background-color: #9c27b0;
+        color: white;
+    }
+    
+    .btn-live:hover {
+        background-color: #7b1fa2;
+        transform: translateY(-2px);
+    }
+    
+    .btn-live.active {
+        background-color: #e91e63;
+        animation: pulse-live 2s infinite;
+    }
+    
+    @keyframes pulse-live {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+    
+    .logs-container {
+        background-color: #000;
+        border-radius: 0 0 10px 10px;
+        padding: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        min-height: 500px;
+        max-height: calc(100vh - 300px);
+        overflow-y: auto;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+    
+    .logs-container pre {
+        margin: 0;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        color: #d4d4d4;
+    }
+    
+    /* Colorización simple (fallback) */
+    .log-line {
+        margin: 2px 0;
+        padding: 2px 0;
+    }
+    
+    .log-error {
+        color: #f44336;
+        font-weight: 500;
+    }
+    
+    .log-warn {
+        color: #ffc107;
+    }
+    
+    .log-info {
+        color: #4caf50;
+    }
+    
+    .log-debug {
+        color: #2196f3;
+    }
+    
+    .log-header {
+        color: #00bcd4;
+        font-weight: bold;
+        background-color: #1a1a1a;
+        padding: 5px;
+        margin: 10px 0;
+    }
+    
+    .log-default {
+        color: #d4d4d4;
+    }
+    
+    .logs-info {
+        background-color: #2d2d2d;
+        padding: 10px 20px;
+        border-left: 1px solid #444;
+        border-right: 1px solid #444;
+        color: #aaa;
+        font-size: 0.9em;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .cache-indicator {
+        display: inline-block;
+        padding: 3px 8px;
+        border-radius: 3px;
+        font-size: 0.85em;
+        font-weight: 500;
+    }
+    
+    .cache-hit {
+        background-color: #4caf50;
+        color: white;
+    }
+    
+    .cache-miss {
+        background-color: #ff9800;
+        color: white;
+    }
+    
+    .search-input {
+        flex: 1;
+        min-width: 200px;
+    }
+    
+    @media (max-width: 768px) {
+        .logs-toolbar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+        
+        .logs-toolbar input,
+        .logs-toolbar select,
+        .logs-toolbar button {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="logs-page">
+    <div class="logs-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h3>📋 Logs - {{ service.name }}</h3>
+                <small>Servicio ID: {{ service.id }}</small>
+            </div>
+            <a href="{{ return_url }}" class="btn btn-light">
+                ← Volver
+            </a>
+        </div>
+    </div>
+    
+    <div class="logs-toolbar">
+        <input type="text" 
+               name="search" 
+               class="search-input"
+               placeholder="🔍 Buscar en logs..."
+               value="{{ search_text }}"
+               hx-get="{% url 'containers:logs_page' service.id %}"
+               hx-trigger="keyup changed delay:500ms"
+               hx-target="#logs-content"
+               hx-include="[name='level'], [name='tail'], [name='rich']">
+        
+        <select name="level"
+                hx-get="{% url 'containers:logs_page' service.id %}"
+                hx-trigger="change"
+                hx-target="#logs-content"
+                hx-include="[name='search'], [name='tail'], [name='rich']">
+            <option value="ALL" {% if log_level == 'ALL' %}selected{% endif %}>Todos los niveles</option>
+            <option value="ERROR" {% if log_level == 'ERROR' %}selected{% endif %}>🔴 ERROR</option>
+            <option value="WARN" {% if log_level == 'WARN' %}selected{% endif %}>🟡 WARN</option>
+            <option value="INFO" {% if log_level == 'INFO' %}selected{% endif %}>🟢 INFO</option>
+            <option value="DEBUG" {% if log_level == 'DEBUG' %}selected{% endif %}>🔵 DEBUG</option>
+        </select>
+        
+        <select name="tail"
+                hx-get="{% url 'containers:logs_page' service.id %}"
+                hx-trigger="change"
+                hx-target="#logs-content"
+                hx-include="[name='search'], [name='level'], [name='rich']">
+            <option value="100" {% if tail == '100' %}selected{% endif %}>100 líneas</option>
+            <option value="500" {% if tail == '500' %}selected{% endif %}>500 líneas</option>
+            <option value="1000" {% if tail == '1000' %}selected{% endif %}>1000 líneas</option>
+            <option value="all" {% if tail == 'all' %}selected{% endif %}>Todas</option>
+        </select>
+        
+        <input type="hidden" name="rich" value="{{ use_rich|yesno:'true,false' }}">
+        
+        <button class="btn-copy" onclick="copyLogs()" title="Copiar logs al portapapeles">
+            📋 Copiar
+        </button>
+        
+        <button class="btn-download" onclick="downloadLogs()" title="Descargar logs como archivo">
+            💾 Descargar
+        </button>
+        
+        <button class="btn-refresh" 
+                hx-get="{% url 'containers:logs_page' service.id %}"
+                hx-target="#logs-content"
+                hx-include="[name='search'], [name='level'], [name='tail'], [name='rich']"
+                title="Refrescar logs">
+            🔄 Refrescar
+        </button>
+        
+        <button id="btn-live" class="btn-live" onclick="toggleLiveStream()" title="Seguir logs en vivo">
+            📡 Seguir en vivo
+        </button>
+        
+        <button class="btn-clear" onclick="scrollToTop()" title="Ir al inicio">
+            ⬆️ Inicio
+        </button>
+    </div>
+    
+    <div class="logs-info">
+        <span>
+            📊 Mostrando <strong>{{ total_lines }}</strong> líneas
+            {% if search_text %}
+            | 🔍 Filtrado por: "<strong>{{ search_text }}</strong>"
+            {% endif %}
+            {% if log_level != 'ALL' %}
+            | 🏷️ Nivel: <strong>{{ log_level }}</strong>
+            {% endif %}
+        </span>
+        <span class="cache-indicator {% if from_cache %}cache-hit{% else %}cache-miss{% endif %}">
+            {% if from_cache %}⚡ Desde caché{% else %}🔄 Actualizado{% endif %}
+        </span>
+    </div>
+    
+    <div class="logs-container" id="logs-content">
+        {{ logs_html|safe }}
+    </div>
+</div>
+{% endblock %}
+
+{% block extrascripts %}
+<script>
+// Copiar logs al portapapeles
+function copyLogs() {
+    const logsContent = document.getElementById('logs-content');
+    const text = logsContent.innerText;
+    
+    navigator.clipboard.writeText(text).then(() => {
+        // Mostrar feedback
+        const btn = event.target;
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '✅ Copiado!';
+        btn.style.backgroundColor = '#4caf50';
+        
+        setTimeout(() => {
+            btn.innerHTML = originalText;
+            btn.style.backgroundColor = '';
+        }, 2000);
+    }).catch(err => {
+        alert('Error al copiar: ' + err);
+    });
+}
+
+// Descargar logs como archivo
+function downloadLogs() {
+    const logsContent = document.getElementById('logs-content');
+    const text = logsContent.innerText;
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `logs-{{ service.name }}-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.log`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    // Feedback
+    const btn = event.target;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '✅ Descargado!';
+    btn.style.backgroundColor = '#2196f3';
+    
+    setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.style.backgroundColor = '';
+    }, 2000);
+}
+
+// Scroll al inicio
+function scrollToTop() {
+    const container = document.querySelector('.logs-container');
+    container.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+}
+
+// Streaming en vivo
+let liveSocket = null;
+let isLiveStreaming = false;
+
+function toggleLiveStream() {
+    const btn = document.getElementById('btn-live');
+    const logsContainer = document.getElementById('logs-content');
+    
+    if (isLiveStreaming) {
+        // Detener streaming
+        if (liveSocket) {
+            liveSocket.send('stop');
+            liveSocket.close();
+            liveSocket = null;
+        }
+        
+        btn.classList.remove('active');
+        btn.innerHTML = '📡 Seguir en vivo';
+        isLiveStreaming = false;
+    } else {
+        // Iniciar streaming
+        const scheme = window.location.protocol === "https:" ? "wss" : "ws";
+        const wsUrl = `${scheme}://${window.location.host}/ws/logs-stream/{{ service.id }}/`;
+        
+        liveSocket = new WebSocket(wsUrl);
+        
+        liveSocket.onopen = () => {
+            btn.classList.add('active');
+            btn.innerHTML = '⏸️ Pausar streaming';
+            isLiveStreaming = true;
+            
+            // Limpiar logs actuales
+            logsContainer.innerHTML = '<pre style="color: #4caf50;">🔴 STREAMING EN VIVO - Conectado</pre>';
+        };
+        
+        liveSocket.onmessage = (event) => {
+            const pre = document.createElement('pre');
+            pre.textContent = event.data;
+            pre.style.margin = '0';
+            pre.style.color = '#d4d4d4';
+            
+            // Colorizar según contenido
+            const text = event.data.toLowerCase();
+            if (text.includes('error')) {
+                pre.style.color = '#f44336';
+            } else if (text.includes('warn')) {
+                pre.style.color = '#ffc107';
+            } else if (text.includes('info')) {
+                pre.style.color = '#4caf50';
+            }
+            
+            logsContainer.appendChild(pre);
+            
+            // Auto-scroll al final
+            logsContainer.scrollTop = logsContainer.scrollHeight;
+        };
+        
+        liveSocket.onerror = (error) => {
+            console.error('WebSocket error:', error);
+            const pre = document.createElement('pre');
+            pre.textContent = '[ERROR] Error de conexión WebSocket';
+            pre.style.color = '#f44336';
+            logsContainer.appendChild(pre);
+        };
+        
+        liveSocket.onclose = () => {
+            btn.classList.remove('active');
+            btn.innerHTML = '📡 Seguir en vivo';
+            isLiveStreaming = false;
+            
+            const pre = document.createElement('pre');
+            pre.textContent = '\n[DESCONECTADO] Streaming finalizado';
+            pre.style.color = '#ff9800';
+            logsContainer.appendChild(pre);
+        };
+    }
+}
+</script>
+{% endblock %}
