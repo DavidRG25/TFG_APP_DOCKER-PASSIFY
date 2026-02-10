@@ -22,24 +22,25 @@ from .models import Service, ServiceContainer
 logger = logging.getLogger(__name__)
 
 
-def fetch_container_logs(service: Service, tail: int = 1000, since: str = None) -> Tuple[List[str], bool]:
+def fetch_container_logs(service: Service, tail: int = 1000, since: str = None, container_name: str = None) -> Tuple[List[str], bool]:
     """
-    Obtener logs del contenedor.
+    Obtener logs del contenedor o contenedores del servicio.
     
     Args:
         service: Servicio del cual obtener logs
         tail: Número de líneas a obtener (default: 1000)
         since: Timestamp desde cuando obtener logs (opcional)
+        container_name: Nombre del contenedor específico (para Compose)
     
     Returns:
         Tuple[List[str], bool]: (lista de líneas de log, es_desde_cache)
     """
     # Intentar obtener de caché
-    cache_key = f"logs_{service.id}_{tail}_{since or 'all'}"
+    cache_key = f"logs_{service.id}_{tail}_{since or 'all'}_{container_name or 'all'}"
     cached_logs = cache.get(cache_key)
     
     if cached_logs:
-        logger.debug(f"Logs obtenidos de caché para servicio {service.id}")
+        logger.debug(f"Logs obtenidos de caché para servicio {service.id} (container: {container_name})")
         return cached_logs, True
     
     docker_client = get_docker_client()
@@ -50,9 +51,16 @@ def fetch_container_logs(service: Service, tail: int = 1000, since: str = None) 
     
     try:
         if service.has_compose:
-            # Servicio Compose: obtener logs de todos los contenedores
-            containers = ServiceContainer.objects.filter(service=service).order_by('name')
+            # Servicio Compose: obtener logs. Si container_name está presente, filtrar por él.
+            containers_query = ServiceContainer.objects.filter(service=service)
+            if container_name:
+                containers_query = containers_query.filter(name=container_name)
             
+            containers = containers_query.order_by('name')
+            
+            if not containers.exists():
+                return [f"[INFO] No se encontraron contenedores para el nombre: {container_name}"], False
+
             for container_record in containers:
                 if not container_record.container_id:
                     continue
@@ -70,13 +78,17 @@ def fetch_container_logs(service: Service, tail: int = 1000, since: str = None) 
                     
                     container_logs = container.logs(**logs_kwargs).decode('utf-8', errors='replace')
                     
-                    # Añadir header para identificar el contenedor
-                    logs_lines.append(f"{'='*80}")
-                    logs_lines.append(f"CONTENEDOR: {container_record.name}")
-                    logs_lines.append(f"ID: {container_record.container_id[:12]}")
-                    logs_lines.append(f"{'='*80}")
+                    # Añadir header para identificar el contenedor solo si hay varios
+                    if containers.count() > 1:
+                        logs_lines.append(f"{'='*80}")
+                        logs_lines.append(f"CONTENEDOR: {container_record.name}")
+                        logs_lines.append(f"ID: {container_record.container_id[:12]}")
+                        logs_lines.append(f"{'='*80}")
+                    
                     logs_lines.extend(container_logs.split('\n'))
-                    logs_lines.append("")  # Línea en blanco entre contenedores
+                    
+                    if containers.count() > 1:
+                        logs_lines.append("")  # Línea en blanco entre contenedores
                     
                 except Exception as e:
                     logger.error(f"Error obteniendo logs de contenedor {container_record.name}: {e}")

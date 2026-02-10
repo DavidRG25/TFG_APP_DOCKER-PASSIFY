@@ -42,17 +42,12 @@
                 <i class="fas fa-stop"></i>
             </button>
 
-            <button class="btn btn-secondary"
-                hx-get="{% url 'service-logs' service.id %}?container={{ container.id }}" hx-target="#genericModalContent"
-                hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#genericModal"
-                title="Logs de {{ container.name }}">
-                <i class="fas fa-history"></i>
-            </button>
+            {# Botón de logs deshabilitado por redundancia (se accede desde el principal) #}
         </div>
 
         <div class="btn-group shadow-sm ms-2">
             {% if container.status == 'running' and container.container_id %}
-            <a href="{% url 'containers:terminal_view' service.id %}?container={{ container.id }}"
+            <a href="{% url 'containers:terminal_v2' service.id %}?container={{ container.id }}"
                 class="btn btn-dark" title="Terminal de {{ container.name }}">
                 <i class="fas fa-terminal"></i>
             </a>

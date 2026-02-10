@@ -3,139 +3,191 @@
 
 {% block extrahead %}
 <style>
-    .logs-page {
-        background-color: #1e1e1e;
+    /* Forzamos que el fondo ocupe toda la pantalla eliminando márgenes de base.html */
+    #main-content {
+        padding: 0 !important;
+    }
+    
+    #content-wrapper {
+        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%) !important; /* Azul grisáceo claro y elegante */
         min-height: 100vh;
-        padding: 20px;
+    }
+
+    .footer {
+        display: none !important;
+    }
+
+    .logs-page {
+        background: transparent; /* El fondo lo hereda del wrapper */
+        min-height: calc(100vh - 60px);
+        padding: 40px 20px;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+    }
+    
+    .logs-card {
+        width: 100%;
+        max-width: 1400px; /* Ancho máximo para que no se estire demasiado en pantallas gigantes */
+        background: #1a1a1a;
+        border-radius: 16px;
+        overflow: hidden;
+        /* Sombra multicapa para efecto difuminado premium */
+        box-shadow: 
+            0 10px 15px -3px rgba(0, 0, 0, 0.1),
+            0 30px 60px -12px rgba(0, 0, 0, 0.25),
+            0 50px 100px -20px rgba(0, 0, 0, 0.2);
+        border: none;
     }
     
     .logs-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        padding: 20px;
-        border-radius: 10px 10px 0 0;
+        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); /* Azul sólido y vibrante */
+        padding: 22px 30px;
         color: white;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: none;
     }
     
     .logs-header h3 {
         margin: 0;
-        font-weight: 600;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        color: #0f172a;
     }
     
     .logs-toolbar {
-        background-color: #2d2d2d;
-        padding: 15px 20px;
-        border-left: 1px solid #444;
-        border-right: 1px solid #444;
+        background-color: rgba(45, 45, 45, 0.6);
+        backdrop-filter: blur(10px);
+        padding: 15px 25px;
         display: flex;
-        flex-wrap: wrap;
+        flex-direction: column;
+        gap: 12px;
+        border-bottom: 1px solid #333;
+    }
+
+    .toolbar-row {
+        display: flex;
+        flex-wrap: nowrap;
         gap: 10px;
         align-items: center;
+        width: 100%;
     }
-    
+
+    @media (max-width: 992px) {
+        .toolbar-row { flex-wrap: wrap; }
+    }
+
     .logs-toolbar input,
     .logs-toolbar select {
-        background-color: #1e1e1e;
-        border: 1px solid #555;
+        background-color: #0a0a0a;
+        border: 1px solid #444;
         color: #fff;
-        padding: 8px 12px;
-        border-radius: 5px;
+        padding: 10px 15px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        transition: all 0.2s;
     }
-    
+
     .logs-toolbar input:focus,
     .logs-toolbar select:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
         outline: none;
-        border-color: #667eea;
-        box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
     }
-    
-    .logs-toolbar button {
-        padding: 8px 16px;
+
+    .search-input { flex-grow: 1; min-width: 250px; }
+
+    /* Estilo Premium para botones */
+    .logs-toolbar button[class^="btn-"] {
         border: none;
-        border-radius: 5px;
+        border-radius: 8px;
+        padding: 10px 20px;
         cursor: pointer;
-        transition: all 0.3s;
-        font-weight: 500;
-    }
-    
-    .btn-copy {
-        background-color: #4caf50;
+        font-weight: 600;
+        font-size: 0.85rem;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        gap: 10px;
         color: white;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     
-    .btn-copy:hover {
-        background-color: #45a049;
+    .btn-copy { background: linear-gradient(135deg, #10b981 0%, #059669 100%); box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); }
+    .btn-download { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2); }
+    .btn-refresh { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); box-shadow: 0 4px 10px rgba(245, 158, 11, 0.2); }
+    .btn-live { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); box-shadow: 0 4px 10px rgba(139, 92, 246, 0.2); }
+    .btn-clear { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2); }
+
+    .logs-toolbar button:hover {
         transform: translateY(-2px);
+        filter: brightness(1.1);
     }
-    
-    .btn-download {
-        background-color: #2196f3;
-        color: white;
-    }
-    
-    .btn-download:hover {
-        background-color: #0b7dda;
-        transform: translateY(-2px);
-    }
-    
-    .btn-refresh {
-        background-color: #ff9800;
-        color: white;
-    }
-    
-    .btn-refresh:hover {
-        background-color: #e68900;
-        transform: translateY(-2px);
-    }
-    
-    .btn-clear {
-        background-color: #f44336;
-        color: white;
-    }
-    
-    .btn-clear:hover {
-        background-color: #da190b;
-        transform: translateY(-2px);
-    }
-    
-    .btn-live {
-        background-color: #9c27b0;
-        color: white;
-    }
-    
-    .btn-live:hover {
-        background-color: #7b1fa2;
-        transform: translateY(-2px);
-    }
-    
+
     .btn-live.active {
-        background-color: #e91e63;
-        animation: pulse-live 2s infinite;
+        background: #ec4899 !important;
+        animation: pulse-live 1.5s infinite;
     }
     
     @keyframes pulse-live {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.7; }
+        0%, 100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.4); }
+        50% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); }
+    }
+
+    /* Estilo Premium para botón Volver */
+    .btn-back-premium {
+        background: rgba(255, 255, 255, 0.15);
+        color: white !important;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        padding: 8px 22px;
+        border-radius: 50px;
+        font-weight: 600;
+        text-decoration: none !important;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.9rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-back-premium:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: translateX(-5px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .btn-back-premium i {
+        font-size: 0.8rem;
+        transition: transform 0.3s;
+    }
+
+    .btn-back-premium:hover i {
+        transform: scale(1.2);
     }
     
     .logs-container {
-        background-color: #000;
-        border-radius: 0 0 10px 10px;
-        padding: 20px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        background-color: #050505;
+        background-image: radial-gradient(circle at 50% -20%, #1e293b 0%, #050505 80%);
+        padding: 30px;
         min-height: 500px;
-        max-height: calc(100vh - 300px);
+        max-height: 70vh;
         overflow-y: auto;
-        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-        font-size: 13px;
-        line-height: 1.6;
+        font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+        font-size: 14px;
+        line-height: 1.7;
     }
     
     .logs-container pre {
         margin: 0;
         white-space: pre-wrap;
-        word-wrap: break-word;
-        color: #d4d4d4;
+        color: #e2e8f0;
     }
     
     /* Colorización simple (fallback) */
@@ -144,178 +196,158 @@
         padding: 2px 0;
     }
     
-    .log-error {
-        color: #f44336;
-        font-weight: 500;
-    }
-    
-    .log-warn {
-        color: #ffc107;
-    }
-    
-    .log-info {
-        color: #4caf50;
-    }
-    
-    .log-debug {
-        color: #2196f3;
-    }
+    .log-error { color: #f87171; font-weight: 600; }
+    .log-warn { color: #fbbf24; }
+    .log-info { color: #4ade80; }
+    .log-debug { color: #60a5fa; }
     
     .log-header {
-        color: #00bcd4;
+        color: #22d3ee;
         font-weight: bold;
-        background-color: #1a1a1a;
-        padding: 5px;
-        margin: 10px 0;
+        background-color: rgba(255,255,255,0.05);
+        padding: 5px 15px;
+        margin: 15px 0 5px 0;
+        border-radius: 4px;
+        display: block;
     }
     
-    .log-default {
-        color: #d4d4d4;
-    }
+    .log-default { color: #cbd5e1; }
     
-    .logs-info {
-        background-color: #2d2d2d;
-        padding: 10px 20px;
-        border-left: 1px solid #444;
-        border-right: 1px solid #444;
-        color: #aaa;
-        font-size: 0.9em;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-    
-    .cache-indicator {
-        display: inline-block;
-        padding: 3px 8px;
-        border-radius: 3px;
-        font-size: 0.85em;
-        font-weight: 500;
-    }
-    
-    .cache-hit {
-        background-color: #4caf50;
-        color: white;
-    }
-    
-    .cache-miss {
-        background-color: #ff9800;
-        color: white;
-    }
-    
-    .search-input {
-        flex: 1;
-        min-width: 200px;
-    }
-    
-    @media (max-width: 768px) {
-        .logs-toolbar {
-            flex-direction: column;
-            align-items: stretch;
-        }
-        
-        .logs-toolbar input,
-        .logs-toolbar select,
-        .logs-toolbar button {
-            width: 100%;
-        }
+    .cache-hit { background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .cache-miss { background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+
+    /* Estilos para el feedback de botones en JS */
+    .btn-success-feedback {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+        transform: scale(1.05);
     }
 </style>
 {% endblock %}
 
 {% block body %}
 <div class="logs-page">
-    <div class="logs-header">
-        <div class="d-flex justify-content-between align-items-center">
+    <div class="logs-card">
+        <div class="logs-header">
             <div>
-                <h3>📋 Logs - {{ service.name }}</h3>
-                <small>Servicio ID: {{ service.id }}</small>
+                <h3>
+                    <i class="fas fa-file-alt" style="color: #60a5fa; margin-right: 12px;"></i>
+                    <span style="color: #fff;">Logs: {{ container_name|default:service.name }}</span>
+                </h3>
+                <div style="margin-top: 5px; color: rgba(255,255,255,0.7); font-size: 0.85rem; font-weight: 400;">
+                    Servicio: <strong style="color: #fff;">{{ service.name }}</strong> | ID: #{{ service.id }}
+                </div>
             </div>
-            <a href="{{ return_url }}" class="btn btn-light">
-                ← Volver
-            </a>
+            <div class="logs-actions">
+                <a href="{{ return_url }}" class="btn-back-premium">
+                    <i class="fas fa-chevron-left"></i> Volver al panel
+                </a>
+            </div>
+        </div>
+    
+    <div class="logs-toolbar">
+        <!-- Fila 1: Filtros -->
+        <div class="toolbar-row">
+            <input type="text" 
+                   name="search" 
+                   class="search-input"
+                   placeholder="🔍 Buscar en logs..."
+                   value="{{ search_text }}"
+                   hx-get="{% url 'containers:logs_page' service.id %}"
+                   hx-trigger="keyup changed delay:500ms"
+                   hx-target="#logs-content"
+                   hx-include="[name='level'], [name='tail'], [name='container'], [name='rich']">
+            
+            <select name="level"
+                    hx-get="{% url 'containers:logs_page' service.id %}"
+                    hx-trigger="change"
+                    hx-target="#logs-content"
+                    hx-include="[name='search'], [name='tail'], [name='container'], [name='rich']">
+                <option value="ALL" {% if log_level == 'ALL' %}selected{% endif %}>Todos los niveles</option>
+                <option value="ERROR" {% if log_level == 'ERROR' %}selected{% endif %}>🔴 ERROR</option>
+                <option value="WARN" {% if log_level == 'WARN' %}selected{% endif %}>🟡 WARN</option>
+                <option value="INFO" {% if log_level == 'INFO' %}selected{% endif %}>🟢 INFO</option>
+                <option value="DEBUG" {% if log_level == 'DEBUG' %}selected{% endif %}>🔵 DEBUG</option>
+            </select>
+            
+            <select name="tail"
+                    hx-get="{% url 'containers:logs_page' service.id %}"
+                    hx-trigger="change"
+                    hx-target="#logs-content"
+                    hx-include="[name='search'], [name='level'], [name='container'], [name='rich']">
+                <option value="100" {% if tail == '100' %}selected{% endif %}>100 líneas</option>
+                <option value="500" {% if tail == '500' %}selected{% endif %}>500 líneas</option>
+                <option value="1000" {% if tail == '1000' %}selected{% endif %}>1000 líneas</option>
+                <option value="all" {% if tail == 'all' %}selected{% endif %}>Todas</option>
+            </select>
+            
+            {% if service.has_compose and containers %}
+            <select name="container"
+                    hx-get="{% url 'containers:logs_page' service.id %}"
+                    hx-trigger="change"
+                    hx-target="#logs-content"
+                    hx-include="[name='search'], [name='level'], [name='tail'], [name='rich']">
+                <option value="all" {% if not selected_container or selected_container == 'all' %}selected{% endif %}>Todos los contenedores</option>
+                {% for container in containers %}
+                <option value="{{ container.id }}" {% if selected_container == container.id|stringformat:"s" %}selected{% endif %}>{{ container.name }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+        </div>
+        
+        <!-- Fila 2: Acciones -->
+        <div class="toolbar-row">
+            <input type="hidden" name="rich" value="{{ use_rich|yesno:'true,false' }}">
+            
+            <button class="btn-copy" onclick="copyLogs()" title="Copiar logs al portapapeles">
+                <i class="fas fa-copy"></i> Copiar
+            </button>
+            
+            <button class="btn-download" onclick="downloadLogs()" title="Descargar logs como archivo">
+                <i class="fas fa-download"></i> Descargar
+            </button>
+            
+            <button class="btn-refresh" 
+                    hx-get="{% url 'containers:logs_page' service.id %}"
+                    hx-target="#logs-content"
+                    hx-include="[name='search'], [name='level'], [name='tail'], [name='container'], [name='rich']"
+                    title="Refrescar logs">
+                <i class="fas fa-sync-alt"></i> Refrescar
+            </button>
+            
+            <button id="btn-live" class="btn-live" onclick="toggleLiveStream()" title="Seguir logs en vivo">
+                <i class="fas fa-satellite-dish"></i> Seguir en vivo
+            </button>
+            
+            <button class="btn-clear" onclick="scrollToTop()" title="Ir al inicio">
+                <i class="fas fa-arrow-up"></i> Inicio
+            </button>
         </div>
     </div>
     
-    <div class="logs-toolbar">
-        <input type="text" 
-               name="search" 
-               class="search-input"
-               placeholder="🔍 Buscar en logs..."
-               value="{{ search_text }}"
-               hx-get="{% url 'containers:logs_page' service.id %}"
-               hx-trigger="keyup changed delay:500ms"
-               hx-target="#logs-content"
-               hx-include="[name='level'], [name='tail'], [name='rich']">
-        
-        <select name="level"
-                hx-get="{% url 'containers:logs_page' service.id %}"
-                hx-trigger="change"
-                hx-target="#logs-content"
-                hx-include="[name='search'], [name='tail'], [name='rich']">
-            <option value="ALL" {% if log_level == 'ALL' %}selected{% endif %}>Todos los niveles</option>
-            <option value="ERROR" {% if log_level == 'ERROR' %}selected{% endif %}>🔴 ERROR</option>
-            <option value="WARN" {% if log_level == 'WARN' %}selected{% endif %}>🟡 WARN</option>
-            <option value="INFO" {% if log_level == 'INFO' %}selected{% endif %}>🟢 INFO</option>
-            <option value="DEBUG" {% if log_level == 'DEBUG' %}selected{% endif %}>🔵 DEBUG</option>
-        </select>
-        
-        <select name="tail"
-                hx-get="{% url 'containers:logs_page' service.id %}"
-                hx-trigger="change"
-                hx-target="#logs-content"
-                hx-include="[name='search'], [name='level'], [name='rich']">
-            <option value="100" {% if tail == '100' %}selected{% endif %}>100 líneas</option>
-            <option value="500" {% if tail == '500' %}selected{% endif %}>500 líneas</option>
-            <option value="1000" {% if tail == '1000' %}selected{% endif %}>1000 líneas</option>
-            <option value="all" {% if tail == 'all' %}selected{% endif %}>Todas</option>
-        </select>
-        
-        <input type="hidden" name="rich" value="{{ use_rich|yesno:'true,false' }}">
-        
-        <button class="btn-copy" onclick="copyLogs()" title="Copiar logs al portapapeles">
-            📋 Copiar
-        </button>
-        
-        <button class="btn-download" onclick="downloadLogs()" title="Descargar logs como archivo">
-            💾 Descargar
-        </button>
-        
-        <button class="btn-refresh" 
-                hx-get="{% url 'containers:logs_page' service.id %}"
-                hx-target="#logs-content"
-                hx-include="[name='search'], [name='level'], [name='tail'], [name='rich']"
-                title="Refrescar logs">
-            🔄 Refrescar
-        </button>
-        
-        <button id="btn-live" class="btn-live" onclick="toggleLiveStream()" title="Seguir logs en vivo">
-            📡 Seguir en vivo
-        </button>
-        
-        <button class="btn-clear" onclick="scrollToTop()" title="Ir al inicio">
-            ⬆️ Inicio
-        </button>
-    </div>
-    
-    <div class="logs-info">
+    <div class="logs-info" style="background: rgba(0,0,0,0.2); padding: 10px 25px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
         <span>
-            📊 Mostrando <strong>{{ total_lines }}</strong> líneas
+            <i class="fas fa-chart-bar me-1" style="color: #3b82f6;"></i> 
+            Mostrando <strong>{{ total_lines }}</strong> líneas
             {% if search_text %}
-            | 🔍 Filtrado por: "<strong>{{ search_text }}</strong>"
+            | <i class="fas fa-search me-1" style="color: #fbbf24;"></i> Filtrado por: "<strong>{{ search_text }}</strong>"
             {% endif %}
             {% if log_level != 'ALL' %}
-            | 🏷️ Nivel: <strong>{{ log_level }}</strong>
+            | <i class="fas fa-tag me-1" style="color: #10b981;"></i> Nivel: <strong>{{ log_level }}</strong>
             {% endif %}
         </span>
-        <span class="cache-indicator {% if from_cache %}cache-hit{% else %}cache-miss{% endif %}">
-            {% if from_cache %}⚡ Desde caché{% else %}🔄 Actualizado{% endif %}
+        <span class="cache-indicator {% if from_cache %}cache-hit{% else %}cache-miss{% endif %}" style="padding: 2px 10px; border-radius: 4px; font-weight: 600;">
+            {% if from_cache %}
+            <i class="fas fa-bolt" style="color: #fbbf24;"></i> Desde caché
+            {% else %}
+            <i class="fas fa-sync-alt" style="color: #10b981;"></i> Actualizado
+            {% endif %}
         </span>
     </div>
     
     <div class="logs-container" id="logs-content">
         {{ logs_html|safe }}
     </div>
+    </div> <!-- Cierre de logs-card -->
 </div>
 {% endblock %}
 
@@ -327,15 +359,15 @@ function copyLogs() {
     const text = logsContent.innerText;
     
     navigator.clipboard.writeText(text).then(() => {
-        // Mostrar feedback
-        const btn = event.target;
-        const originalText = btn.innerHTML;
-        btn.innerHTML = '✅ Copiado!';
-        btn.style.backgroundColor = '#4caf50';
+        const btn = event.currentTarget;
+        const originalHTML = btn.innerHTML;
+        
+        btn.classList.add('btn-success-feedback');
+        btn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
         
         setTimeout(() => {
-            btn.innerHTML = originalText;
-            btn.style.backgroundColor = '';
+            btn.classList.remove('btn-success-feedback');
+            btn.innerHTML = originalHTML;
         }, 2000);
     }).catch(err => {
         alert('Error al copiar: ' + err);

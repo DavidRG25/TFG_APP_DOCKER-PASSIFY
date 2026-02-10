@@ -130,6 +130,24 @@ fi
 echo "=========================================="
 echo ""
 
+# Verificar e instalar dependencias faltantes
+if [[ -f "${ROOT_DIR}/requirements.txt" ]]; then
+  echo "[*] Verificando dependencias..."
+  
+  # Detectar pip del venv
+  if [[ -x "${VENV_DIR}/Scripts/pip" ]]; then
+    PIP="${VENV_DIR}/Scripts/pip"
+  elif [[ -x "${VENV_DIR}/bin/pip" ]]; then
+    PIP="${VENV_DIR}/bin/pip"
+  else
+    PIP="${PYTHON} -m pip"
+  fi
+  
+  # Instalar dependencias faltantes (silenciosamente si ya están)
+  "${PIP}" install -q -r "${ROOT_DIR}/requirements.txt" 2>&1 | grep -v "Requirement already satisfied" || true
+  echo "    ✓ Dependencias verificadas"
+fi
+
 # Ejecutar migraciones (rapido si no hay cambios)
 echo "[*] Ejecutando migraciones"
 "${PYTHON}" manage.py migrate --noinput
