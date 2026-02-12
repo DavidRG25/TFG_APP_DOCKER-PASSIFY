@@ -1,2 +1,22 @@
-{# Partial: Contenido de logs para actualizaciones HTMX #}
+{# Partial: Contenido de logs y estado para actualizaciones HTMX #}
+<div id="logs-info-fragment" hx-swap-oob="true" style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+    <span>
+        <i class="fas fa-chart-bar me-1" style="color: #3b82f6;"></i> 
+        Mostrando <strong>{{ total_logs_count|default:total_lines }}</strong> líneas
+        {% if search_text %}
+        | <i class="fas fa-search me-1" style="color: #fbbf24;"></i> Filtrado por: "<strong>{{ search_text }}</strong>"
+        {% endif %}
+        {% if log_level and log_level != 'ALL' %}
+        | <i class="fas fa-tag me-1" style="color: #10b981;"></i> Nivel: <strong>{{ log_level }}</strong>
+        {% endif %}
+    </span>
+    <span class="cache-indicator {% if from_cache %}cache-hit{% else %}cache-miss{% endif %}" style="padding: 2px 10px; border-radius: 4px; font-weight: 600;">
+        {% if from_cache %}
+        <i class="fas fa-bolt" style="color: #fbbf24;"></i> Desde caché
+        {% else %}
+        <i class="fas fa-sync-alt" style="color: #10b981;"></i> Actualizado
+        {% endif %}
+    </span>
+</div>
+
 {{ logs_html|safe }}

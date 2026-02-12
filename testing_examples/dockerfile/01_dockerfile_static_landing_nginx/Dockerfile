@@ -10,7 +10,13 @@ COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 # Contenido estático
 COPY site/ /usr/share/nginx/html/
 
-# No hace falta crear usuarios ni cambiar PIDs, la imagen ya viene lista
+# Entrypoint con logs de prueba
+COPY entrypoint.sh /entrypoint.sh
+# No es necesario chmod +x porque lo ejecutaremos con 'sh' si hace falta, 
+# pero nginx-unprivileged tiene permisos.
+
 EXPOSE 8080
 
 HEALTHCHECK --interval=10s --timeout=2s --retries=3 CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1
+
+ENTRYPOINT ["sh", "/entrypoint.sh"]

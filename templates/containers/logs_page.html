@@ -97,7 +97,36 @@
         outline: none;
     }
 
-    .search-input { flex-grow: 1; min-width: 250px; }
+    .search-container {
+        display: flex;
+        gap: 10px;
+        flex-grow: 1;
+        min-width: 300px;
+    }
+
+    .search-input { 
+        flex-grow: 1;
+    }
+
+    .btn-clear-search-premium {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #fff;
+        border-radius: 8px;
+        padding: 0 15px;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .btn-clear-search-premium:hover {
+        background: #ef4444;
+        border-color: #ef4444;
+    }
 
     /* Estilo Premium para botones */
     .logs-toolbar button[class^="btn-"] {
@@ -128,14 +157,23 @@
     }
 
     .btn-live.active {
-        background: #ec4899 !important;
-        animation: pulse-live 1.5s infinite;
+        background: #f59e0b !important;
+        animation: pulse-live 2s infinite;
     }
     
     @keyframes pulse-live {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.4); }
-        50% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); }
+        0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+        50% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
     }
+
+    button:disabled, select:disabled, input:disabled {
+        opacity: 0.5 !important;
+        cursor: not-allowed !important;
+        pointer-events: none !important;
+    }
+
+    .d-none { display: none !important; }
+    .d-flex { display: flex !important; }
 
     /* Estilo Premium para botón Volver */
     .btn-back-premium {
@@ -184,31 +222,43 @@
         line-height: 1.7;
     }
     
-    .logs-container pre {
+    .logs-container pre,
+    .log-line {
         margin: 0;
-        white-space: pre-wrap;
-        color: #e2e8f0;
+        white-space: pre !important; /* Forzamos que se mantenga el formato original sin saltos automáticos */
+        font-family: inherit;
+        display: block;
+        min-width: fit-content;
+    }
+    
+    .logs-container {
+        background-color: #050505;
+        background-image: radial-gradient(circle at 50% -20%, #1e293b 0%, #050505 80%);
+        padding: 20px;
+        min-height: 500px;
+        max-height: 75vh;
+        overflow: auto; /* Permite scroll vertical y horizontal */
+        font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        border: 1px solid #333;
     }
     
     /* Colorización simple (fallback) */
-    .log-line {
-        margin: 2px 0;
-        padding: 2px 0;
-    }
-    
-    .log-error { color: #f87171; font-weight: 600; }
-    .log-warn { color: #fbbf24; }
-    .log-info { color: #4ade80; }
-    .log-debug { color: #60a5fa; }
+    .log-error { color: #f87171 !important; }
+    .log-warn { color: #fbbf24 !important; }
+    .log-info { color: #4ade80 !important; }
+    .log-debug { color: #60a5fa !important; }
     
     .log-header {
         color: #22d3ee;
         font-weight: bold;
         background-color: rgba(255,255,255,0.05);
         padding: 5px 15px;
-        margin: 15px 0 5px 0;
+        margin: 10px 0;
         border-radius: 4px;
         display: block;
+        white-space: normal !important;
     }
     
     .log-default { color: #cbd5e1; }
@@ -244,24 +294,37 @@
             </div>
         </div>
     
-    <div class="logs-toolbar">
+    <div class="logs-toolbar" id="logs-filters">
         <!-- Fila 1: Filtros -->
         <div class="toolbar-row">
-            <input type="text" 
-                   name="search" 
-                   class="search-input"
-                   placeholder="🔍 Buscar en logs..."
-                   value="{{ search_text }}"
-                   hx-get="{% url 'containers:logs_page' service.id %}"
-                   hx-trigger="keyup changed delay:500ms"
-                   hx-target="#logs-content"
-                   hx-include="[name='level'], [name='tail'], [name='container'], [name='rich']">
+            <div class="search-container">
+                <input type="text" 
+                       name="search" 
+                       id="logs-search-input"
+                       class="search-input"
+                       placeholder="🔍 Buscar en logs..."
+                       value="{{ search_text }}"
+                       hx-get="{% url 'containers:logs_page' service.id %}"
+                       hx-trigger="keyup changed delay:500ms"
+                       hx-target="#logs-content"
+                       hx-include="#logs-filters"
+                       oninput="toggleClearBtn(this)">
+                
+                <button type="button" 
+                        id="btn-clear-search" 
+                        class="btn-clear-search-premium {% if not search_text %}d-none{% endif %}" 
+                        onclick="clearSearch()"
+                        title="Limpiar búsqueda">
+                    <i class="fas fa-broom"></i> Limpiar
+                </button>
+            </div>
             
             <select name="level"
                     hx-get="{% url 'containers:logs_page' service.id %}"
                     hx-trigger="change"
                     hx-target="#logs-content"
-                    hx-include="[name='search'], [name='tail'], [name='container'], [name='rich']">
+                    hx-include="#logs-filters"
+                    title="Filtrar por nivel de severidad">
                 <option value="ALL" {% if log_level == 'ALL' %}selected{% endif %}>Todos los niveles</option>
                 <option value="ERROR" {% if log_level == 'ERROR' %}selected{% endif %}>🔴 ERROR</option>
                 <option value="WARN" {% if log_level == 'WARN' %}selected{% endif %}>🟡 WARN</option>
@@ -273,7 +336,7 @@
                     hx-get="{% url 'containers:logs_page' service.id %}"
                     hx-trigger="change"
                     hx-target="#logs-content"
-                    hx-include="[name='search'], [name='level'], [name='container'], [name='rich']">
+                    hx-include="#logs-filters">
                 <option value="100" {% if tail == '100' %}selected{% endif %}>100 líneas</option>
                 <option value="500" {% if tail == '500' %}selected{% endif %}>500 líneas</option>
                 <option value="1000" {% if tail == '1000' %}selected{% endif %}>1000 líneas</option>
@@ -285,7 +348,7 @@
                     hx-get="{% url 'containers:logs_page' service.id %}"
                     hx-trigger="change"
                     hx-target="#logs-content"
-                    hx-include="[name='search'], [name='level'], [name='tail'], [name='rich']">
+                    hx-include="#logs-filters">
                 <option value="all" {% if not selected_container or selected_container == 'all' %}selected{% endif %}>Todos los contenedores</option>
                 {% for container in containers %}
                 <option value="{{ container.id }}" {% if selected_container == container.id|stringformat:"s" %}selected{% endif %}>{{ container.name }}</option>
@@ -298,19 +361,19 @@
         <div class="toolbar-row">
             <input type="hidden" name="rich" value="{{ use_rich|yesno:'true,false' }}">
             
-            <button class="btn-copy" onclick="copyLogs()" title="Copiar logs al portapapeles">
+            <button class="btn-copy" onclick="copyLogs(this)" title="Copiar logs al portapapeles">
                 <i class="fas fa-copy"></i> Copiar
             </button>
             
-            <button class="btn-download" onclick="downloadLogs()" title="Descargar logs como archivo">
+            <button class="btn-download" onclick="downloadLogs(this)" title="Descargar logs como archivo">
                 <i class="fas fa-download"></i> Descargar
             </button>
             
             <button class="btn-refresh" 
-                    hx-get="{% url 'containers:logs_page' service.id %}"
+                    hx-get="{% url 'containers:logs_page' service.id %}?refresh=true"
                     hx-target="#logs-content"
-                    hx-include="[name='search'], [name='level'], [name='tail'], [name='container'], [name='rich']"
-                    title="Refrescar logs">
+                    hx-include="#logs-filters"
+                    title="Obtener logs más recientes del contenedor (limpia la caché)">
                 <i class="fas fa-sync-alt"></i> Refrescar
             </button>
             
@@ -324,24 +387,26 @@
         </div>
     </div>
     
-    <div class="logs-info" style="background: rgba(0,0,0,0.2); padding: 10px 25px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
-        <span>
-            <i class="fas fa-chart-bar me-1" style="color: #3b82f6;"></i> 
-            Mostrando <strong>{{ total_lines }}</strong> líneas
-            {% if search_text %}
-            | <i class="fas fa-search me-1" style="color: #fbbf24;"></i> Filtrado por: "<strong>{{ search_text }}</strong>"
-            {% endif %}
-            {% if log_level != 'ALL' %}
-            | <i class="fas fa-tag me-1" style="color: #10b981;"></i> Nivel: <strong>{{ log_level }}</strong>
-            {% endif %}
-        </span>
-        <span class="cache-indicator {% if from_cache %}cache-hit{% else %}cache-miss{% endif %}" style="padding: 2px 10px; border-radius: 4px; font-weight: 600;">
-            {% if from_cache %}
-            <i class="fas fa-bolt" style="color: #fbbf24;"></i> Desde caché
-            {% else %}
-            <i class="fas fa-sync-alt" style="color: #10b981;"></i> Actualizado
-            {% endif %}
-        </span>
+    <div class="logs-info" id="logs-info-container" style="background: rgba(0,0,0,0.2); padding: 10px 25px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+        <div id="logs-info-fragment" style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+            <span>
+                <i class="fas fa-chart-bar me-1" style="color: #3b82f6;"></i> 
+                Mostrando <strong>{{ total_lines }}</strong> líneas
+                {% if search_text %}
+                | <i class="fas fa-search me-1" style="color: #fbbf24;"></i> Filtrado por: "<strong>{{ search_text }}</strong>"
+                {% endif %}
+                {% if log_level != 'ALL' %}
+                | <i class="fas fa-tag me-1" style="color: #10b981;"></i> Nivel: <strong>{{ log_level }}</strong>
+                {% endif %}
+            </span>
+            <span class="cache-indicator {% if from_cache %}cache-hit{% else %}cache-miss{% endif %}" style="padding: 2px 10px; border-radius: 4px; font-weight: 600;">
+                {% if from_cache %}
+                <i class="fas fa-bolt" style="color: #fbbf24;"></i> Desde caché
+                {% else %}
+                <i class="fas fa-sync-alt" style="color: #10b981;"></i> Actualizado
+                {% endif %}
+            </span>
+        </div>
     </div>
     
     <div class="logs-container" id="logs-content">
@@ -353,13 +418,38 @@
 
 {% block extrascripts %}
 <script>
+// Mostrar/ocultar botón de limpiar
+function toggleClearBtn(input) {
+    const btn = document.getElementById('btn-clear-search');
+    btn.style.display = input.value.length > 0 ? 'flex' : 'none';
+}
+
+// Limpiar búsqueda
+function clearSearch() {
+    const input = document.getElementById('logs-search-input');
+    const btn = document.getElementById('btn-clear-search');
+    input.value = '';
+    btn.style.display = 'none';
+    
+    // Forzamos una recarga limpia pidiendo refresh=true para limpiar la caché
+    const level = document.querySelector('select[name="level"]').value;
+    const tail = document.querySelector('select[name="tail"]').value;
+    const container = document.querySelector('select[name="container"]').value;
+    
+    const url = `?search=&level=${level}&tail=${tail}&container=${container}&refresh=true&rich=true&force_refresh=true`;
+    
+    htmx.ajax('GET', url, {
+        target: '#logs-content',
+        swap: 'innerHTML'
+    });
+}
+
 // Copiar logs al portapapeles
-function copyLogs() {
+function copyLogs(btn) {
     const logsContent = document.getElementById('logs-content');
     const text = logsContent.innerText;
     
     navigator.clipboard.writeText(text).then(() => {
-        const btn = event.currentTarget;
         const originalHTML = btn.innerHTML;
         
         btn.classList.add('btn-success-feedback');
@@ -375,7 +465,7 @@ function copyLogs() {
 }
 
 // Descargar logs como archivo
-function downloadLogs() {
+function downloadLogs(btn) {
     const logsContent = document.getElementById('logs-content');
     const text = logsContent.innerText;
     const blob = new Blob([text], { type: 'text/plain' });
@@ -389,16 +479,28 @@ function downloadLogs() {
     URL.revokeObjectURL(url);
     
     // Feedback
-    const btn = event.target;
     const originalText = btn.innerHTML;
-    btn.innerHTML = '✅ Descargado!';
-    btn.style.backgroundColor = '#2196f3';
+    const originalClass = btn.className;
+    
+    btn.innerHTML = '<i class="fas fa-check"></i> Descargado!';
+    btn.classList.add('btn-success-feedback');
     
     setTimeout(() => {
         btn.innerHTML = originalText;
-        btn.style.backgroundColor = '';
+        btn.classList.remove('btn-success-feedback');
     }, 2000);
 }
+
+// Reconectar contenedor individual
+function reconnect_container(name) {
+    if (liveSocket && liveSocket.readyState === WebSocket.OPEN) {
+        liveSocket.send(JSON.stringify({
+            "command": "reconnect",
+            "container": name
+        }));
+    }
+}
+window.reconnect_container = reconnect_container;
 
 // Scroll al inicio
 function scrollToTop() {
@@ -417,72 +519,75 @@ function toggleLiveStream() {
     const btn = document.getElementById('btn-live');
     const logsContainer = document.getElementById('logs-content');
     
+    // Función para bloquear/desbloquear UI
+    const setUIState = (disabled) => {
+        const elements = document.querySelectorAll('.logs-toolbar select, .logs-toolbar input, .btn-refresh, .btn-copy, .btn-download');
+        elements.forEach(el => el.disabled = disabled);
+    };
+    
     if (isLiveStreaming) {
         // Detener streaming
-        if (liveSocket) {
-            liveSocket.send('stop');
+        if (liveSocket && liveSocket.readyState === WebSocket.OPEN) {
+            liveSocket.send("stop");
             liveSocket.close();
-            liveSocket = null;
         }
+        liveSocket = null;
         
         btn.classList.remove('active');
-        btn.innerHTML = '📡 Seguir en vivo';
+        btn.innerHTML = '<i class="fas fa-satellite-dish"></i> Seguir en vivo';
         isLiveStreaming = false;
+        
+        setUIState(false); // Rehabilitar controles
+        
+        // Volver a cargar logs estáticos pulsando REFRESCAR
+        document.querySelector('.btn-refresh').click();
     } else {
         // Iniciar streaming
         const scheme = window.location.protocol === "https:" ? "wss" : "ws";
-        const wsUrl = `${scheme}://${window.location.host}/ws/logs-stream/{{ service.id }}/`;
+        const containerSelect = document.querySelector('select[name="container"]');
+        const containerVal = containerSelect ? containerSelect.value : 'all';
+        const socketUrl = `${scheme}://${window.location.host}/ws/logs-stream/{{ service.id }}/?container=${containerVal}`;
         
-        liveSocket = new WebSocket(wsUrl);
+        liveSocket = new WebSocket(socketUrl);
         
         liveSocket.onopen = () => {
             btn.classList.add('active');
-            btn.innerHTML = '⏸️ Pausar streaming';
+            btn.innerHTML = '<i class="fas fa-stop"></i> Detener vivo';
             isLiveStreaming = true;
             
-            // Limpiar logs actuales
-            logsContainer.innerHTML = '<pre style="color: #4caf50;">🔴 STREAMING EN VIVO - Conectado</pre>';
+            setUIState(true); // Bloquear otros controles
+            
+            // Limpiar logs actuales para el modo live
+            logsContainer.innerHTML = '<div style="color: #4ade80; padding: 10px; font-weight: bold; border-bottom: 1px solid #333; animation: pulse 2s infinite;">📡 MODO LIVE ACTIVO: ESCUCHANDO EVENTOS...</div>';
         };
         
         liveSocket.onmessage = (event) => {
-            const pre = document.createElement('pre');
-            pre.textContent = event.data;
-            pre.style.margin = '0';
-            pre.style.color = '#d4d4d4';
-            
-            // Colorizar según contenido
-            const text = event.data.toLowerCase();
-            if (text.includes('error')) {
-                pre.style.color = '#f44336';
-            } else if (text.includes('warn')) {
-                pre.style.color = '#ffc107';
-            } else if (text.includes('info')) {
-                pre.style.color = '#4caf50';
+            try {
+                const data = JSON.parse(event.data);
+                if (data.log) {
+                    const div = document.createElement('div');
+                    div.innerHTML = data.log; // El backend envía el HTML colorizado
+                    logsContainer.appendChild(div);
+                    
+                    // Auto-scroll al final
+                    logsContainer.scrollTop = logsContainer.scrollHeight;
+                }
+            } catch (err) {
+                console.warn("Mensaje live no es JSON:", event.data);
             }
-            
-            logsContainer.appendChild(pre);
-            
-            // Auto-scroll al final
-            logsContainer.scrollTop = logsContainer.scrollHeight;
-        };
-        
-        liveSocket.onerror = (error) => {
-            console.error('WebSocket error:', error);
-            const pre = document.createElement('pre');
-            pre.textContent = '[ERROR] Error de conexión WebSocket';
-            pre.style.color = '#f44336';
-            logsContainer.appendChild(pre);
         };
         
         liveSocket.onclose = () => {
-            btn.classList.remove('active');
-            btn.innerHTML = '📡 Seguir en vivo';
-            isLiveStreaming = false;
-            
-            const pre = document.createElement('pre');
-            pre.textContent = '\n[DESCONECTADO] Streaming finalizado';
-            pre.style.color = '#ff9800';
-            logsContainer.appendChild(pre);
+            if (isLiveStreaming) {
+                btn.classList.remove('active');
+                btn.innerHTML = '<i class="fas fa-satellite-dish"></i> Seguir en vivo';
+                isLiveStreaming = false;
+            }
+        };
+        
+        liveSocket.onerror = (err) => {
+            console.error("Error WS Live:", err);
+            logsContainer.innerHTML += '<div style="color: #ef4444; padding: 10px;">🔴 ERROR DE CONEXIÓN AL STREAM</div>';
         };
     }
 }
