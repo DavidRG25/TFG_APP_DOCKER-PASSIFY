@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block body %}
+<div class="container-fluid min-vh-100 d-flex align-items-center justify-content-center p-4" style="background: radial-gradient(circle at top right, #fef2f2, #fee2e2);">
+    <div class="card border-0 shadow-lg text-center p-5" style="max-width: 550px; border-radius: 24px; background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px);">
+        
+        <div class="mb-4">
+            <div class="bg-warning bg-opacity-10 rounded-circle d-inline-flex align-items-center justify-content-center mb-4" style="width: 100px; height: 100px;">
+                <i class="fas fa-tools text-warning fs-1"></i>
+            </div>
+            <h1 class="fw-bold mb-2" style="color: #1e293b; letter-spacing: -1px; font-size: 4rem;">500</h1>
+            <h2 class="fw-bold mb-3" style="color: #334155;">Error de servidor</h2>
+            <p class="text-muted fs-5 px-3">
+                Algo ha salido mal en nuestras máquinas. Estamos trabajando para solucionarlo lo antes posible.
+            </p>
+        </div>
+
+        <div class="alert alert-light border border-dashed rounded-3 py-3 mb-4 mx-2" style="background: #fffbeb;">
+            <div class="d-flex align-items-center justify-content-center gap-2 text-secondary mb-1">
+                <i class="fas fa-exclamation-triangle small"></i> 
+                <span class="small fw-semibold text-uppercase font-monospace text-muted">Internal Error</span>
+            </div>
+            <div class="fw-bold text-dark fs-5">INTERNAL_SERVER_ERROR</div>
+        </div>
+
+        <div class="d-flex flex-column gap-3 px-4">
+            <button onclick="window.location.reload()" class="btn btn-warning btn-lg rounded-pill fw-bold py-3 shadow-sm transform-hover text-dark w-100">
+                <i class="fas fa-sync me-2"></i> Intentar de nuevo
+            </button>
+            <a href="{% url 'containers:student_panel' %}" class="btn btn-light btn-lg rounded-pill fw-bold py-3 border transform-hover w-100">
+                <i class="fas fa-home me-2"></i> Ir al Panel
+            </a>
+            <p class="text-muted small mt-3 opacity-75">
+                Si el problema persiste, intenta limpiar la caché de tu navegador.
+            </p>
+        </div>
+    </div>
+</div>
+
+<style>
+.transform-hover {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.transform-hover:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.2);
+}
+.border-dashed {
+    border-style: dashed !important;
+}
+</style>
+{% endblock %}

@@ -960,57 +960,6 @@ def service_table(request):
 
 
 @login_required
-def terminal_view(request, pk):
-    """
-    DEPRECATED: Usar terminal_v2_view en su lugar.
-    Se mantendrá hasta v6.2.0 para compatibilidad.
-    
-    Muestra la terminal web para el servicio si el usuario es el propietario
-    y el contenedor esta en ejecucion.
-    """
-    user = request.user
-    if user_is_admin(user) or user_is_teacher(user):
-        service = get_object_or_404(Service, pk=pk)
-    else:
-        service = get_object_or_404(Service, pk=pk, owner=user)
-
-    if service.status != "running" or not service.container_id:
-        return HttpResponse("El servicio no esta en ejecucion.", status=400)
-    docker_client = get_docker_client()
-    if docker_client is None:
-        return HttpResponse("Docker no esta disponible actualmente.", status=400)
-    try:
-        container = docker_client.containers.get(service.container_id)
-        container.reload()
-        if (container.status or "").lower() != "running":
-            return HttpResponse("El contenedor no esta en ejecucion.", status=400)
-    except NotFound:
-        return HttpResponse("El contenedor no existe.", status=404)
-    except DockerException as exc:
-        return HttpResponse(f"No se pudo acceder al contenedor: {exc}", status=400)
-
-    ws_path = f"/ws/terminal/{service.id}/"
-    
-    # Capturar URL de retorno para volver al contexto correcto
-    return_url = request.GET.get('return_url')
-    if not return_url:
-        referer = request.META.get('HTTP_REFERER', '')
-        if 'subjects/' in referer:
-            # Si viene de una asignatura, volver ahí
-            return_url = referer
-        else:
-            # Por defecto, panel principal
-            from django.urls import reverse
-            return_url = reverse('containers:student_panel')
-    
-    return render(request, "containers/terminal.html", {
-        "service": service,
-        "ws_path": ws_path,
-        "return_url": return_url,
-    })
-
-
-@login_required
 def terminal_v2_view(request, pk):
     """
     Terminal web mejorada con PyXtermJS.
@@ -1022,10 +971,31 @@ def terminal_v2_view(request, pk):
     - Timeout configurable
     """
     user = request.user
-    if user_is_admin(user) or user_is_teacher(user):
-        service = get_object_or_404(Service, pk=pk)
-    else:
-        service = get_object_or_404(Service, pk=pk, owner=user)
+    
+    # 1. Intentar obtener el servicio sin filtrar por dueño primero
+    try:
+        service = Service.objects.get(pk=pk)
+    except Service.DoesNotExist:
+        raise Http404("El servicio solicitado no existe.")
+
+    # 2. Validar Permisos
+    has_permission = False
+    if user_is_admin(user):
+        has_permission = True
+    elif user_is_teacher(user):
+        # El profesor solo puede entrar si es de su asignatura
+        if service.subject and service.subject.teacher_user == user:
+            has_permission = True
+    elif service.owner == user:
+        has_permission = True
+
+    if not has_permission:
+        # En lugar de 404, devolvemos una página de error estilizada
+        return render(request, "containers/errors/no_permission.html", {
+            "service_name": service.name,
+            "error_title": "Acceso Denegado",
+            "error_message": "No tienes los permisos necesarios para acceder a esta terminal interactiva."
+        }, status=403)
     
     # Obtener parámetro de contenedor (para servicios Compose)
     container_id = request.GET.get('container')
@@ -1478,47 +1448,59 @@ def logs_page(request, pk):
     tail = request.GET.get('tail', '1000')
     use_rich = request.GET.get('rich', 'true').lower() == 'true'
     selected_container = request.GET.get('container', 'all')
+    force_refresh = request.GET.get('refresh', 'false').lower() == 'true'
     
-    # Convertir tail a int (o None para 'all')
-    try:
-        tail_int = int(tail) if tail != 'all' else 10000
-    except ValueError:
-        tail_int = 1000
-    
-    # Obtener contenedores si es Compose
+    # Inicializar contenedores (necesario para el context de retorno)
     containers = []
     if service.has_compose:
         containers = list(service.containers.all())
-    
-    # Obtener logs
+
+    # Obtener utilidades
     from .utils import (
         fetch_container_logs,
+        group_logs_by_container,
         colorize_logs_rich,
         colorize_logs_simple,
         filter_logs,
-        filter_by_level
+        filter_by_level,
+        invalidate_logs_cache
     )
     
-    # Si se seleccionó un contenedor específico en Compose
+    # Si se pide refrescar, invalidar caché antes de obtener logs
+    if force_refresh:
+        invalidate_logs_cache(service)
+
+    # Convertir tail a int (o None para 'all')
+    try:
+        tail_int = int(tail) if tail != 'all' else 'all'
+    except ValueError:
+        tail_int = 1000
+
     if service.has_compose and selected_container != 'all':
         try:
             container_id = int(selected_container)
             specific_container = service.containers.get(id=container_id)
-            # Obtener logs solo de ese contenedor
-            logs_lines, from_cache = fetch_container_logs(service, tail=tail_int, container_name=specific_container.name)
+            logs_lines, from_cache = fetch_container_logs(service, tail=tail_int, container_name=specific_container.name, force_refresh=force_refresh)
         except (ValueError, ServiceContainer.DoesNotExist):
-            logs_lines, from_cache = fetch_container_logs(service, tail=tail_int)
+            logs_lines, from_cache = fetch_container_logs(service, tail=tail_int, force_refresh=force_refresh)
     else:
-        logs_lines, from_cache = fetch_container_logs(service, tail=tail_int)
+        logs_lines, from_cache = fetch_container_logs(service, tail=tail_int, force_refresh=force_refresh)
     
-    # Aplicar filtros
+    # Aplicar filtros sobre las líneas "raw" (con prefijo [name] si aplica)
     if search_text:
         logs_lines = filter_logs(logs_lines, search_text)
     
     if log_level != 'ALL':
         logs_lines = filter_by_level(logs_lines, log_level)
     
-    # Colorizar logs
+    # Guardar conteo real antes de añadir cabeceras
+    total_logs_count = len(logs_lines)
+    
+    # Agrupar por contenedor y añadir cabeceras '==='
+    if service.has_compose or selected_container != 'all':
+        logs_lines = group_logs_by_container(logs_lines)
+    
+    # Colorizar logs final
     try:
         if use_rich:
             logs_html = colorize_logs_rich(logs_lines)
@@ -1542,8 +1524,11 @@ def logs_page(request, pk):
     if request.headers.get('HX-Request'):
         return render(request, "containers/_partials/logs/_logs_content.html", {
             "logs_html": logs_html,
+            "total_logs_count": total_logs_count,
             "total_lines": len(logs_lines),
             "from_cache": from_cache,
+            "search_text": search_text,
+            "log_level": log_level,
         })
     
     # Request normal: página completa

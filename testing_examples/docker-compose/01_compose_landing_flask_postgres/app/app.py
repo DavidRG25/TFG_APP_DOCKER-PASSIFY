@@ -138,11 +138,17 @@ def submit():
     msg = (request.form.get("message") or "").strip()
     if not msg:
         return redirect("/")
+    
+    # LOG DE PRUEBA PARA PAASIFY
+    import sys
+    print(f"[WEB-LOG] Procesando nuevo mensaje: '{msg}'", file=sys.stdout, flush=True)
+    
     init_db()
     conn = get_conn()
     try:
         with conn.cursor() as cur:
             cur.execute("INSERT INTO messages (message) VALUES (%s);", (msg,))
+            print(f"[DB-EVENT] Insertado registro en PostgreSQL para: {msg}", file=sys.stdout, flush=True)
         conn.commit()
     finally:
         conn.close()
