@@ -9,12 +9,15 @@ Incluye funciones para:
 """
 
 import logging
+import re
+from datetime import datetime, timedelta, timezone
 from typing import List, Tuple
 from django.core.cache import cache
 from rich.console import Console
 from rich.syntax import Syntax
 from rich.text import Text
 from io import StringIO
+import dateutil.parser
 
 from .docker_client import get_docker_client
 from .models import Service, ServiceContainer
@@ -31,10 +34,22 @@ def fetch_container_logs(service: Service, tail: int = 1000, since: str = None, 
     docker_client = get_docker_client()
     if not docker_client: return [" ERROR: Docker no disponible"], False
     
+    # Calcular 'since' exacto si es relativo
+    since_seconds = None
+    if since:
+        match = re.match(r'(\d+)([mhd])', since)
+        if match:
+            val, unit = int(match.group(1)), match.group(2)
+            mult = {'m': 60, 'h': 3600, 'd': 86400}
+            since_seconds = int(datetime.now(timezone.utc).timestamp()) - (val * mult[unit])
+
     temp_logs = []
     try:
-        logs_kwargs = {'tail': tail, 'timestamps': True, 'stream': False} # stream=False demuxes automatically
-        if since: logs_kwargs['since'] = since
+        logs_kwargs = {'tail': tail, 'timestamps': True, 'stream': False}
+        if since_seconds:
+            logs_kwargs['since'] = since_seconds
+        elif since:
+            logs_kwargs['since'] = since
 
         containers = []
         if service.has_compose:
@@ -43,11 +58,14 @@ def fetch_container_logs(service: Service, tail: int = 1000, since: str = None, 
                 c_query = c_query.filter(name=container_name)
             containers = list(c_query.filter(container_id__isnull=False))
         elif service.container_id:
-            containers = [service] # mock object or handled below
+            containers = [service] 
+
+        # Timezone de España (CET=UTC+1 en invierno)
+        # Para ser precisos sin pytz, usamos un offset fijo
+        spain_tz = timezone(timedelta(hours=1))
 
         for c_rec in containers:
-            c_id = getattr(c_rec, 'container_id', None) or getattr(c_rec, 'container_id', None) # handle both
-            # If it's the service itself (simple mode)
+            c_id = getattr(c_rec, 'container_id', None) or getattr(c_rec, 'container_id', None)
             if not c_id and not service.has_compose: c_id = service.container_id
             if not c_id: continue
             
@@ -55,21 +73,57 @@ def fetch_container_logs(service: Service, tail: int = 1000, since: str = None, 
                 c = docker_client.containers.get(c_id)
                 data = c.logs(**logs_kwargs).decode('utf-8', errors='replace')
                 prefix = f"[{getattr(c_rec, 'name', 'serv')}] " if service.has_compose else ""
+                
                 for line in data.splitlines():
                     if not line.strip(): continue
-                    ts = line.split(' ')[0] if 'T' in line else "0"
-                    temp_logs.append((ts, f"{prefix}{line}"))
-            except: continue
+                    
+                    # El formato de Docker con timestamps=True es: "2026-02-15T12:11:00.246570572Z contenido..."
+                    parts = line.split(' ', 1)
+                    raw_ts = parts[0]
+                    content = parts[1] if len(parts) > 1 else ""
+                    
+                    try:
+                        # Parsing preciso con dateutil
+                        dt_utc = dateutil.parser.parse(raw_ts)
+                        
+                        # Filtro manual de seguridad (por si Docker falla o el reloj deriva)
+                        if since_seconds and dt_utc.timestamp() < since_seconds:
+                            continue
+                            
+                        # Convertir a hora de España
+                        dt_spain = dt_utc.astimezone(spain_tz)
+                        # Formato completo sugerido: 15/02/2026 13:30:00
+                        human_ts = dt_spain.strftime("%d/%m/%Y %H:%M:%S")
+                        
+                        # Formatear línea final: [DD/MM/YYYY HH:MM:SS] contenido
+                        formatted_line = f"[{human_ts}] {prefix}{content}"
+                        temp_logs.append((dt_utc.timestamp(), formatted_line))
+                    except:
+                        # Si falla el parseo, dejamos el log original
+                        temp_logs.append((0, f"{prefix}{line}"))
+            except Exception as e: 
+                logger.error(f"Error recuperando logs de {c_id}: {e}")
+                continue
 
         temp_logs.sort(key=lambda x: x[0])
         lines = [l[1] for l in temp_logs]
+        
+        # SI NO HAY LOGS DE CONTENEDOR Y EL SERVICIO TIENE ERROR, MOSTRAR LOGS DEL SISTEMA (EJ. FALLO BUILD/RAR)
+        if not lines and service.status == 'error' and service.logs:
+            lines = [f"[SISTEMA] {line}" for line in service.logs.splitlines()]
+            return lines, False
+
         if tail != 'all':
-            try: lines = lines[-int(tail):]
+            try: 
+                t_count = int(tail)
+                if len(lines) > t_count:
+                    lines = lines[-t_count:]
             except: pass
             
         cache.set(cache_key, lines, 30 if not force_refresh else 5)
         return lines, False
     except Exception as e:
+        logger.error(f"Error general en fetch_container_logs: {e}")
         return [f"[ERROR] {e}"], False
 
 
@@ -208,7 +262,7 @@ def invalidate_logs_cache(service: Service):
     # Como no podemos hacer cache.delete_pattern fácilmente en todos los backends,
     # borramos las combinaciones más comunes
     tails = [100, 500, 1000, 10000, 'all']
-    sinces = [None, 'all']
+    sinces = [None, 'all', '5m', '15m', '1h', '4h', '24h', '7d']
     
     # Obtener nombres de contenedores si los hay
     container_names = ['all']

@@ -419,10 +419,14 @@ def _ensure_compose_ports(data: dict, previous_map: dict[str, dict[tuple[int, st
 def sync_service_status(service: Service):
     """
     Sincroniza el estado del servicio con Docker de forma proactiva.
-    
-    Rescata servicios estancados en estados transitorios (pending, starting, etc.)
-    si Docker ya informa de un estado estable.
+    Implementa un cooldown de 5 segundos para evitar bloqueos de base de datos.
     """
+    from django.core.cache import cache as django_cache
+    cache_key = f"sync_cooldown_{service.id}"
+    if django_cache.get(cache_key):
+        return
+    django_cache.set(cache_key, True, 5)
+
     # Ignorar servicios eliminados - no deben ser "resucitados"
     if service.status == "removed":
         return
@@ -452,21 +456,23 @@ def sync_service_status(service: Service):
 
                 return
 
+            # 1. Recopilar datos de Docker fuera de la transacción (Evita bloqueos de red dentro de lock de DB)
+            container_states = []
             all_running = True
             any_running = False
+            
             for ctr in containers:
-                ctr.reload()
+                try:
+                    ctr.reload()
+                except Exception:
+                    continue
+                    
                 status = (ctr.status or "").lower()
-                
-                # Un contenedor está "listo" si está corriendo O si ha terminado con éxito (exit code 0)
                 exit_code = ctr.attrs.get('State', {}).get('ExitCode', 0)
                 is_ready = (status == "running") or (status == "exited" and exit_code == 0)
                 
-
-                
                 if status == "running":
                     any_running = True
-                
                 if not is_ready:
                     all_running = False
                 
@@ -475,17 +481,45 @@ def sync_service_status(service: Service):
                 
                 internal_ports, assigned_ports = _extract_container_port_info(ctr)
                 
-                # Sincronizar ServiceContainer records
-                ServiceContainer.objects.update_or_create(
-                    service=service,
-                    name=svc_name,
-                    defaults={
+                container_states.append({
+                    "name": svc_name,
+                    "defaults": {
                         "container_id": ctr.id,
                         "status": status,
                         "internal_ports": internal_ports,
                         "assigned_ports": assigned_ports,
                     }
-                )
+                })
+
+            # 2. Aplicar cambios en una transacción rápida
+            with transaction.atomic():
+                for state in container_states:
+                    svc_name = state["name"]
+                    defaults = state["defaults"]
+                    
+                    # Cargar registro actual
+                    container_record = ServiceContainer.objects.filter(service=service, name=svc_name).first()
+                    
+                    if container_record:
+                        # Solo actualizar si hay cambios reales para ahorrar I/O
+                        changed = False
+                        # Solo actualizamos puertos si el contenedor corre o si detectamos puertos nuevos (evitar borrado en stop)
+                        actual_defaults = {
+                            "container_id": defaults["container_id"],
+                            "status": defaults["status"],
+                        }
+                        if defaults["status"] == "running" or defaults["assigned_ports"]:
+                            actual_defaults["internal_ports"] = defaults["internal_ports"]
+                            actual_defaults["assigned_ports"] = defaults["assigned_ports"]
+
+                        for key, value in actual_defaults.items():
+                            if getattr(container_record, key) != value:
+                                setattr(container_record, key, value)
+                                changed = True
+                        if changed:
+                            container_record.save()
+                    else:
+                        ServiceContainer.objects.create(service=service, name=svc_name, **defaults)
 
 
 
@@ -831,6 +865,7 @@ def _run_container_internal(
     force_restart: bool = False,
     custom_port: int | None = None,
     command: list[str] | None = None,
+    container_configs: dict | None = None,
 ):
     """
     Arranca (o rearma) el contenedor asociado a un Service.
@@ -869,13 +904,13 @@ def _run_container_internal(
     # ========== DECISIÓN: ¿Es compose o simple? ==========
     if service.has_compose:
         # ===== MODO COMPOSE =====
-        _run_compose_service(service, docker_client, force_restart)
+        _run_compose_service(service, docker_client, force_restart, container_configs)
     else:
         # ===== MODO SIMPLE (mantiene funcionalidad anterior 100%) =====
         _run_simple_service(service, docker_client, force_restart, custom_port, command)
 
 
-def _run_compose_service(service: Service, docker_client, force_restart: bool):
+def _run_compose_service(service: Service, docker_client, force_restart: bool, container_configs: dict | None = None):
     """
     Ejecuta un servicio docker-compose.
     Crea ServiceContainer records para cada contenedor.
@@ -954,12 +989,19 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool):
         
         internal_ports, assigned_ports = _extract_container_port_info(ctr)
         
+        # Aplicar configuración personalizada si existe
+        c_config = (container_configs or {}).get(svc_name, {})
+        c_web = c_config.get('is_web', False)
+        c_type = c_config.get('container_type', 'misc')
+
         ServiceContainer.objects.update_or_create(
             service=service,
             name=svc_name,
             defaults={
                 "container_id": ctr.id,
                 "status": ctr.status,
+                "container_type": c_type,
+                "is_web": c_web,
                 "internal_ports": internal_ports,
                 "assigned_ports": assigned_ports,
             }
@@ -1151,14 +1193,17 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
         raise
 
 
-def _run_container_worker(
-    service_id: int, force_restart: bool, custom_port: int | None, command: list[str] | None
-) -> None:
+def _run_container_worker(service_id: int, force_restart: bool, custom_port: int | None, command: list[str] | None, container_configs: dict | None = None) -> None:
+    """Worker que ejecuta la creación del contenedor en background."""
     service = None
     try:
         service = Service.objects.get(pk=service_id)
         _run_container_internal(
-            service, force_restart=force_restart, custom_port=custom_port, command=command
+            service,
+            force_restart=force_restart,
+            custom_port=custom_port,
+            command=command,
+            container_configs=container_configs,
         )
     except Service.DoesNotExist:
         return
@@ -1181,6 +1226,7 @@ def run_container(
     custom_port: int | None = None,
     command: list[str] | None = None,
     enqueue: bool = True,
+    container_configs: dict | None = None,
 ) -> None:
     """
     Encola la ejecucion del contenedor para no bloquear el hilo que atiende la peticion.
@@ -1201,7 +1247,7 @@ def run_container(
     service.status = "pending"
     _append_log(service, "Ejecucion encolada.")
     service.save(update_fields=["status", "logs", "updated_at"])
-    EXECUTOR.submit(_run_container_worker, service.pk, force_restart, custom_port, command)
+    EXECUTOR.submit(_run_container_worker, service.pk, force_restart, custom_port, command, container_configs)
 
 
 # ==================== STOP / REMOVE ====================

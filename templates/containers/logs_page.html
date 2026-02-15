@@ -294,7 +294,12 @@
             </div>
         </div>
     
-    <div class="logs-toolbar" id="logs-filters">
+    <div class="logs-toolbar" id="logs-filters" style="position: relative;">
+        <!-- Overlay para modo Live -->
+        <div id="live-overlay" class="d-none" style="position: absolute; top: 0; left: 0; width: 100%; height: 50%; background: rgba(0,0,0,0.6); z-index: 5; border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+            <span class="text-warning fw-bold small"><i class="fas fa-exclamation-triangle me-2"></i>Filtros inhabilitados en modo Live</span>
+        </div>
+        
         <!-- Fila 1: Filtros -->
         <div class="toolbar-row">
             <div class="search-container">
@@ -332,6 +337,21 @@
                 <option value="DEBUG" {% if log_level == 'DEBUG' %}selected{% endif %}>🔵 DEBUG</option>
             </select>
             
+            <select name="since"
+                    hx-get="{% url 'containers:logs_page' service.id %}"
+                    hx-trigger="change"
+                    hx-target="#logs-content"
+                    hx-include="#logs-filters"
+                    title="Filtrar por antigüedad (desde hace...)">
+                <option value="" {% if not since %}selected{% endif %}>Cualquier momento</option>
+                <option value="5m" {% if since == '5m' %}selected{% endif %}>Últimos 5 min</option>
+                <option value="15m" {% if since == '15m' %}selected{% endif %}>Últimos 15 min</option>
+                <option value="1h" {% if since == '1h' %}selected{% endif %}>Última hora</option>
+                <option value="4h" {% if since == '4h' %}selected{% endif %}>Últimas 4 horas</option>
+                <option value="24h" {% if since == '24h' %}selected{% endif %}>Últimas 24 horas</option>
+                <option value="7d" {% if since == '7d' %}selected{% endif %}>Últimos 7 días</option>
+            </select>
+
             <select name="tail"
                     hx-get="{% url 'containers:logs_page' service.id %}"
                     hx-trigger="change"
@@ -384,6 +404,9 @@
             <button class="btn-clear" onclick="scrollToTop()" title="Ir al inicio">
                 <i class="fas fa-arrow-up"></i> Inicio
             </button>
+            <button class="btn-clear" style="background: linear-gradient(135deg, #64748b 0%, #475569 100%);" onclick="scrollToBottom()" title="Ir al final">
+                <i class="fas fa-arrow-down"></i> Final
+            </button>
         </div>
     </div>
     
@@ -398,6 +421,12 @@
                 {% if log_level != 'ALL' %}
                 | <i class="fas fa-tag me-1" style="color: #10b981;"></i> Nivel: <strong>{{ log_level }}</strong>
                 {% endif %}
+                {% if since %}
+                | <i class="fas fa-clock me-1" style="color: #60a5fa;"></i> Desde hace: <strong>{{ since }}</strong>
+                {% endif %}
+                <span class="ms-3 text-muted" style="font-size: 0.75rem;">
+                    <i class="fas fa-info-circle me-1"></i> Timestamps convertidos a hora local (España)
+                </span>
             </span>
             <span class="cache-indicator {% if from_cache %}cache-hit{% else %}cache-miss{% endif %}" style="padding: 2px 10px; border-radius: 4px; font-weight: 600;">
                 {% if from_cache %}
@@ -433,10 +462,11 @@ function clearSearch() {
     
     // Forzamos una recarga limpia pidiendo refresh=true para limpiar la caché
     const level = document.querySelector('select[name="level"]').value;
+    const since = document.querySelector('select[name="since"]').value;
     const tail = document.querySelector('select[name="tail"]').value;
-    const container = document.querySelector('select[name="container"]').value;
+    const container = document.querySelector('select[name="container"]') ? document.querySelector('select[name="container"]').value : 'all';
     
-    const url = `?search=&level=${level}&tail=${tail}&container=${container}&refresh=true&rich=true&force_refresh=true`;
+    const url = `?search=&level=${level}&since=${since}&tail=${tail}&container=${container}&refresh=true&rich=true&force_refresh=true`;
     
     htmx.ajax('GET', url, {
         target: '#logs-content',
@@ -511,6 +541,15 @@ function scrollToTop() {
     });
 }
 
+// Scroll al final
+function scrollToBottom() {
+    const container = document.querySelector('.logs-container');
+    container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth'
+    });
+}
+
 // Streaming en vivo
 let liveSocket = null;
 let isLiveStreaming = false;
@@ -521,8 +560,30 @@ function toggleLiveStream() {
     
     // Función para bloquear/desbloquear UI
     const setUIState = (disabled) => {
-        const elements = document.querySelectorAll('.logs-toolbar select, .logs-toolbar input, .btn-refresh, .btn-copy, .btn-download');
-        elements.forEach(el => el.disabled = disabled);
+        const filtersContainer = document.getElementById('logs-filters');
+        const overlay = document.getElementById('live-overlay');
+        const elements = filtersContainer.querySelectorAll('select, input, .btn-refresh, .btn-copy, .btn-download');
+        
+        elements.forEach(el => {
+            el.disabled = disabled;
+            if (disabled) el.style.opacity = '0.5';
+            else el.style.opacity = '1';
+        });
+        
+        // Efecto visual en el contenedor y overlay
+        if (disabled) {
+            filtersContainer.style.background = 'rgba(45, 45, 45, 0.9)';
+            if (overlay) {
+                overlay.classList.remove('d-none');
+                overlay.classList.add('d-flex');
+            }
+        } else {
+            filtersContainer.style.background = 'rgba(45, 45, 45, 0.6)';
+            if (overlay) {
+                overlay.classList.remove('d-flex');
+                overlay.classList.add('d-none');
+            }
+        }
     };
     
     if (isLiveStreaming) {
@@ -545,8 +606,14 @@ function toggleLiveStream() {
         // Iniciar streaming
         const scheme = window.location.protocol === "https:" ? "wss" : "ws";
         const containerSelect = document.querySelector('select[name="container"]');
+        const sinceSelect = document.querySelector('select[name="since"]');
+        const tailSelect = document.querySelector('select[name="tail"]');
+        
         const containerVal = containerSelect ? containerSelect.value : 'all';
-        const socketUrl = `${scheme}://${window.location.host}/ws/logs-stream/{{ service.id }}/?container=${containerVal}`;
+        const sinceVal = sinceSelect ? sinceSelect.value : '';
+        const tailVal = tailSelect ? tailSelect.value : '100';
+        
+        const socketUrl = `${scheme}://${window.location.host}/ws/logs-stream/{{ service.id }}/?container=${containerVal}&since=${sinceVal}&tail=${tailVal}`;
         
         liveSocket = new WebSocket(socketUrl);
         

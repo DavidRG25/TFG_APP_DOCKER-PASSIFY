@@ -25,6 +25,9 @@ urlpatterns = [
     # Verificar disponibilidad de puertos
     path("check-port/", views.check_port_availability, name="check_port"),
     
+    # Análisis de Docker Compose
+    path("analyze-compose/", views.analyze_compose, name="analyze_compose"),
+    
     # Gestión de tokens API
     path("api-token/", views.manage_api_token, name="api_token"),
     

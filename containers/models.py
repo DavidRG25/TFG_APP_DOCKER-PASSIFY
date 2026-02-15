@@ -88,7 +88,9 @@ class Service(models.Model):
     created_at = models.DateTimeField("Creado", auto_now_add=True)
     updated_at = models.DateTimeField("Actualizado", auto_now=True)
 
-    # Opciones
+    # Opciones de tipado y visibilidad
+    container_type = models.CharField("Tipo de contenedor", max_length=20, default='misc')
+    is_web = models.BooleanField("¿Es una web accesible?", default=True)
     volume_name = models.CharField("Nombre del volumen", max_length=255, blank=True, null=True)
 
     class Meta:
@@ -139,6 +141,8 @@ class ServiceContainer(models.Model):
     name = models.CharField("Nombre del contenedor", max_length=100)
     container_id = models.CharField("ID Docker", max_length=100, blank=True, null=True)
     status = models.CharField("Estado", max_length=20, default="unknown")
+    container_type = models.CharField("Tipo de contenedor", max_length=20, default='misc')
+    is_web = models.BooleanField("¿Es una web accesible?", default=False)
     internal_ports = models.JSONField("Puertos internos", blank=True, null=True)
     assigned_ports = models.JSONField("Puertos asignados", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

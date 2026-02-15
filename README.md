@@ -23,7 +23,10 @@
 - **Visualización de Archivos y Logs** con resaltado de sintaxis (Prism.js).
 - **Terminal Web Interactiva** (basada en WebSocket y xterm.js) para ejecutar comandos en tiempo real dentro del contenedor.
 - **Interfaz Reactiva con HTMX** para actualización de paneles, estados y acciones sin recargar la página.
-- **Sincronización con Docker en tiempo real**: detecta contenedores borrados manualmente y actualiza su estado en la base de datos.
+- **Sincronización Inteligente**: Sistema de **Throttling (Cooldown)** y **Atomic Transactions** para garantizar la estabilidad de la base de datos incluso con múltiples usuarios realizando polling.
+- **Persistencia de Estado**: Los puertos y configuraciones de servicios Docker Compose se mantienen visibles en la interfaz incluso cuando los contenedores están detenidos.
+- **Despliegue Flexible**: Permite desplegar proyectos complejos subiendo un único archivo `.zip` que contenga el `docker-compose.yml` o `Dockerfile` en la raíz.
+- **Aislamiento y Seguridad**: Validación estricta de archivos de orquestación, prohibiendo `bind mounts` y configuraciones privilegiadas para proteger el host.
 
 ---
 
@@ -45,8 +48,9 @@
 
 ### **Base de Datos**
 
-- **SQLite** para desarrollo.
-- **MySQL** o **PostgreSQL** recomendados en producción.
+- **Híbrida**: Configurada para detectar automáticamente el entorno.
+- **SQLite** (por defecto): Ideal para desarrollo local y pruebas rápidas. Incluye optimizaciones de **WAL (Write-Ahead Logging)** y **Throttling** para evitar bloqueos.
+- **PostgreSQL**: Recomendado para entornos de producción dockerizados o con alta concurrencia.
 
 ---
 
@@ -179,20 +183,35 @@ python manage.py runserver 0.0.0.0:8000
 python -m daphne -b 0.0.0.0 -p 8080 app_passify.asgi:application
 ```
 
-### 6. Variables de entorno (ejemplo .env)
+### 6. Variables de entorno (archivo .env)
 
-```
+```bash
+# Configuración Básica
 DJANGO_SECRET_KEY=pon_aqui_una_clave_segura
 DJANGO_DEBUG=True
-DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1
+DJANGO_ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+
+# Herramientas Externas
+UNRAR_TOOL_PATH="C:/Program Files/7-Zip/7z.exe"
+
+# Base de Datos Híbrida
+# Si DB_NAME está vacío, PaaSify usa SQLite automáticamente.
+# Para usar PostgreSQL, rellena estos campos:
+DB_NAME=
+DB_USER=
+DB_PASSWORD=
+DB_HOST=
+DB_PORT=
 ```
 
 ### 6. Crear un servicio (resumen)
 
-- Modo imagen por defecto: selecciona una imagen del catalogo, puerto opcional entre 40000-50000 (o dejalo vacio para auto-asignar).
-- Modo custom:
-  - Dockerfile o docker-compose (exclusivos).
-  - Codigo fuente obligatorio en .zip o .rar. Para .rar necesitas la herramienta externa (ver requisitos).
+- **Modo imagen por defecto**: Selecciona una imagen del catálogo, puerto opcional entre 40000-50000.
+- **Modo DockerHub**: Introduce cualquier imagen pública y el puerto interno que use (ej: `python:3.9` puerto `5000`).
+- **Modo Custom**:
+  - **Estructura flexible**: Puedes subir el `Dockerfile` / `docker-compose.yml` por separado O incluirlo dentro del archivo `.zip` del código fuente.
+  - El sistema detectará automáticamente la orquestación dentro del paquete.
+  - Soporta arquitecturas multi-contenedor complejas (ver ejemplo Mega Stack).
 
 ### 7. Pruebas rapidas
 
@@ -331,13 +350,19 @@ python manage.py create_demo_users
 | **Alumno**   | `alumno`   | `Alumno!2025`   | Grupo `Student`.      |
 | **Profesor** | `profesor` | `Profesor!2025` | Grupo `Teacher`.      |
 
-### **2. Imágenes de Catálogo**
+### **2. Imágenes de Catálogo y Ejemplos**
 
 Para restaurar las imágenes por defecto del catálogo:
 
 ```bash
 python manage.py populate_example_images
 ```
+
+#### **Ejemplos de Validación Sugeridos (Carpeta `testing_examples`):**
+
+1. **Simple**: `02_dockerfile_flask_api` (Flask con dashboard Tailwind).
+2. **Orquestación**: `02_compose_redis_nginx` (Nginx + Redis).
+3. **Mega Stack**: `04_compose_mega_stack` (Stack completo: Gateway + API + Redis + Postgres con flujo de datos interactivo).
 
 ### **3. Mantenimiento y Purga**
 

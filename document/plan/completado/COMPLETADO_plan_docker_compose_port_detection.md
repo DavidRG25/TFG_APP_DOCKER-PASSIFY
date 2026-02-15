@@ -2,7 +2,7 @@
 
 **Fecha:** 2026-02-02  
 **Autor:** Sistema PaaSify  
-**Estado:** Propuesta  
+**Estado:** Completado ✅  
 **Prioridad:** Alta
 
 ---
@@ -13,9 +13,10 @@ Implementar un sistema de análisis automático de archivos `docker-compose.yml`
 
 1. Detecte todos los servicios/contenedores definidos
 2. Extraiga puertos internos y externos de cada servicio
-3. Muestre una lista visual de contenedores con sus puertos
-4. Valide la estructura del archivo y muestre errores claros
-5. Oculte los campos manuales de puerto cuando se usa Docker Compose
+3. Muestre una tabla interactiva con el tipo de contenedor detectado (API, DB, etc.) y su iconografía.
+4. Permita al usuario modificar el tipo detectado y activar/desactivar un interruptor "Web" (que habilitará el botón de acceso).
+5. Valide la estructura del archivo y muestre errores claros.
+6. Oculte los campos manuales de puerto cuando se usa Docker Compose.
 
 ---
 
@@ -64,13 +65,15 @@ Mejorar la experiencia de usuario al crear servicios con Docker Compose, elimina
 2. Usuario sube docker-compose.yml
 3. Sistema analiza el archivo automáticamente
 4. Sistema muestra:
-   ├─ ✅ Lista de contenedores detectados
+   ├─ ✅ Tabla de contenedores detectados
+   ├─ ✅ Tipo de contenedor detectado (con posibilidad de cambio)
+   ├─ ✅ Interruptor de "Modo Web" (manual)
    ├─ ✅ Puertos de cada contenedor (interno:externo)
    ├─ ✅ Volúmenes detectados
    ├─ ⚠️  Advertencias (puertos no declarados, conflictos)
    └─ ❌ Errores de sintaxis o estructura
-5. Usuario revisa y confirma
-6. Usuario crea el servicio
+5. Usuario ajusta tipos/web si es necesario.
+6. Usuario crea el servicio enviando la configuración final.
 ```
 
 ### **Ejemplo Visual**
@@ -222,44 +225,27 @@ compose_file: <archivo docker-compose.yml>
 **Response (Éxito):**
 
 ```json
-{
-  "success": true,
   "containers": [
     {
-      "name": "nginx-sin-volumen",
+      "name": "nginx",
       "image": "nginx:latest",
+      "container_type": "web",
+      "is_web": true,
       "ports": [
         {
           "host": "8080",
-          "container": "80",
-          "protocol": "tcp"
+          "container": "80"
         }
       ],
-      "volumes": [],
-      "environment": {},
-      "warnings": []
-    },
-    {
-      "name": "redis",
-      "image": "redis:7",
-      "ports": [
-        {
-          "host": "6379",
-          "container": "6379",
-          "protocol": "tcp"
-        }
-      ],
-      "volumes": [],
-      "environment": {},
       "warnings": []
     }
   ],
-  "volumes": ["datos_nginx"],
-  "networks": [],
   "warnings": [],
   "errors": []
 }
 ```
+
+> **Nota:** Todos estos campos deben estar documentados en la OpenAPI/Swagger de la aplicación.
 
 **Response (Error de Sintaxis):**
 

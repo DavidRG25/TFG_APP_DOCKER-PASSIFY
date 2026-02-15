@@ -2,19 +2,26 @@
 <div class="border rounded-3 p-2 bg-light">
     <div class="d-flex justify-content-between align-items-center mb-2">
         <div>
-            {# Icono según tipo de servicio #}
-            {% if 'redis' in container.name|lower %}
-            <i class="fas fa-database text-danger me-2"></i>
-            {% elif 'postgres' in container.name|lower or 'mysql' in container.name|lower or 'mariadb' in container.name|lower %}
-            <i class="fas fa-database text-primary me-2"></i>
-            {% elif 'mongo' in container.name|lower %}
-            <i class="fas fa-leaf text-success me-2"></i>
-            {% elif 'web' in container.name|lower or 'app' in container.name|lower or 'nginx' in container.name|lower %}
-            <i class="fas fa-globe text-info me-2"></i>
+            {# Icono según tipo de servicio (prioriza tipo explícito) #}
+            {% if container.container_type == 'database' %}
+            <i class="fas fa-database text-primary me-2" title="Base de Datos"></i>
+            {% elif container.container_type == 'api' %}
+            <i class="fas fa-microchip text-warning me-2" title="API / Backend"></i>
+            {% elif container.container_type == 'web' %}
+            <i class="fas fa-globe text-info me-2" title="Web / Frontend"></i>
+            {# Fallback histórico por nombre #}
+            {% elif 'redis' in container.name|lower or 'cache' in container.name|lower %}
+            <i class="fas fa-memory text-danger me-2" title="Cache"></i>
+            {% elif 'postgres' in container.name|lower or 'mysql' in container.name|lower or 'mariadb' in container.name|lower or 'db' in container.name|lower %}
+            <i class="fas fa-database text-primary me-2" title="Base de Datos"></i>
+            {% elif 'api' in container.name|lower or 'backend' in container.name|lower %}
+            <i class="fas fa-server text-warning me-2" title="API / Backend"></i>
+            {% elif 'gateway' in container.name|lower or 'nginx' in container.name|lower or 'web' in container.name|lower %}
+            <i class="fas fa-network-wired text-info me-2" title="Gateway / Web"></i>
             {% elif 'worker' in container.name|lower or 'celery' in container.name|lower %}
-            <i class="fas fa-cog text-warning me-2"></i>
+            <i class="fas fa-cogs text-secondary me-2" title="Worker"></i>
             {% else %}
-            <i class="fas fa-cube text-secondary me-2"></i>
+            <i class="fas fa-cube text-muted me-2"></i>
             {% endif %}
             <strong class="text-primary">{{ container.name }}</strong>
         </div>
@@ -57,16 +64,19 @@
             </button>
             {% endif %}
 
-            {# Botón Acceder si tiene puertos #}
-            {% if container.assigned_ports and host %}
-            {% with first_port=container.assigned_ports.0.external %}
-            {% if first_port %}
-            <a href="http://{{ host }}:{{ first_port }}" class="btn btn-primary" target="_blank"
-                rel="noopener" title="Acceder a {{ container.name }}">
-                <i class="fas fa-external-link-alt"></i>
-            </a>
-            {% endif %}
-            {% endwith %}
+            {# Botón Acceder si tiene puertos y es un servicio web #}
+            {% if container.assigned_ports and host and container.is_web %}
+                {% with first_port_obj=container.assigned_ports.0 %}
+                    {% with p_ext=first_port_obj.external p_int=first_port_obj.internal|default:80 %}
+                        {# Solo mostrar si no es un puerto tipico de DB/Worker y no tiene nombre de DB/Worker #}
+                        {% if p_int != 6379 and p_int != 5432 and p_int != 3306 and p_int != 27017 and 'redis' not in container.name|lower and 'worker' not in container.name|lower and 'db' not in container.name|lower %}
+                            <a href="http://{{ host }}:{{ p_ext }}" class="btn btn-primary" target="_blank"
+                                rel="noopener" title="Acceder a {{ container.name }}">
+                                <i class="fas fa-external-link-alt"></i>
+                            </a>
+                        {% endif %}
+                    {% endwith %}
+                {% endwith %}
             {% endif %}
         </div>
     </div>

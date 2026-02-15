@@ -6,26 +6,76 @@ Endpoint dedicado para monitorear la salida de tus contenedores en tiempo real o
 
 ### Ver Logs
 
-Obtiene la salida estándar (stdout) y de error (stderr) del contenedor. Es la herramienta principal para depurar fallos en tus aplicaciones.
+Obtiene la salida estándar (`stdout`) y de error (`stderr`) del contenedor. Si el servicio ha fallado al crearse (por ejemplo, error al descomprimir o en el `Dockerfile`), este endpoint devolverá los logs del sistema para ayudarte a depurar.
 
 **Endpoint:** `GET /api/containers/{id}/logs/`
 
-```bash
-curl -X GET "{{ PAASIFY_API_URL }}/containers/{id}/logs/" \
-  -H "Authorization: Bearer <TU_API_TOKEN>"
-```
+#### Parámetros opcionales (Query Params)
 
-#### Tip: Formato de salida
-
-Este endpoint devuelve texto plano (`text/plain`), lo que facilita su lectura directa en la terminal sin necesidad de procesar JSON.
+| Parámetro   | Descripción                        | Valores ejemplo                      |
+| :---------- | :--------------------------------- | :----------------------------------- |
+| `tail`      | Número de líneas finales a mostrar | `10`, `100`, `all` (por defecto 200) |
+| `since`     | Filtrar por antigüedad             | `5m`, `1h`, `24h`, `7d`              |
+| `container` | ID del contenedor (solo Compose)   | `1`, `2`                             |
 
 ---
 
-### Escenarios de uso
+### Ejemplos Prácticos
 
-1. **Error de arranque**: Si el estado del servicio es `error`, consulta este endpoint para ver el mensaje de error de Docker o de tu aplicación.
-2. **Depuración**: Puedes añadir `print()` o logs en tu código y verlos aquí instantáneamente.
-3. **Multi-contenedor (Compose)**: Si usas Docker Compose, puedes filtrar los logs de un contenedor específico añadiendo el parámetro `?container={id_contenedor}`.
+Usa estos comandos en tu terminal para verificar el funcionamiento:
+
+#### 1. Modo Dockerfile (mi-app-passify-example-dockerfile)
+
+Para ver las últimas 10 líneas de actividad:
+
+```bash
+curl -X GET "{{ PAASIFY_API_URL }}/containers/{ID_SERVICIO}/logs/?tail=10" \
+  -H "Authorization: Bearer <TU_API_TOKEN>"
+```
+
+#### 2. Modo Docker Compose (stack-completo-passify)
+
+Para ver los logs de la última hora de todo el stack:
+
+```bash
+curl -X GET "{{ PAASIFY_API_URL }}/containers/{ID_SERVICIO}/logs/?since=1h" \
+  -H "Authorization: Bearer <TU_API_TOKEN>"
+```
+
+#### 3. Filtrar un contenedor específico en Compose
+
+Si quieres ver solo los logs de un servicio hijo (ej. el contenedor de la base de datos):
+
+```bash
+curl -X GET "{{ PAASIFY_API_URL }}/containers/{ID_SERVICIO}/logs/?container={ID_CONTENEDOR_HIJO}" \
+  -H "Authorization: Bearer <TU_API_TOKEN>"
+```
+
+---
+
+#### Tip: Depuración de errores de aplicación
+
+Si tu servicio está en estado `ERROR`, consulta este endpoint para identificar fallos en tu código o en la configuración del entorno. Los logs te mostrarán el _stacktrace_ exacto del error.
+
+**Ejemplo de error por dependencia faltante (Python):**
+
+```text
+Traceback (most recent call last):
+  File "app.py", line 1, in <module>
+    import flask
+ModuleNotFoundError: No module named 'flask'
+```
+
+_Solución: Verifica que has incluido todas las dependencias en tu archivo `requirements.txt`._
+
+**Ejemplo de error en Dockerfile:**
+
+```text
+[DOCKER] Step 4/6 : RUN pip install -r missing_file.txt
+[DOCKER] ERROR: Could not open requirements file: [Errno 2] No such file or directory: 'missing_file.txt'
+```
+
+_Solución: Asegúrate de que los nombres de los archivos en tu Dockerfile coinciden exactamente con los de tu código subido._
 
 ---
 

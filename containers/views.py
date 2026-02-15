@@ -4,6 +4,7 @@ import json
 from django.db import models
 
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.core.exceptions import FieldError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -30,6 +31,7 @@ from paasify.roles import (
 from .docker_client import get_docker_client
 from .models import AllowedImage, Service, ServiceContainer
 from .serializers import AllowedImageSerializer, ServiceSerializer
+from .compose_parser import DockerComposeParser
 from .services import (
     remove_container, 
     run_container, 
@@ -39,6 +41,25 @@ from .services import (
     fetch_container_logs,
     sync_service_status
 )
+
+@login_required
+@require_POST
+def analyze_compose(request):
+    """
+    Analiza un archivo docker-compose.yml y retorna información estructurada.
+    """
+    if 'compose_file' not in request.FILES:
+        return JsonResponse({'success': False, 'error': 'No se proporcionó archivo'}, status=400)
+
+    compose_file = request.FILES['compose_file']
+    try:
+        content = compose_file.read().decode('utf-8')
+    except Exception:
+        return JsonResponse({'success': False, 'error': 'Archivo no válido'}, status=400)
+
+    parser = DockerComposeParser(content)
+    result = parser.parse()
+    return JsonResponse(result)
 
 
 # ----------------------------- helpers -----------------------------
@@ -194,10 +215,18 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if project_id:
             project = get_object_or_404(UserProject, pk=project_id, user_profile__user=request.user)
 
+        # Capturar configuraciones personalizadas de contenedores (para compose)
+        container_configs = request.data.get("container_configs")
+        if isinstance(container_configs, str):
+            try:
+                container_configs = json.loads(container_configs)
+            except:
+                container_configs = None
+
         service = serializer.save(owner=request.user, status="creating", project=project)
 
         try:
-            run_container(service, custom_port=custom_port)
+            run_container(service, custom_port=custom_port, container_configs=container_configs)
         except Exception as exc:
             service.status = "error"
             service.logs = str(exc)
@@ -352,29 +381,33 @@ class ServiceViewSet(viewsets.ModelViewSet):
         """
         service = self.get_object()
         container_id_param = request.query_params.get("container")
+        tail_param = request.query_params.get("tail", "200")
+        since_param = request.query_params.get("since")
         
-        # Determinar de dónde obtener los logs
+        # Validar tail
+        try:
+            tail_val = int(tail_param) if tail_param != 'all' else 'all'
+        except:
+            tail_val = 200
+
+        # Determinar de dónde obtener los logs usando la utilidad unificada
+        container_name = None
         if container_id_param:
-            # Modo compose: logs de contenedor específico
             try:
                 container_record = ServiceContainer.objects.get(pk=container_id_param, service=service)
-                log_content = fetch_container_logs(container_record)
-                title = f"Logs de {service.name} - {container_record.name}"
+                container_name = container_record.name
             except ServiceContainer.DoesNotExist:
-                log_content = "(contenedor no encontrado)"
-                title = f"Logs de {service.name}"
-        else:
-            # Modo simple: logs del servicio (comportamiento anterior)
-            log_content = service.logs or "(sin logs)"
-            if service.container_id:
-                docker_client = get_docker_client()
-                if docker_client:
-                    try:
-                        container = docker_client.containers.get(service.container_id)
-                        log_content = container.logs(tail=200).decode(errors="replace")
-                    except Exception as e:
-                        log_content = f"(error leyendo logs: {e})"
-            title = f"Logs de {service.name}"
+                pass
+        
+        # Obtener logs (la utilidad ya maneja tail, since y la conversión horaria)
+        logs_lines, _ = fetch_container_logs(
+            service, 
+            tail=tail_val, 
+            since=since_param, 
+            container_name=container_name
+        )
+        log_content = "\n".join(logs_lines) if logs_lines else "(sin logs en este periodo)"
+        title = f"Logs de {service.name}" + (f" - {container_name}" if container_name else "")
         
         if self._is_htmx(request):
             # Determinamos si hace falta polling (si está operando o si está corriendo para ver logs frescos)
@@ -1446,6 +1479,7 @@ def logs_page(request, pk):
     search_text = request.GET.get('search', '').strip()
     log_level = request.GET.get('level', 'ALL')
     tail = request.GET.get('tail', '1000')
+    since = request.GET.get('since', '')
     use_rich = request.GET.get('rich', 'true').lower() == 'true'
     selected_container = request.GET.get('container', 'all')
     force_refresh = request.GET.get('refresh', 'false').lower() == 'true'
@@ -1476,15 +1510,17 @@ def logs_page(request, pk):
     except ValueError:
         tail_int = 1000
 
+    since_val = since if since else None
+
     if service.has_compose and selected_container != 'all':
         try:
             container_id = int(selected_container)
             specific_container = service.containers.get(id=container_id)
-            logs_lines, from_cache = fetch_container_logs(service, tail=tail_int, container_name=specific_container.name, force_refresh=force_refresh)
+            logs_lines, from_cache = fetch_container_logs(service, tail=tail_int, since=since_val, container_name=specific_container.name, force_refresh=force_refresh)
         except (ValueError, ServiceContainer.DoesNotExist):
-            logs_lines, from_cache = fetch_container_logs(service, tail=tail_int, force_refresh=force_refresh)
+            logs_lines, from_cache = fetch_container_logs(service, tail=tail_int, since=since_val, force_refresh=force_refresh)
     else:
-        logs_lines, from_cache = fetch_container_logs(service, tail=tail_int, force_refresh=force_refresh)
+        logs_lines, from_cache = fetch_container_logs(service, tail=tail_int, since=since_val, force_refresh=force_refresh)
     
     # Aplicar filtros sobre las líneas "raw" (con prefijo [name] si aplica)
     if search_text:
@@ -1529,6 +1565,7 @@ def logs_page(request, pk):
             "from_cache": from_cache,
             "search_text": search_text,
             "log_level": log_level,
+            "since": since,
         })
     
     # Request normal: página completa
@@ -1538,6 +1575,7 @@ def logs_page(request, pk):
         "search_text": search_text,
         "log_level": log_level,
         "tail": tail,
+        "since": since,
         "use_rich": use_rich,
         "total_lines": len(logs_lines),
         "from_cache": from_cache,
