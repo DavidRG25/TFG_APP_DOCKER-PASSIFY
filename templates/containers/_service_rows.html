@@ -43,6 +43,17 @@
         </span>
       {% endif %}
     </div>
+    <div class="mt-1" style="line-height: 1;">
+      {% if s.mode == 'dockerhub' %}
+        <small class="text-secondary" style="font-size: 0.65rem; font-weight: 600;"><i class="fab fa-docker me-1"></i>DockerHub</small>
+      {% elif s.mode == 'custom' %}
+         {% if s.has_compose %}
+            <small class="text-primary" style="font-size: 0.65rem; font-weight: 600;"><i class="fas fa-network-wired me-1"></i>Compose</small>
+         {% else %}
+            <small class="text-info" style="font-size: 0.65rem; font-weight: 600;"><i class="fas fa-file-code me-1"></i>Dockerfile</small>
+         {% endif %}
+      {% endif %}
+    </div>
   </td>
 
   <td><code class="small text-primary">{{ s.image|truncatechars:30 }}</code></td>

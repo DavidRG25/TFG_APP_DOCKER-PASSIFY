@@ -1288,7 +1288,7 @@ def edit_service(request, pk):
 
         try:
             # Purga y reconstrucción total
-            remove_container(service)
+            remove_container(service, keep_files=True)
             run_container(service)
         except Exception as exc:
             return HttpResponse(f"Error al reiniciar: {exc}", status=500)
@@ -1323,7 +1323,8 @@ def edit_service(request, pk):
     return render(request, "containers/edit_service.html", {
         "service": service,
         "return_url": return_url,
-        "containers_info": containers_info
+        "containers_info": containers_info,
+        "env_vars_json": json.dumps(service.env_vars or {}, indent=2)
     })
 
 
