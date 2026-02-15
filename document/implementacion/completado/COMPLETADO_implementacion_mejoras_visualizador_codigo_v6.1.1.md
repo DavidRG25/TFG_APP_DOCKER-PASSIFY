@@ -1,7 +1,7 @@
 # Mejora Implementada: Visualizador de Código "White IDE Premium"
 
 **Fecha:** 12/02/2026
-**Autor:** Antigravity (IA) & David RG
+**Autor:** David RG
 **Estado:** COMPLETADO
 **Versión de Mejora:** v1.0 (v6.1.1 Core)
 

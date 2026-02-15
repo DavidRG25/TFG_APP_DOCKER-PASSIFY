@@ -85,4 +85,4 @@ Implementación profesional de terminal web (PyXtermJS) y visor de logs avanzado
 
 **Versión Final:** v6.1.5 - Terminal y Logs Resilientes  
 **Estado:** ✅ COMPLETADO  
-**Responsable:** Antigravity AI
+**Responsable:** David RG

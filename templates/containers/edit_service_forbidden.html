@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}No Permitido - Editar Servicio | PaaSify{% endblock %}
+
+{% block body %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10 col-xl-9">
+            <div class="card border-0 shadow-lg">
+                <div class="card-body p-5 text-center">
+                    <!-- Icono de advertencia -->
+                    <div class="mb-4">
+                        <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-warning bg-opacity-10 p-4">
+                            <i class="fas fa-lock fa-3x text-warning"></i>
+                        </div>
+                    </div>
+
+                    <!-- Título -->
+                    <h2 class="fw-bold text-dark mb-3">
+                        <i class="fas fa-shield-alt text-warning me-2"></i>
+                        Servicio del Catálogo Oficial
+                    </h2>
+
+                    <!-- Mensaje principal -->
+                    <p class="lead text-muted mb-4">
+                        Los servicios desplegados desde el <strong>catálogo oficial</strong> no pueden ser modificados directamente.
+                    </p>
+
+                    <!-- Explicación detallada -->
+                    <div class="alert alert-warning border-0 text-start mb-4" role="alert">
+                        <h6 class="alert-heading fw-bold">
+                            <i class="fas fa-info-circle me-2"></i>¿Por qué no puedo editarlo?
+                        </h6>
+                        <p class="mb-2 small">
+                            Las imágenes del catálogo están <strong>pre-configuradas y verificadas</strong> por PaaSify para garantizar su seguridad y estabilidad.
+                        </p>
+                        <p class="mb-0 small">
+                            Modificar estos servicios podría comprometer su funcionamiento o introducir vulnerabilidades.
+                        </p>
+                    </div>
+
+                    <!-- Información del servicio -->
+                    <div class="bg-light rounded-3 p-3 mb-4 text-start">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <small class="text-muted d-block">Nombre del Servicio</small>
+                                <strong class="text-dark">{{ service.name }}</strong>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">Imagen</small>
+                                <strong class="text-dark">{{ service.image }}</strong>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">Modo de Despliegue</small>
+                                <span class="badge bg-primary">
+                                    <i class="fas fa-box-open me-1"></i>Catálogo Oficial
+                                </span>
+                            </div>
+                            <div class="col-6">
+                                <small class="text-muted d-block">Estado</small>
+                                {% if service.status == 'running' %}
+                                <span class="badge bg-success">
+                                    {{ service.status|upper }}
+                                </span>
+                                {% else %}
+                                <span class="badge bg-secondary">
+                                    {{ service.status|upper }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Opciones alternativas -->
+                    <div class="card bg-white border border-primary border-opacity-25 mb-4 shadow-sm">
+                        <div class="card-body p-4">
+                            <h6 class="fw-bold text-primary mb-3">
+                                <i class="fas fa-lightbulb me-2"></i>Alternativas Recomendadas
+                            </h6>
+                            <div class="text-start">
+                                <div class="mb-3 p-3 bg-light rounded">
+                                    <strong class="d-block text-dark mb-2">
+                                        <i class="fas fa-sync-alt text-primary me-2"></i>Opción 1: Recrear el Servicio
+                                    </strong>
+                                    <small class="text-muted">
+                                        Elimina este servicio y crea uno nuevo con la configuración que necesitas usando <strong>DockerHub</strong> o <strong>Personalizado</strong>.
+                                    </small>
+                                </div>
+                                <div class="mb-3 p-3 bg-light rounded">
+                                    <strong class="d-block text-dark mb-2">
+                                        <i class="fab fa-docker text-primary me-2"></i>Opción 2: Usar DockerHub
+                                    </strong>
+                                    <small class="text-muted">
+                                        Despliega la misma imagen desde DockerHub para tener control total sobre variables de entorno y configuración.
+                                    </small>
+                                </div>
+                                <div class="p-3 bg-light rounded">
+                                    <strong class="d-block text-dark mb-2">
+                                        <i class="fas fa-code text-primary me-2"></i>Opción 3: Despliegue Personalizado
+                                    </strong>
+                                    <small class="text-muted">
+                                        Crea un servicio personalizado con tu propio Dockerfile o docker-compose.yml para máxima flexibilidad.
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botones de acción -->
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                        <a href="{% url 'containers:student_services_in_subject' service.subject.id %}" class="btn btn-outline-secondary btn-lg">
+                            <i class="fas fa-arrow-left me-2"></i>Volver a Mis Servicios
+                        </a>
+                        <a href="{% url 'containers:new_service' %}?return_url={{ request.path }}" class="btn btn-primary btn-lg">
+                            <i class="fas fa-plus-circle me-2"></i>Crear Nuevo Servicio
+                        </a>
+                    </div>
+
+                    <!-- Ayuda adicional -->
+                    <div class="mt-4 pt-3 border-top">
+                        <small class="text-muted">
+                            <i class="fas fa-question-circle me-1"></i>
+                            ¿Necesitas ayuda? Consulta la 
+                            <a href="{% url 'containers:api_docs' %}" class="text-decoration-none">documentación de la API</a>
+                            o contacta con tu profesor.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

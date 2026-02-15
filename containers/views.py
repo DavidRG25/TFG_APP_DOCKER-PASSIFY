@@ -8,6 +8,7 @@ from django.views.decorators.http import require_POST
 from django.core.exceptions import FieldError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.template.loader import render_to_string
 from django.utils.html import escape
 
@@ -255,6 +256,28 @@ class ServiceViewSet(viewsets.ModelViewSet):
             status=201,
             headers=headers
         )
+
+    def perform_update(self, serializer):
+        service = self.get_object()
+        if service.mode == 'default':
+            raise PermissionDenied("Los servicios del catálogo oficial no se pueden editar.")
+        
+        # Guardar cambios
+        updated_service = serializer.save()
+        
+        # Procesar archivos si vienen por multipart
+        self._attach_uploaded_files(updated_service, self.request, updated_service.mode)
+        
+        # Reiniciar contenedor
+        try:
+            remove_container(updated_service)
+            run_container(updated_service)
+        except Exception as exc:
+            # En API reportamos el error pero permitimos que el objeto se guarde
+            updated_service.status = "error"
+            updated_service.logs = f"Error al actualizar: {exc}"
+            updated_service.save()
+            raise ValidationError(f"Error al reiniciar contenedor: {exc}")
 
     def _validation_error_response(self, exc: ValidationError):
         """Devuelve un fragmento HTML con errores de validación para HTMX."""
@@ -1196,10 +1219,17 @@ def professor_project_detail(request, project_id):
     )
 
 
-# Editar servicio (env/volumenes) y reiniciar
+# Editar servicio (env/archivos) y reiniciar
 @login_required
 def edit_service(request, pk):
     service = get_object_or_404(Service, pk=pk, owner=request.user)
+
+    # Restricción: No se pueden editar servicios del catálogo (default)
+    if service.mode == 'default':
+        return render(request, 'containers/edit_service_forbidden.html', {
+            'service': service,
+            'title': 'No Permitido - Editar Servicio'
+        })
 
     if request.method == "POST":
         def _parse_optional_json(raw_value: str, field_label: str):
@@ -1215,25 +1245,86 @@ def edit_service(request, pk):
 
         try:
             env_vars = _parse_optional_json(request.POST.get("env_vars", ""), "Variables de entorno")
-            # SEGURIDAD CRÍTICA: Volúmenes deshabilitados completamente
-            # volumes = _parse_optional_json(request.POST.get("volumes", ""), "Volumenes")
+            container_configs = _parse_optional_json(request.POST.get("container_configs", ""), "Configuración de contenedores")
         except ValueError as exc:
             return HttpResponse(str(exc), status=400)
 
+        # Actualizar campos
         service.env_vars = env_vars or None
-        # SEGURIDAD: No permitir modificación de volúmenes
-        # service.volumes = volumes or None
-        service.save(update_fields=["env_vars", "updated_at"])
+        service.container_configs = container_configs or None
+        
+        # Tipo y visibilidad (solo modo dockerhub o custom/dockerfile)
+        if service.mode == 'dockerhub' or (service.mode == 'custom' and service.dockerfile):
+            service.container_type = request.POST.get("container_type", service.container_type)
+            service.is_web = request.POST.get("is_web") == "on"
+            
+            i_port = request.POST.get("internal_port")
+            if i_port:
+                try:
+                    service.internal_port = int(i_port)
+                except ValueError:
+                    pass
+        
+        # Puerto externo (assigned_port)
+        c_port = request.POST.get("custom_port")
+        if c_port:
+            try:
+                service.assigned_port = int(c_port)
+            except ValueError:
+                pass
+        else:
+            # Si se deja vacío, se vuelve a automático (None)
+            service.assigned_port = None
+
+        # Actualizar archivos si se proporcionan (reemplazo total)
+        if request.FILES.get("dockerfile"):
+            service.dockerfile = request.FILES["dockerfile"]
+        if request.FILES.get("compose"):
+            service.compose = request.FILES["compose"]
+        if request.FILES.get("code"):
+            service.code = request.FILES["code"]
+
+        service.save()
 
         try:
+            # Purga y reconstrucción total
             remove_container(service)
             run_container(service)
         except Exception as exc:
             return HttpResponse(f"Error al reiniciar: {exc}", status=500)
 
-        return redirect("containers:student_panel")
+        return_url = request.POST.get('return_url')
+        if not return_url:
+            return_url = reverse('containers:student_panel')
+        return redirect(return_url)
 
-    return render(request, "containers/edit_service.html", {"service": service})
+    # Capturar URL de retorno inicial
+    return_url = request.GET.get('return_url')
+    if not return_url:
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'subjects/' in referer or 'projects/' in referer:
+            return_url = referer
+        else:
+            return_url = reverse('containers:student_panel')
+
+    # Para Compose, necesitamos los contenedores actuales para la tabla si existen
+    containers_info = []
+    if service.has_compose:
+        for c in service.containers.all():
+            if c.name != "principal":
+                containers_info.append({
+                    'name': c.name,
+                    'internal_ports': c.internal_ports,
+                    'assigned_ports': c.assigned_ports,
+                    'is_web': c.is_web,
+                    'container_type': c.container_type
+                })
+
+    return render(request, "containers/edit_service.html", {
+        "service": service,
+        "return_url": return_url,
+        "containers_info": containers_info
+    })
 
 
 @login_required
@@ -1252,7 +1343,16 @@ def new_service_page(request):
     Proporciona mejor UX que el modal con más espacio y ayuda contextual.
     """
     # Obtener datos necesarios para el formulario
-    images = AllowedImage.objects.all().order_by('name')
+    images = AllowedImage.objects.all().order_by('image_type', 'name')
+    
+    # Agrupar imágenes por tipo para el selector categorizado
+    images_by_type = {}
+    for img in images:
+        type_label = dict(AllowedImage.IMAGE_TYPES).get(img.image_type, "Otros")
+        if type_label not in images_by_type:
+            images_by_type[type_label] = []
+        images_by_type[type_label].append(img)
+    
     subjects = Subject.objects.filter(students=request.user)
     user_projects = UserProject.objects.filter(
         user_profile__user=request.user
@@ -1283,6 +1383,7 @@ def new_service_page(request):
     
     context = {
         'images': images,
+        'images_by_type': images_by_type,
         'available_subjects': subjects,
         'user_projects': user_projects,
         'host': host,
@@ -1344,10 +1445,11 @@ def api_documentation_view(request, section_slug="introduccion"):
         {"slug": "autenticacion",   "title": "Autenticación",          "file": "02_authentication.md"},
         {"slug": "gets",            "title": "Consultas (GETs)",      "file": "03_gets.md"},
         {"slug": "crear",           "title": "Crear Servicio",        "file": "04_create.md"},
-        {"slug": "acciones",        "title": "Acciones del Servicio", "file": "05_actions.md"},
-        {"slug": "logs",            "title": "Logs del Servicio",     "file": "06_logs.md"},
-        {"slug": "ci-cd",           "title": "Integración CI/CD",     "file": "07_cicd.md"},
-        {"slug": "errores",         "title": "Códigos de Error",      "file": "08_errors.md"},
+        {"slug": "modificar",       "title": "Modificar Servicio",    "file": "05_modify.md"},
+        {"slug": "acciones",        "title": "Acciones del Servicio", "file": "06_actions.md"},
+        {"slug": "logs",            "title": "Logs del Servicio",     "file": "07_logs.md"},
+        {"slug": "ci-cd",           "title": "Integración CI/CD",     "file": "08_cicd.md"},
+        {"slug": "errores",         "title": "Códigos de Error",      "file": "09_errors.md"},
     ]
 
     # Buscar la seccion actual
@@ -1437,8 +1539,12 @@ def api_command_generator_view(request):
     # URL de retorno
     return_url = request.GET.get('return_url')
     if not return_url:
-        from django.urls import reverse
-        return_url = reverse('containers:student_panel')
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'subjects/' in referer:
+            return_url = referer
+        else:
+            from django.urls import reverse
+            return_url = reverse('containers:student_panel')
         
     context = {
         'token': token.key,

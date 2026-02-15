@@ -2,7 +2,7 @@
 
 **Fecha:** 15/02/2026
 **Estado:** COMPLETADO
-**Autor:** Antigravity AI
+**Autor:** David RG
 
 ## 1. Descripción
 

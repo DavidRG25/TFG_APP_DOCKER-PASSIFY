@@ -2,7 +2,7 @@
 
 **Fecha actualización:** 13/02/2026  
 **Versión:** v6.3.0  
-**Tester:** David RG / Antigravity AI  
+**Tester:** David RG  
 **Estado:** ✅ **COMPLETADO (40/40 PASADOS)**
 
 ---
@@ -445,7 +445,7 @@ Si un test falla, añade comentarios en la sección de bugs.
 - [x] Performance aceptable bajo carga
 - [x] Listo para commit final
 
-**Firma:** **Antigravity AI / David RG**  
+**Firma:** **David RG**  
 **Fecha:** **2026-02-13**
 
 ---

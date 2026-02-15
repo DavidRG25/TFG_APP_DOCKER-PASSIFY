@@ -183,25 +183,31 @@
               <h5 class="fw-bold text-primary mb-3">
                 <i class="fas fa-sliders-h me-2" style="margin-right: 0.5rem"></i>Configuracion
               </h5>
-
               {# Imagen (solo modo default) #}
               <div class="mb-3" id="block-default-image">
                 <label for="service-image" class="form-label fw-semibold d-block mb-2">
                   Imagen Docker <span class="text-danger">*</span>
                 </label>
-                <select class="form-select form-select-lg" id="service-image" name="image" required style="
-                    border: 2px solid #dee2e6;
+                <select class="form-select form-select-lg shadow-sm" id="service-image" name="image" required style="
+                    border: 2px solid #4e73df;
+                    border-left-width: 5px;
                     font-size: 1.1rem;
                     padding: 0.75rem 1rem;
                     height: auto;
                   ">
-                  {% for img in images %}
-                  <option value="{{ img.name }}:{{ img.tag }}">
-                    {{ img.name }}:{{ img.tag }} - {{ img.description }}
-                  </option>
-                  {% endfor %}\
+                  {% for type_label, type_images in images_by_type.items %}
+                  <optgroup label="{% if type_label == 'Web / Frontend' %}🌐{% elif type_label == 'Base de Datos' %}🗄️{% elif type_label == 'Generador de API' %}⚙️{% else %}📦{% endif %} {{ type_label }}">
+                    {% for img in type_images %}
+                    <option value="{{ img.name }}:{{ img.tag }}" data-desc="{{ img.description }}" data-type="{{ img.image_type }}">
+                      {{ img.name }}:{{ img.tag }} - {{ img.description }}
+                    </option>
+                    {% endfor %}
+                  </optgroup>
+                  {% endfor %}
                 </select>
-                <small class="text-muted">Selecciona una imagen del catalogo oficial.</small>
+                <small class="text-muted d-block mt-2">
+                  <i class="fas fa-check-double text-success me-1"></i>Seleccionada una imagen oficial verificada por PaaSify.
+                </small>
               </div>
 
               {# Imagen desde DockerHub (solo modo dockerhub) #}
@@ -402,33 +408,59 @@
                 </div>
               </div>
 
-              {# Configuración de Acceso y Tipo (Útil para Dockerfile y DockerHub) #}
+              {# Configuración de Acceso y Tipo (Útil para Todos los modos simples) #}
               <div id="block-simple-access-config" class="mb-4" style="display: none; transition: all 0.3s ease;">
                 <div class="card border-0 bg-light shadow-sm">
                   <div class="card-body p-3">
-                    <div class="row align-items-center">
-                      <div class="col-md-6 mb-3 mb-md-0">
-                        <label class="form-label fw-bold text-dark">
-                          <i class="fas fa-tag me-2"></i>Tipo de Servicio
+                    <label class="form-label fw-bold d-block mb-3 text-primary">
+                      <i class="fas fa-cog me-2"></i>Personalizar Rol del Contenedor
+                    </label>
+                    <div class="row g-3">
+                      <div class="col-md-7">
+                        <label class="form-label small fw-bold text-muted text-uppercase mb-2">
+                          <i class="fas fa-tag me-1 text-primary"></i>Tipo de Servicio
                         </label>
-                        <select class="form-select" name="container_type">
-                          <option value="misc">🛡️ General / Miscelánea</option>
-                          <option value="web" selected>🌐 Frontend / Web</option>
-                          <option value="api">⚙️ API / Backend</option>
-                          <option value="database">🗄️ Base de Datos</option>
-                        </select>
-                      </div>
-                      <div class="col-md-6 ps-md-4 border-start">
-                        <label class="form-label fw-bold text-dark d-block">
-                          <i class="fas fa-eye me-2"></i>Visibilidad
-                        </label>
-                        <div class="form-check form-switch mt-2">
-                          <input class="form-check-input" type="checkbox" name="is_web" id="is_web_simple" checked>
-                          <label class="form-check-label fw-semibold" for="is_web_simple">Permitir acceso vía web</label>
+                        <div class="row g-2" id="container-type-selector-buttons">
+                          <div class="col-6">
+                            <button type="button" class="btn btn-outline-info w-100 py-2 text-start btn-type-sel active" data-type="web">
+                              <i class="fas fa-globe me-2"></i><strong>WEB</strong>
+                              <div class="x-small opacity-75 d-block mt-1">Frontend, Sitios estáticos</div>
+                            </button>
+                          </div>
+                          <div class="col-6">
+                            <button type="button" class="btn btn-outline-primary w-100 py-2 text-start btn-type-sel" data-type="api">
+                              <i class="fas fa-server me-2"></i><strong>API</strong>
+                              <div class="x-small opacity-75 d-block mt-1">Backend, Microservicios</div>
+                            </button>
+                          </div>
+                          <div class="col-6">
+                            <button type="button" class="btn btn-outline-success w-100 py-2 text-start btn-type-sel" data-type="database">
+                              <i class="fas fa-database me-2"></i><strong>DB</strong>
+                              <div class="x-small opacity-75 d-block mt-1">Bases de datos, Almacén</div>
+                            </button>
+                          </div>
+                          <div class="col-6">
+                            <button type="button" class="btn btn-outline-secondary w-100 py-2 text-start btn-type-sel" data-type="misc">
+                              <i class="fas fa-cube me-2"></i><strong>OTRO</strong>
+                              <div class="x-small opacity-75 d-block mt-1">Herramientas, Scripts</div>
+                            </button>
+                          </div>
                         </div>
-                        <small class="text-muted d-block mt-1" style="font-size: 0.8rem; line-height: 1.2;">
-                          Si se desactiva, se oculta el botón "Acceder", pero el servicio sigue accesible vía terminal, logs o puerto directo.
-                        </small>
+                        <input type="hidden" name="container_type" id="input_container_type" value="web">
+                      </div>
+                      <div class="col-md-5 ps-md-4 border-start d-flex flex-column justify-content-center">
+                        <div class="p-3 rounded-3 bg-white border">
+                          <label class="form-label fw-bold text-dark d-flex align-items-center mb-2">
+                            <i class="fas fa-eye me-2 text-warning"></i>Visibilidad Web
+                          </label>
+                          <div class="form-check form-switch mt-1">
+                            <input class="form-check-input" type="checkbox" name="is_web" id="is_web_simple" checked>
+                            <label class="form-check-label fw-semibold" for="is_web_simple">Acceso vía navegador</label>
+                          </div>
+                          <p class="text-muted mt-2 mb-0" style="font-size: 0.75rem; line-height: 1.4;">
+                            Determina si PaaSify intentará generar un enlace público y mostrar el botón "Acceder".
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
