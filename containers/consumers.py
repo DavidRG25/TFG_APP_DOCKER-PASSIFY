@@ -320,6 +320,8 @@ class LogsStreamConsumer(WebsocketConsumer):
         query_string = self.scope.get("query_string", b"").decode("utf-8")
         query_params = parse_qs(query_string)
         self.selected_container_id = query_params.get("container", [None])[0]
+        self.tail = query_params.get("tail", ["10"])[0]
+        self.since = query_params.get("since", [None])[0]
         
         self.accept()
         
@@ -377,6 +379,8 @@ class LogsStreamConsumer(WebsocketConsumer):
         """Sigue los logs de un contenedor con buffering y auto-reconexión limitada"""
         import struct
         import time
+        import dateutil.parser
+        from datetime import timedelta, timezone
         from .utils import colorize_logs_rich
         
         prefix = f"[{name}] " if self.service.has_compose else ""
@@ -414,7 +418,21 @@ class LogsStreamConsumer(WebsocketConsumer):
                 line_buffer = b""
                 
                 # Iniciamos stream
-                log_stream = container.logs(stream=True, follow=True, tail=10)
+                # Iniciamos stream
+                logs_kwargs = {'stream': True, 'follow': True, 'timestamps': True} # Añadir timestamps
+                
+                # Configurar tail
+                try:
+                    if self.tail == 'all': logs_kwargs['tail'] = 'all'
+                    else: logs_kwargs['tail'] = int(self.tail)
+                except:
+                    logs_kwargs['tail'] = 10
+                
+                # Configurar since
+                if self.since:
+                    logs_kwargs['since'] = self.since
+
+                log_stream = container.logs(**logs_kwargs)
                 
                 # Si llegamos aquí, hemos conectado
                 retry_count = 0 
@@ -442,6 +460,18 @@ class LogsStreamConsumer(WebsocketConsumer):
                         for l in parts:
                             txt = l.decode('utf-8', errors='replace').strip()
                             if txt:
+                                # Formatear con hora local (España)
+                                parts = txt.split(' ', 1)
+                                if 'T' in parts[0]:
+                                    try:
+                                        raw_ts = parts[0]
+                                        content = parts[1] if len(parts) > 1 else ""
+                                        dt_utc = dateutil.parser.parse(raw_ts)
+                                        dt_spain = dt_utc.astimezone(timezone(timedelta(hours=1)))
+                                        human_ts = dt_spain.strftime("%d/%m/%Y %H:%M:%S")
+                                        txt = f"[{human_ts}] {content}"
+                                    except: pass
+                                
                                 self.send_json({"log": colorize_logs_rich([f"{prefix}{txt}"])})
                 
                 # Si el stream termina solo y no hemos parado nosotros

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PaaSify Mega Stack</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-white min-h-screen font-sans">
+    <div class="max-w-4xl mx-auto p-8">
+        
+        <header class="text-center mb-12">
+            <div class="mb-6 flex justify-center">
+                <div class="bg-indigo-500/20 p-6 rounded-full border border-indigo-500/30 animate-pulse">
+                    <i class="fas fa-layer-group text-6xl text-indigo-400"></i>
+                </div>
+            </div>
+            <h1 class="text-5xl font-extrabold mb-4 tracking-tight">Mega Stack <span class="text-indigo-400">PaaSify</span></h1>
+            <p class="text-xl text-slate-400 font-light">
+                Demostración de flujo de datos multi-contenedor.
+            </p>
+        </header>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            <!-- Formulario de Entrada -->
+            <div class="bg-slate-800/50 p-8 rounded-3xl border border-slate-700 shadow-2xl">
+                <h2 class="text-2xl font-bold mb-6 flex items-center gap-3">
+                    <i class="fas fa-paper-plane text-indigo-400"></i>
+                    Inyectar Datos
+                </h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-2">Mensaje para el Stack</label>
+                        <input type="text" id="dataInput" 
+                               class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-white"
+                               placeholder="Escribe algo aquí...">
+                    </div>
+                    <button onclick="sendData()" id="sendBtn"
+                            class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2">
+                        <span>Ejecutar Pipeline</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+
+                <!-- Feedback del Proceso -->
+                <div id="statusList" class="mt-8 space-y-3 opacity-0 transition-opacity duration-500">
+                    <div class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-slate-700">
+                        <span class="text-sm font-medium">Gateway (Nginx)</span>
+                        <span class="text-emerald-400 text-xs font-bold">✓ RECIBIDO</span>
+                    </div>
+                    <div id="apiStatus" class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-slate-700">
+                        <span class="text-sm font-medium">API (Flask)</span>
+                        <span class="status-marker text-slate-500 text-xs font-bold italic">PROCESANDO...</span>
+                    </div>
+                    <div id="dbStatus" class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-slate-700">
+                        <span class="text-sm font-medium">Database (Postgres)</span>
+                        <span class="status-marker text-slate-500 text-xs font-bold italic">ESPERANDO...</span>
+                    </div>
+                    <div id="cacheStatus" class="flex items-center justify-between p-3 bg-slate-900/50 rounded-lg border border-slate-700">
+                        <span class="text-sm font-medium">Cache (Redis)</span>
+                        <span class="status-marker text-slate-500 text-xs font-bold italic">ESPERANDO...</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Estadísticas en tiempo real -->
+            <div class="space-y-6">
+                <div class="bg-indigo-600 p-8 rounded-3xl shadow-xl relative overflow-hidden">
+                    <div class="relative z-10">
+                        <h3 class="text-indigo-100 text-sm font-bold uppercase tracking-wider mb-2">Total en Base de Datos</h3>
+                        <div id="dbCount" class="text-5xl font-black">--</div>
+                    </div>
+                    <i class="fas fa-database absolute -right-4 -bottom-4 text-8xl text-indigo-500 opacity-20"></i>
+                </div>
+
+                <div class="bg-slate-800/50 p-6 rounded-3xl border border-slate-700">
+                    <h3 class="text-slate-400 text-xs font-bold uppercase tracking-wider mb-4 px-2">Historial Reciente (Redis)</h3>
+                    <div id="historyList" class="space-y-2">
+                        <div class="text-slate-500 text-center py-4 text-sm italic">Sin datos registrados</div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <footer class="mt-12 text-center text-slate-500 text-sm">
+            <p>&copy; 2026 PaaSify Cloud Hub &bull; Verificación de Conectividad</p>
+        </footer>
+    </div>
+
+    <script>
+        async function fetchStats() {
+            try {
+                const res = await fetch('/api/stats');
+                const data = await res.json();
+                
+                document.getElementById('dbCount').innerText = data.total_db_records || 0;
+                
+                const hist = document.getElementById('historyList');
+                if (data.recent_history && data.recent_history.length > 0) {
+                    hist.innerHTML = data.recent_history.map(msg => `
+                        <div class="bg-slate-900 px-4 py-2 rounded-xl text-sm border border-slate-700/50 flex items-center gap-2">
+                            <i class="fas fa-history text-indigo-500 text-xs"></i>
+                            ${msg}
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                console.error("Error cargando stats:", e);
+            }
+        }
+
+        async function sendData() {
+            const input = document.getElementById('dataInput');
+            const btn = document.getElementById('sendBtn');
+            const statusList = document.getElementById('statusList');
+            const content = input.value.trim();
+
+            if (!content) return;
+
+            // UI State
+            input.disabled = true;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            statusList.classList.remove('opacity-0');
+            
+            resetStatusMarkers();
+
+            try {
+                // Paso 1: API
+                updateMarker('apiStatus', '✓ CONECTADO', 'text-emerald-400');
+                
+                const response = await fetch('/api/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content })
+                });
+                
+                const result = await response.json();
+                
+                // Paso 2: Postgres
+                if (result.results.postgres.includes('OK')) {
+                    updateMarker('dbStatus', '✓ ALMACENADO', 'text-emerald-400');
+                } else {
+                    updateMarker('dbStatus', '✗ ERROR', 'text-rose-400');
+                }
+
+                // Paso 3: Redis
+                if (result.results.redis.includes('OK')) {
+                    updateMarker('cacheStatus', '✓ CACHEADO', 'text-emerald-400');
+                } else {
+                    updateMarker('cacheStatus', '✗ ERROR', 'text-rose-400');
+                }
+
+                input.value = '';
+                await fetchStats();
+
+            } catch (error) {
+                updateMarker('apiStatus', '✗ ERROR API', 'text-rose-400');
+            } finally {
+                input.disabled = false;
+                btn.disabled = false;
+                btn.innerHTML = '<span>Ejecutar Pipeline</span> <i class="fas fa-arrow-right"></i>';
+            }
+        }
+
+        function updateMarker(id, text, colorClass) {
+            const marker = document.querySelector(`#${id} .status-marker`);
+            marker.innerText = text;
+            marker.className = `status-marker ${colorClass} text-xs font-bold`;
+        }
+
+        function resetStatusMarkers() {
+            ['apiStatus', 'dbStatus', 'cacheStatus'].forEach(id => {
+                const marker = document.querySelector(`#${id} .status-marker`);
+                marker.innerText = id === 'apiStatus' ? 'PROCESANDO...' : 'ESPERANDO...';
+                marker.className = 'status-marker text-slate-500 text-xs font-bold italic';
+            });
+        }
+
+        // Cargar stats iniciales
+        fetchStats();
+        setInterval(fetchStats, 5000);
+    </script>
+</body>
+</html>

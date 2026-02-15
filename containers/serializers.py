@@ -17,6 +17,8 @@ class ServiceContainerSerializer(serializers.ModelSerializer):
             "name",
             "container_id",
             "status",
+            "container_type",
+            "is_web",
             "internal_ports",
             "assigned_ports",
             "created_at",
@@ -24,6 +26,16 @@ class ServiceContainerSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields  # Todos son de solo lectura
 
+
+class EmptyStringJSONField(serializers.JSONField):
+    """
+    JSONField que trata cadenas vacías "" como None o dict vacío.
+    Necesario para multipart/form-data donde los campos vacíos se envían como "".
+    """
+    def to_internal_value(self, data):
+        if data == "":
+            return None
+        return super().to_internal_value(data)
 
 class ServiceSerializer(serializers.ModelSerializer):
     """
@@ -48,6 +60,7 @@ class ServiceSerializer(serializers.ModelSerializer):
     env_vars = serializers.JSONField(required=False)
     volumes = serializers.JSONField(required=False)
     internal_port = serializers.IntegerField(required=False, allow_null=True)
+    container_configs = EmptyStringJSONField(required=False, write_only=True)
 
     # Permitir enlazar asignatura
     subject = serializers.PrimaryKeyRelatedField(queryset=Subject.objects.all(), required=True)
@@ -88,10 +101,13 @@ class ServiceSerializer(serializers.ModelSerializer):
             "env_vars",
             "volumes",
             "subject",
-            "project",      # Anadido
+            "project",
             "internal_port",
-            "has_compose",  # Anadido
-            "containers",    # Anadido
+            "container_type",
+            "is_web",
+            "has_compose",
+            "containers",
+            "container_configs", # Campo para configuraciones de contenedores en compose
         )
         read_only_fields = ("id", "assigned_port", "status", "has_compose", "containers")
 
@@ -332,22 +348,22 @@ class ServiceSerializer(serializers.ModelSerializer):
 
         # ---- Reglas de modo ----
         if mode == "custom":
-            # Modo Custom: exactamente uno entre dockerfile / compose
+            # Modo Custom: al menos uno entre dockerfile / compose / code
+            # Pero la lógica de ejecución necesita saber qué buscar.
             if has_image:
                 raise serializers.ValidationError(
                     {"image": _("No debe indicar imagen cuando usa Dockerfile o docker-compose.")}
                 )
-            if not (has_dockerfile or has_compose):
+            
+            # Si no hay ni dockerfile ni compose, DEBE haber código (ZIP) para intentar buscar dentro
+            if not (has_dockerfile or has_compose or has_code):
                 raise serializers.ValidationError(
-                    {"mode": _("El modo 'custom' requiere subir un Dockerfile o un docker-compose.yml.")}
+                    {"mode": _("El modo 'custom' requiere subir un Dockerfile, un docker-compose.yml o un archivo ZIP con el proyecto.")}
                 )
+            
             if has_dockerfile and has_compose:
                 raise serializers.ValidationError(
                     {"compose": _("Use Dockerfile o docker-compose, pero no ambos a la vez.")}
-                )
-            if not has_code:
-                raise serializers.ValidationError(
-                    {"code": "Debes adjuntar un archivo .zip o .rar con el código fuente."}
                 )
         
         elif mode == "dockerhub":

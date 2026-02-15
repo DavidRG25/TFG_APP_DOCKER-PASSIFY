@@ -50,11 +50,16 @@
         {% endif %}
 
         {% if service.container_id and service.status == 'running' %}
-            {% if host and service.assigned_port %}
-            <a href="http://{{ host }}:{{ service.assigned_port }}" class="btn btn-primary" target="_blank"
-                rel="noopener" title="Acceder a la Web">
-                <i class="fas fa-external-link-alt"></i>
-            </a>
+            {% if host and service.assigned_port and service.is_web %}
+                {% with p_int=service.internal_port|default:80 %}
+                    {# Solo mostrar si no es un puerto tipico de DB/Worker y no tiene nombre de DB/Worker #}
+                    {% if p_int != 6379 and p_int != 5432 and p_int != 3306 and p_int != 27017 and 'redis' not in service.name|lower and 'worker' not in service.name|lower and 'db' not in service.name|lower %}
+                        <a href="http://{{ host }}:{{ service.assigned_port }}" class="btn btn-primary" target="_blank"
+                            rel="noopener" title="Acceder a la Web">
+                            <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    {% endif %}
+                {% endwith %}
             {% endif %}
             <a href="{% url 'containers:terminal_v2' service.id %}" class="btn btn-dark"
                 title="Terminal Web Mejorada">

@@ -151,12 +151,12 @@ fi
 # Ejecutar migraciones (rapido si no hay cambios)
 echo "[*] Ejecutando migraciones"
 "${PYTHON}" manage.py migrate --noinput
-echo "    âœ“ Migraciones completadas"
+echo "    - Migraciones completadas"
 
 # Recolectar archivos estaticos
 echo "[*] Recolectando archivos estaticos"
 "${PYTHON}" manage.py collectstatic --noinput --verbosity 0
-echo "    âœ“ Archivos estaticos recolectados"
+echo "    -“ Archivos estaticos recolectados"
 
 # Arrancar servidor
 echo ""
