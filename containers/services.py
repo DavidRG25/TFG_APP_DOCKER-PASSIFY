@@ -247,6 +247,8 @@ def _extract_container_port_info(container):
     assigned_ports = []
     ports_settings = container.attrs.get("NetworkSettings", {}).get("Ports") or {}
     
+    seen_assigned = set()
+    
     for binding_key, bindings in ports_settings.items():
         try:
             container_port, protocol = binding_key.split("/")
@@ -268,11 +270,16 @@ def _extract_container_port_info(container):
                     host_port_int = int(host_port)
                 except ValueError:
                     continue
-                assigned_ports.append({
-                    "internal": container_port_int,
-                    "external": host_port_int,
-                    "protocol": protocol
-                })
+                
+                # Deduplicar: mismo puerto interno, externo y protocolo
+                entry_key = (container_port_int, host_port_int, protocol.lower())
+                if entry_key not in seen_assigned:
+                    assigned_ports.append({
+                        "internal": container_port_int,
+                        "external": host_port_int,
+                        "protocol": protocol
+                    })
+                    seen_assigned.add(entry_key)
     
     return internal_ports, assigned_ports
 
@@ -585,12 +592,28 @@ def sync_service_status(service: Service):
 
 # ==================== PORT MANAGEMENT ====================
 
+def _is_port_available_on_host(port: int) -> bool:
+    """Verifica si el puerto puede ser bindeado en el host (0.0.0.0)."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("0.0.0.0", port))
+        s.close()
+        return True
+    except socket.error:
+        return False
+
+
 def _release_port(port: int | None):
     if port:
         PortReservation.objects.filter(port=port).delete()
 
 
 def _reserve_specific_port(port: int) -> None:
+    # Primero verificar host si estamos en un entorno restrictivo (como Windows)
+    if not _is_port_available_on_host(port):
+        raise RuntimeError(f"El puerto {port} está reservado por el sistema o en uso.")
+    
     try:
         with transaction.atomic():
             PortReservation.objects.create(port=port)
@@ -606,12 +629,20 @@ def _reserve_random_port() -> int:
     """Reserva un puerto aleatorio dentro del rango definido."""
     for _ in range(50):
         candidate = generate_random_port()
+        
+        # 1. Verificar disponibilidad en el host
+        if not _is_port_available_on_host(candidate):
+            continue
+            
+        # 2. Intentar reservar en DB
         try:
             with transaction.atomic():
                 PortReservation.objects.create(port=candidate)
             return candidate
         except IntegrityError:
             continue
+    
+    # Fallback al método secuencial mejorado
     return PortReservation.reserve_free_port()
 
 

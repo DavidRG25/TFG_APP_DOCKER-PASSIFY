@@ -51,3 +51,6 @@ whitenoise==6.6.0
 # Terminal y Logs mejorados
 pyxtermjs==0.5.0.2
 rich==13.7.0
+
+# Soporte HTTP/2 y TLS para Daphne
+Twisted[http2,tls]

@@ -239,98 +239,111 @@
   }
 
   function applyMode() {
-    const mode = document.querySelector('input[name="mode"]:checked')?.value || "default";
-    const submode = document.querySelector('input[name="custom_subtype"]:checked')?.value || "dockerfile";
-    
-    const imgSel = document.getElementById("service-image");
-    const dockerhubInput = document.getElementById("service-dockerhub");
-    const dockerfile = document.querySelector('input[name="dockerfile"]');
-    const compose = document.querySelector('input[name="compose"]');
-    const code = document.querySelector('input[name="code"]');
-    const internalPort = document.querySelector('input[name="internal_port"]');
-    const customPort = document.querySelector('input[name="custom_port"]');
-    
-    const imageContainer = document.getElementById("block-default-image");
-    const dockerhubBlock = document.getElementById("block-dockerhub-mode");
-    const customSubtypeBlock = document.getElementById("block-custom-subtype");
-    
-    const dockerfileBlock = document.getElementById("block-dockerfile");
-    const composeBlock = document.getElementById("block-compose");
-    const codeBlock = document.getElementById("block-code");
-
-    // Limpieza de estados visuales
-    if (imageContainer) imageContainer.style.display = "none";
-    if (dockerhubBlock) dockerhubBlock.style.display = "none";
-    if (customSubtypeBlock) customSubtypeBlock.style.display = "none";
-    if (dockerfileBlock) dockerfileBlock.style.display = "none";
-    if (composeBlock) composeBlock.style.display = "none";
-    if (codeBlock) codeBlock.style.display = "none";
-
-    // --- LOGICA DE LIMPIEZA Y HABILITACION ---
-    
-    if (mode === "default") {
-      if (imageContainer) imageContainer.style.display = "block";
-      if (imgSel) { imgSel.disabled = false; imgSel.required = true; }
+    try {
+      const mode = document.querySelector('input[name="mode"]:checked')?.value || "default";
+      const submode = document.querySelector('input[name="custom_subtype"]:checked')?.value || "dockerfile";
       
-      if (dockerhubInput) { dockerhubInput.value = ""; dockerhubInput.disabled = true; dockerhubInput.required = false; }
-      if (dockerfile) { dockerfile.value = ""; dockerfile.disabled = true; }
-      if (compose) { compose.value = ""; compose.disabled = true; }
-      if (code) { code.value = ""; code.required = false; }
-    } else if (mode === "dockerhub") {
-      if (dockerhubBlock) dockerhubBlock.style.display = "block";
-      if (dockerhubInput) {
-        dockerhubInput.disabled = false;
-        dockerhubInput.required = true;
-      }
-      if (imgSel) { imgSel.disabled = true; imgSel.required = false; }
-      if (dockerfile) { dockerfile.value = ""; dockerfile.disabled = true; }
-      if (dockerhubInput) { dockerhubInput.disabled = false; dockerhubInput.required = true; }
-      if (code) { code.required = false; }
-    } else if (mode === "custom") {
-      if (customSubtypeBlock) customSubtypeBlock.style.display = "block";
-      if (codeBlock) codeBlock.style.display = "block";
-      if (code) { code.required = true; } // En custom el ZIP es obligatorio
+      const imgSel = document.getElementById("service-image");
+      const dockerhubInput = document.getElementById("service-dockerhub");
+      const dockerfile = document.querySelector('input[name="dockerfile"]');
+      const compose = document.querySelector('input[name="compose"]');
+      const code = document.querySelector('input[name="code"]');
+      const internalPort = document.querySelector('input[name="internal_port"]');
+      const customPort = document.querySelector('input[name="custom_port"]');
       
-      if (submode === "dockerfile") {
-        if (dockerfileBlock) dockerfileBlock.style.display = "block";
-        if (dockerfile) dockerfile.disabled = false;
-      } else { // submode === "compose"
-        if (composeBlock) composeBlock.style.display = "block";
-        if (compose) compose.disabled = false;
-      }
-    }
+      const imageContainer = document.getElementById("block-default-image");
+      const dockerhubBlock = document.getElementById("block-dockerhub-mode");
+      const customSubtypeBlock = document.getElementById("block-custom-subtype");
+      const dockerfileBlock = document.getElementById("block-dockerfile");
+      const composeBlock = document.getElementById("block-compose");
+      const codeBlock = document.getElementById("block-code");
+      const analysisBlock = document.getElementById("block-analysis");
 
-    // Gestion de Visibilidad y Tipado (Simple vs Advanced)
-    const simpleAccessBlock = document.getElementById("block-simple-access-config");
-    const analysisBlock = document.getElementById("block-analysis");
-    const portConfigBlock = document.getElementById("block-port-config");
+      // Limpieza de estados visuales
+      [imageContainer, dockerhubBlock, customSubtypeBlock, dockerfileBlock, composeBlock, codeBlock, analysisBlock].forEach(el => {
+        if (el) el.style.display = "none";
+      });
 
-    if (mode === "dockerhub" || (mode === "custom" && submode === "dockerfile")) {
-        if (simpleAccessBlock) simpleAccessBlock.style.display = "block";
-        if (analysisBlock) analysisBlock.style.display = "none";
-        if (portConfigBlock) portConfigBlock.style.display = "block";
-    } else if (mode === "custom" && submode === "compose") {
-        if (simpleAccessBlock) simpleAccessBlock.style.display = "none";
-        if (portConfigBlock) portConfigBlock.style.display = "none";
-        // El analysisBlock se muestra tras el fetch exitoso
-        if (compose && compose.files.length > 0) {
-            requestComposeAnalysis(compose.files[0]);
+      // --- LOGICA DE LIMPIEZA Y HABILITACION ---
+      
+      if (mode === "default") {
+        if (imageContainer) imageContainer.style.display = "block";
+        if (imgSel) { imgSel.disabled = false; imgSel.required = true; }
+        
+        if (dockerhubInput) { dockerhubInput.disabled = true; dockerhubInput.required = false; }
+        if (dockerfile) { dockerfile.disabled = true; }
+        if (compose) { compose.disabled = true; }
+        if (code) { code.required = false; }
+      } else if (mode === "dockerhub") {
+        if (dockerhubBlock) dockerhubBlock.style.display = "block";
+        if (dockerhubInput) {
+          dockerhubInput.disabled = false;
+          dockerhubInput.required = true;
         }
-    } else {
-        if (simpleAccessBlock) simpleAccessBlock.style.display = "none";
-        if (analysisBlock) analysisBlock.style.display = "none";
-        if (portConfigBlock) portConfigBlock.style.display = "none";
+        if (imgSel) { imgSel.disabled = true; imgSel.required = false; }
+        if (dockerfile) { dockerfile.disabled = true; }
+        if (code) { code.required = false; }
+      } else if (mode === "custom") {
+        if (customSubtypeBlock) customSubtypeBlock.style.display = "block";
+        if (codeBlock) codeBlock.style.display = "block";
+        if (code) { code.required = true; }
+        
+        // Deshabilitar selectores de imagen no usados en modo custom
+        if (imgSel) { imgSel.disabled = true; imgSel.required = false; }
+        if (dockerhubInput) { dockerhubInput.disabled = true; dockerhubInput.required = false; }
+        
+        if (submode === "dockerfile") {
+          if (dockerfileBlock) dockerfileBlock.style.display = "block";
+          if (dockerfile) dockerfile.disabled = false;
+          if (compose) compose.disabled = true;
+        } else { // submode === "compose"
+          if (composeBlock) composeBlock.style.display = "block";
+          if (compose) compose.disabled = false;
+          if (dockerfile) dockerfile.disabled = true;
+        }
+      }
+
+      // Gestion de Visibilidad y Tipado (Simple vs Advanced)
+      const simpleAccessBlock = document.getElementById("block-simple-access-config");
+      const portConfigBlock = document.getElementById("block-port-config");
+
+      if (mode === "dockerhub" || (mode === "custom" && submode === "dockerfile")) {
+          // Relocalización dinámica según UX solicitada
+          if (simpleAccessBlock) {
+              if (mode === "dockerhub" && portConfigBlock) {
+                  portConfigBlock.parentNode.insertBefore(simpleAccessBlock, portConfigBlock);
+              } else if (mode === "custom" && codeBlock) {
+                  codeBlock.parentNode.insertBefore(simpleAccessBlock, codeBlock);
+              }
+              simpleAccessBlock.style.display = "block";
+          }
+          if (analysisBlock) analysisBlock.style.display = "none";
+          if (portConfigBlock) portConfigBlock.style.display = "block";
+      } else if (mode === "custom" && submode === "compose") {
+          if (simpleAccessBlock) simpleAccessBlock.style.display = "none";
+          if (portConfigBlock) portConfigBlock.style.display = "none";
+          // El analysisBlock se muestra tras el fetch exitoso
+          if (compose && compose.files && compose.files.length > 0) {
+              requestComposeAnalysis(compose.files[0]);
+          }
+      } else {
+          if (simpleAccessBlock) simpleAccessBlock.style.display = "none";
+          if (analysisBlock) analysisBlock.style.display = "none";
+          if (portConfigBlock) portConfigBlock.style.display = "none";
+      }
+
+      // Gestion de Ejemplos en Sidebar
+      document.querySelectorAll(".example-block").forEach(b => b.style.display = "none");
+      const exampleId = mode === "default" ? "example-default" : 
+                        mode === "dockerhub" ? "example-dockerhub" :
+                        submode === "dockerfile" ? "example-custom-dockerfile" : "example-custom-compose";
+      const ex = document.getElementById(exampleId);
+      if (ex) ex.style.display = "block";
+
+      if (internalPort) internalPort.disabled = (mode === "default");
+    } catch (e) {
+      console.error("Error in applyMode:", e);
     }
-
-    // Gestion de Ejemplos en Sidebar
-    document.querySelectorAll(".example-block").forEach(b => b.style.display = "none");
-    const exampleId = mode === "default" ? "example-default" : 
-                      mode === "dockerhub" ? "example-dockerhub" :
-                      submode === "dockerfile" ? "example-custom-dockerfile" : "example-custom-compose";
-    const ex = document.getElementById(exampleId);
-    if (ex) ex.style.display = "block";
-
-    if (internalPort) internalPort.disabled = (mode === "default");
   }
 
 
@@ -430,6 +443,30 @@
         }
       });
     });
+
+    // Manejar selección de tipo de contenedor vía botones
+    document.querySelectorAll(".btn-type-sel").forEach(btn => {
+      btn.addEventListener("click", function() {
+        // Quitar active de todos
+        document.querySelectorAll(".btn-type-sel").forEach(b => b.classList.remove("active"));
+        // Poner active al actual
+        this.classList.add("active");
+        // Actualizar input oculto
+        const type = this.getAttribute("data-type");
+        const input = document.getElementById("input_container_type");
+        if (input) input.value = type;
+        
+        // Auto-sincronizar is_web (opcional: si es DB, desactivar web por defecto)
+        const webSwitch = document.getElementById("is_web_simple");
+        if (webSwitch) {
+            if (type === "database") {
+                webSwitch.checked = false;
+            } else if (type === "web") {
+                webSwitch.checked = true;
+            }
+        }
+      });
+    });
     
     const dockerfile = document.querySelector('input[name="dockerfile"]');
     const compose = document.querySelector('input[name="compose"]');
@@ -438,6 +475,9 @@
         compose.addEventListener("change", function(e) {
             if (this.files.length > 0) {
                 requestComposeAnalysis(this.files[0]);
+            } else {
+                const analysisBlock = document.getElementById("block-analysis");
+                if (analysisBlock) analysisBlock.style.display = "none";
             }
         });
     }
@@ -510,10 +550,10 @@
       row.dataset.containerName = c.name;
       
       const typeOptions = [
-        { val: 'web', label: '🌐 Web/Frontend' },
-        { val: 'api', label: '⚙️ API/Backend' },
-        { val: 'database', label: '🗄️ Base de Datos' },
-        { val: 'misc', label: '🛡️ General' }
+        { val: 'web', label: '🌐 &nbsp; Web / Frontend' },
+        { val: 'api', label: '⚙️ &nbsp; API / Backend' },
+        { val: 'database', label: '🗄️ &nbsp; Base de Datos' },
+        { val: 'misc', label: '🛡️ &nbsp; General' }
       ];
 
       const optionsHtml = typeOptions.map(opt => 
@@ -539,8 +579,8 @@
       if (c.warnings && c.warnings.length > 0) {
         c.warnings.forEach(w => {
             const al = document.createElement("div");
-            al.className = "alert alert-warning py-1 px-2 small mb-1";
-            al.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i><strong>${c.name}:</strong> ${w}`;
+            al.className = "alert alert-info py-1 px-2 small mb-1";
+            al.innerHTML = `<i class="fas fa-info-circle me-2"></i><strong>${c.name}:</strong> ${w}`;
             warningsDiv.appendChild(al);
         });
       }

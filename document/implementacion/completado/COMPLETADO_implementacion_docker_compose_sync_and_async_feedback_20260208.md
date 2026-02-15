@@ -1,7 +1,7 @@
 # Implementación: Sincronización Docker Compose y Operaciones Asíncronas
 
 **Fecha:** 08/02/2026
-**Autor:** Antigravity (Assistant)
+**Autor:** David RG
 **Estado:** ✅ Completado
 
 ## 1. Contexto
