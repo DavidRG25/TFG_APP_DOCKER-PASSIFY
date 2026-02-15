@@ -28,9 +28,9 @@
         </button>
 
         {% if service.mode != 'default' %}
-        <a href="{% url 'containers:edit_service' service.id %}" class="btn btn-warning"
+        <a href="{% url 'containers:edit_service' service.id %}" class="btn text-white" style="background-color: #fd7e14; border-color: #fd7e14;"
             title="Editar servicio">
-            <i class="fas fa-pen text-white"></i>
+            <i class="fas fa-pen"></i>
         </a>
         {% endif %}
 

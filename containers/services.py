@@ -89,96 +89,76 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> 
     2. El código fuente esté descomprimido en services/<id>/
     
     Retorna el Path del workspace.
+    NOTA: Esta función copia los contenidos desde el storage de Django al sistema de archivos local
+    con nombres estándar (Dockerfile, source.zip), sin alterar los archivos originales de Django.
     """
+    import shutil
+    import os
+    
     workspace = ensure_service_workspace(service)
     
-    # Mapeo de campos FileField a nombres de archivo esperados
-    mapping = {
-        "dockerfile": "Dockerfile",
-        "compose": "docker-compose.yml",
-    }
-    updated_fields = []
-    from django.core.files.storage import default_storage
-    from django.core.files.base import ContentFile
-    
-    for field, filename in mapping.items():
-        ff = getattr(service, field, None)
-        if not ff:
-            continue
-        
-        # Ruta física deseada
-        dest = workspace / filename
-        desired_rel = f"services/{service.id}/{filename}"
-        
-        # Caso A: El archivo ya está en el sitio correcto y existe físicamente
-        if ff.name == desired_rel and dest.exists():
-            continue
-            
-        # Caso B: El archivo necesita ser movido o copiado
+    # 1. Copiar Dockerfile
+    if service.dockerfile:
+        dest = workspace / "Dockerfile"
         try:
-            # Si el archivo está en 'tmp/', lo leemos y movemos
-            content = ff.read()
-            
-            # 1. Si el nombre en DB está mal (ej. apunta a 'tmp/'), actualizarlo
-            if ff.name != desired_rel:
-                old_path = ff.name
-                ff.save(desired_rel, ContentFile(content), save=False)
-                updated_fields.append(field)
-                
-                # Intentar borrar el rastro viejo (especialmente útil para limpiar services/tmp/)
-                if old_path and old_path != desired_rel:
-                    try: 
-                        if default_storage.exists(old_path):
-                            default_storage.delete(old_path)
-                    except: pass
-            
-            # 2. Asegurar que el archivo existe físicamente en el workspace
-            if not dest.exists():
+            if service.dockerfile: # Check doble por seguridad
+                with service.dockerfile.open("rb") as f_in:
+                    content = f_in.read()
+                    with open(dest, "wb") as f_out:
+                        f_out.write(content)
+        except Exception as e:
+            print(f"[ERROR] No se pudo copiar Dockerfile: {e}")
+
+    # 2. Copiar docker-compose.yml
+    if service.compose:
+        dest = workspace / "docker-compose.yml"
+        try:
+            with service.compose.open("rb") as f_in:
+                content = f_in.read()
                 with open(dest, "wb") as f_out:
                     f_out.write(content)
-                    
         except Exception as e:
-            print(f"[warning] Error preparando {field}: {e}")
-            continue
+            print(f"[ERROR] No se pudo copiar docker-compose: {e}")
 
-    if updated_fields:
-        service.save(update_fields=updated_fields)
-    
-    # Descomprimir código si existe
+    # 3. Copiar y descomprimir Código
     if unpack_code and service.code:
-        code_ext = os.path.splitext(service.code.name or "")[1] or ".zip"
-        code_rel = f"services/{service.id}/source{code_ext}"
-        code_dest_phys = workspace / f"source{code_ext}"
+        # Determinar extensión original
+        try:
+            ext = os.path.splitext(service.code.name)[1].lower() or ".zip"
+        except:
+            ext = ".zip"
+            
+        archive_name = f"source{ext}"
+        dest_archive = workspace / archive_name
         
-        # Si el código no está en su sitio o es un temporal, moverlo
-        if service.code.name != code_rel or not code_dest_phys.exists():
-            old_code_path = service.code.name
+        try:
+            # Copiar archivo zip/rar al workspace con nombre estándar
             with service.code.open("rb") as f_in:
                 content = f_in.read()
-                service.code.save(code_rel, ContentFile(content), save=False)
-            service.save(update_fields=["code"])
+                with open(dest_archive, "wb") as f_out:
+                    f_out.write(content)
             
-            if old_code_path and old_code_path != code_rel:
-                try: 
-                    if default_storage.exists(old_code_path):
-                        default_storage.delete(old_code_path)
-                except: pass
+            # Limpiar workspace ANTES de descomprimir 
+            # (borrar todo menos los archivos fuente que acabamos de poner)
+            for item in workspace.iterdir():
+                # Lista de intocables (archivos base)
+                if item.name.lower() in [archive_name.lower(), "dockerfile", "docker-compose.yml", ".vs"]:
+                    continue
+                
+                try:
+                    if item.is_file():
+                        item.unlink()
+                    elif item.is_dir():
+                        shutil.rmtree(item)
+                except Exception:
+                    pass
+
+            # Descomprimir
+            _unpack_code_archive_to(str(workspace), archive_path=str(dest_archive))
             
-            # Asegurar copia física para descompresión
-            with open(code_dest_phys, "wb") as f_out:
-                f_out.write(content)
-        
-        # Limpiar archivos previos pero mantener los estructurales
-        for item in workspace.iterdir():
-            if item.name not in ["Dockerfile", "docker-compose.yml", "source.zip", "source.rar"]:
-                if item.is_file():
-                    item.unlink()
-                elif item.is_dir() and item.name not in [".vs"]:
-                    shutil.rmtree(item)
-        
-        # Descomprimir usando la ruta física para evitar errores de reapertura
-        _unpack_code_archive_to(str(workspace), archive_path=str(code_dest_phys))
-    
+        except Exception as e:
+            print(f"[ERROR] Fallo procesando código ZIP: {e}")
+
     return workspace
 
 
@@ -800,10 +780,15 @@ def _validate_upload(ff, *, allowed_extensions=None, max_size=MAX_UPLOAD_SIZE):
     if ff is None:
         return
 
-    if max_size and getattr(ff, "size", None) and ff.size > max_size:
-        raise ValueError(
-            f"El archivo '{getattr(ff, 'name', 'desconocido')}' supera el tamaño máximo permitido ({max_size // (1024 * 1024)} MiB)."
-        )
+    try:
+        if max_size and getattr(ff, "size", None) and ff.size > max_size:
+            raise ValueError(
+                f"El archivo '{getattr(ff, 'name', 'desconocido')}' supera el tamaño máximo permitido ({max_size // (1024 * 1024)} MiB)."
+            )
+    except (FileNotFoundError, OSError):
+        # Si el archivo no se encuentra en disco en este preciso momento (race cond), 
+        # saltamos validacion de tamaño para evitar crash.
+        pass
 
     if allowed_extensions is not None:
         name = getattr(ff, "name", "") or ""
@@ -1414,7 +1399,7 @@ def stop_container_async(service: Service) -> None:
     EXECUTOR.submit(_stop_container_worker, service.pk)
 
 
-def remove_container(service: Service):
+def remove_container(service: Service, keep_files: bool = False):
     """
     Elimina el servicio completamente.
     
@@ -1491,7 +1476,8 @@ def remove_container(service: Service):
             service.save(update_fields=["logs"])
         
         # Limpiar workspace
-        cleanup_service_workspace(service)
+        if not keep_files:
+            cleanup_service_workspace(service)
         
     else:
         # ===== MODO SIMPLE: Limpieza manual =====
@@ -1533,7 +1519,8 @@ def remove_container(service: Service):
                 service.save(update_fields=["logs"])
         
         # Limpiar workspace
-        cleanup_service_workspace(service)
+        if not keep_files:
+            cleanup_service_workspace(service)
 
     service.container_id = None
     service.assigned_port = None
