@@ -18,7 +18,6 @@ class UserProfile(models.Model):
     )
     nombre = models.CharField(
         max_length=100,
-        unique=True,
         null=False,
         verbose_name="Nombre y apellidos",
     )
