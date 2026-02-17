@@ -15,6 +15,7 @@ urlpatterns = [
     path("terminal-v2/<int:pk>/", views.terminal_v2_view, name="terminal_v2"),  # Terminal mejorada
     path("logs/<int:pk>/", views.logs_page, name="logs_page"),  # Página de logs
     path("edit/<int:pk>/", views.edit_service, name="edit_service"),
+    path("view-file/<int:pk>/", views.view_service_file, name="view_file"),
     
     # Nueva página dedicada para crear servicio
     path("new/", views.new_service_page, name="new_service"),

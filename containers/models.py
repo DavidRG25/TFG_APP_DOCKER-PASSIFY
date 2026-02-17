@@ -108,6 +108,7 @@ class Service(models.Model):
     code = models.FileField("Codigo fuente (zip)", upload_to=get_service_upload_path, blank=True, null=True)
     volumes = models.JSONField("Volumenes", blank=True, null=True)
     env_vars = models.JSONField("Variables de entorno", blank=True, null=True)
+    container_configs = models.JSONField("Configuración de contenedores", blank=True, null=True)
     build_context_dir = models.CharField("Directorio de build (tmp)", max_length=300, blank=True, null=True)
     mode = models.CharField(
         "Modo de despliegue",
@@ -174,6 +175,7 @@ class ServiceContainer(models.Model):
     )
     name = models.CharField("Nombre del contenedor", max_length=100)
     container_id = models.CharField("ID Docker", max_length=100, blank=True, null=True)
+    image_name = models.CharField("Imagen", max_length=255, blank=True, null=True)
     status = models.CharField("Estado", max_length=20, default="unknown")
     container_type = models.CharField("Tipo de contenedor", max_length=20, default='misc')
     is_web = models.BooleanField("¿Es una web accesible?", default=False)

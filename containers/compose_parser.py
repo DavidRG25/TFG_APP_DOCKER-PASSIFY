@@ -95,15 +95,23 @@ class DockerComposeParser:
         name_lower = name.lower()
         image = config.get('image', '').lower()
         
-        if any(x in name_lower or x in image for x in ['redis', 'cache']):
-            return 'misc' # Redis lo tratamos como misc o cache si tuviéramos ese tipo
-        if any(x in name_lower or x in image for x in ['postgres', 'mysql', 'mariadb', 'db', 'sql', 'mongo']):
-            return 'database'
-        if any(x in name_lower or x in image for x in ['api', 'backend', 'server', 'flask', 'django', 'node']):
-            return 'api'
-        if any(x in name_lower or x in image for x in ['gateway', 'nginx', 'web', 'frontend', 'proxy']):
-            return 'web'
-        return 'misc'
+        detected = 'misc'
+        # 1. Bases de Datos (Prioridad alta)
+        if any(x in name_lower or x in image for x in ['postgres', 'mysql', 'mariadb', 'db', 'sql', 'mongo', 'postgis']):
+            detected = 'database'
+        # 2. Redis/Cache (Tratados como misc/general en este sistema)
+        elif any(x in name_lower or x in image for x in ['redis', 'cache', 'memcached']):
+            detected = 'misc'
+        # 3. Web / Gateway / Frontend
+        elif any(x in name_lower or x in image for x in ['gateway', 'nginx', 'web', 'frontend', 'proxy', 'app', 'front', 'httpd', 'apache', 'traefik']):
+            detected = 'web'
+        # 4. API / Backend
+        elif any(x in name_lower or x in image for x in ['api', 'backend', 'server', 'flask', 'django', 'node', 'back', 'gunicorn', 'uvicorn']):
+            detected = 'api'
+        else:
+            detected = 'misc'
+            
+        return detected
 
     def _detect_is_web(self, name, config, ports) -> bool:
         # Si tiene puertos y el nombre suena a gateway/web/api, es web
