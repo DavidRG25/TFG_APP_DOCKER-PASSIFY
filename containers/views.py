@@ -1,7 +1,9 @@
 # test comment
+
 # containers/views.py
 import json
 from django.db import models
+from django.conf import settings
 
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
@@ -1250,8 +1252,8 @@ def edit_service(request, pk):
             return HttpResponse(str(exc), status=400)
 
         # Actualizar campos
-        service.env_vars = env_vars or None
-        service.container_configs = container_configs or None
+        service.env_vars = env_vars if env_vars is not None else None
+        service.container_configs = container_configs if container_configs is not None else None
         
         # Tipo y visibilidad (solo modo dockerhub o custom/dockerfile)
         if service.mode == 'dockerhub' or (service.mode == 'custom' and service.dockerfile):
@@ -1289,7 +1291,9 @@ def edit_service(request, pk):
         try:
             # Purga y reconstrucción total
             remove_container(service, keep_files=True)
-            run_container(service)
+            # Usar configs del POST o caer al modelo
+            configs_to_use = container_configs if container_configs else service.container_configs
+            run_container(service, container_configs=configs_to_use)
         except Exception as exc:
             return HttpResponse(f"Error al reiniciar: {exc}", status=500)
 
@@ -1314,6 +1318,7 @@ def edit_service(request, pk):
             if c.name != "principal":
                 containers_info.append({
                     'name': c.name,
+                    'image': c.image_name,
                     'internal_ports': c.internal_ports,
                     'assigned_ports': c.assigned_ports,
                     'is_web': c.is_web,
@@ -1326,6 +1331,54 @@ def edit_service(request, pk):
         "containers_info": containers_info,
         "env_vars_json": json.dumps(service.env_vars or {}, indent=2)
     })
+
+
+@login_required
+def view_service_file(request, pk):
+    """
+    Retorna el contenido de un archivo (Dockerfile o Compose) en formato JSON para el modal de vista.
+    """
+    service = get_object_or_404(Service, pk=pk)
+    
+    # Seguridad: solo dueño o admin
+    if service.owner != request.user and not request.user.is_superuser:
+        return JsonResponse({'success': False, 'error': 'No autorizado'}, status=403)
+    
+    file_type = request.GET.get('type')
+    file_obj = None
+    
+    if file_type == 'dockerfile':
+        file_obj = service.dockerfile
+    elif file_type == 'compose':
+        file_obj = service.compose
+    
+    if not file_obj:
+        return JsonResponse({'success': False, 'error': 'Archivo no asignado o inexistente'})
+    
+    try:
+        if not file_obj or not file_obj.name:
+            return JsonResponse({'success': False, 'error': 'El archivo no tiene una ruta válida en la base de datos.'})
+
+        # Importar settings localmente para mayor seguridad en la función
+        from django.conf import settings
+        from pathlib import Path
+        
+        # Construir ruta absoluta
+        media_root = Path(settings.MEDIA_ROOT)
+        file_path = media_root / file_obj.name
+        
+        if not file_path.exists():
+            return JsonResponse({
+                'success': False, 
+                'error': f"Archivo físico no encontrado en: {file_obj.name}"
+            })
+
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            content = f.read()
+            return JsonResponse({'success': True, 'content': content})
+            
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f"Excepción al leer archivo: {str(e)}"})
 
 
 @login_required

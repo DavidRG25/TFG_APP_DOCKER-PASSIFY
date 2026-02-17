@@ -1,366 +1,70 @@
-{% extends "base.html" %}
-{% load static %}
-
-{% block body %}
-<div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh;">
-  {# Header con degradado #}
-  <div class="rounded-3 p-4 mb-4 shadow-sm" style="background: linear-gradient(135deg, #fd7e14 0%, #d35400 100%);">
-    <div class="d-flex justify-content-between align-items-center">
-      <div>
-        <h1 class="h3 mb-1 text-white fw-bold">Editar servicio: {{ service.name }}</h1>
-        <p class="text-white-50 mb-0">
-            Modo: 
-            {% if service.mode == 'custom' %}
-                <strong>Personalizado</strong>
-                <span class="ms-1 opacity-75">
-                    {% if service.has_compose %}<i class="fas fa-layer-group me-1"></i>Stack Compose{% else %}<i class="fas fa-file-code me-1"></i>Dockerfile{% endif %}
-                </span>
-            {% else %}
-                <strong>{{ service.get_mode_display }}</strong>
-            {% endif %}
-            | Estado: {{ service.status }}
-        </p>
-      </div>
-      <a href="{{ return_url }}" class="btn btn-outline-light d-flex align-items-center">
-        <i class="fas fa-arrow-left me-2"></i>Volver
-      </a>
-    </div>
-  </div>
-
+{% extends 'base.html' %} {% load static %} {% block title %}Editar Servicio -
+PaaSify{% endblock %} {% block body %}
+<div class="container-fluid py-4">
   <div class="row justify-content-center">
-    <div class="col-xl-10 col-lg-11">
-      {# CONFIGURACIÓN ACTUAL #}
-      <div class="card border-0 shadow-sm rounded-4 mb-4">
-        <div class="card-header bg-transparent border-0 py-3">
-          <h5 class="mb-0 fw-bold text-secondary">
-            <i class="fas fa-info-circle me-2"></i>Configuración Actual
-          </h5>
-        </div>
-        <div class="card-body p-4">
-          <div class="row g-3">
-            <div class="col-md-3">
-              <small class="text-muted d-block mb-1">Imagen</small>
-              <div class="fw-bold">{{ service.image }}</div>
-              {% if service.mode == 'dockerhub' %}
-              <small class="badge bg-info mt-1">
-                <i class="fas fa-lock me-1"></i>No modificable
-              </small>
-              {% endif %}
-            </div>
-            <div class="col-md-3">
-              <small class="text-muted d-block mb-1">Puerto Externo</small>
-              <div class="fw-bold">{{ service.assigned_port|default:"Auto-asignado" }}</div>
-            </div>
-            <div class="col-md-3">
-              <small class="text-muted d-block mb-1">Puerto Interno</small>
-              <div class="fw-bold">{{ service.internal_port|default:"No especificado" }}</div>
-            </div>
-            <div class="col-md-3">
-              <small class="text-muted d-block mb-1">Tipo</small>
-              <div class="fw-bold">{{ service.get_container_type_display }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
+    <div class="col-xl-11">
+      
+      {# 1. Cabecera #}
+      {% include 'containers/_partials/edit/_header.html' %}
 
-      {# FORMULARIO DE EDICIÓN #}
-      <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
-        <div class="card-body p-4 p-md-5">
-          <form method="post" enctype="multipart/form-data" id="editServiceForm">
+      <div class="row justify-content-center">
+        <div class="col-lg-12">
+          
+           {# 2. Configuración Actual (Solo para servicios simples) #}
+           {% if not service.has_compose %}
+             {% include 'containers/_partials/edit/_current_config.html' %}
+           {% endif %}
+
+          {# Formulario Principal #}
+          <form
+            id="editServiceForm"
+            method="POST"
+            enctype="multipart/form-data"
+            class="needs-validation"
+            novalidate
+          >
             {% csrf_token %}
+            {# Input para configuraciones de contenedores (Compose) #}
+            <input type="hidden" name="container_configs" id="container_configs_json" />
             <input type="hidden" name="return_url" value="{{ return_url }}">
-            <input type="hidden" name="container_configs" id="container_configs_json" value="{{ service.container_configs|default:'{}' }}">
 
-            <div class="row g-4">
-              {# SECCIÓN IZQUIERDA: CONFIGURACIÓN BÁSICA #}
-              <div class="col-md-6">
-                <h5 class="fw-bold mb-3"><i class="fas fa-sliders-h me-2 text-primary"></i>Configuración de Red</h5>
-                
-                {# Puerto Externo con botones #}
-                <div class="mb-4">
-                  <label class="form-label fw-bold text-dark">
-                    <i class="fas fa-plug me-2 text-primary"></i>Puerto Externo Principal
-                  </label>
-                  <div class="input-group">
-                    <input type="number" name="custom_port" id="customPortInput" 
-                           class="form-control form-control-lg border-2"
-                           min="40000" max="50000" value="{{ service.assigned_port|default:'' }}"
-                           placeholder="Auto-asignado">
-                    <button type="button" class="btn btn-outline-secondary" id="clearPortBtn" title="Limpiar puerto">
-                      <i class="fas fa-eraser"></i>
-                    </button>
-                    <button type="button" class="btn btn-outline-primary" id="verifyPortBtn" title="Verificar disponibilidad">
-                      <i class="fas fa-check-circle"></i> Verificar
-                    </button>
-                  </div>
-                  <small class="text-muted">Rango: 40000 - 50000. Si se deja vacío, PaaSify asignará uno.</small>
-                  <div id="portStatus" class="mt-2"></div>
-                </div>
-
-                {# Puerto Interno - Solo DockerHub o Dockerfile #}
-                {% if service.mode == 'dockerhub' or not service.has_compose %}
-                <div class="mb-4">
-                  <label class="form-label fw-bold text-dark">
-                    <i class="fas fa-sign-in-alt me-2 text-primary"></i>Puerto Interno de la App
-                  </label>
-                  <input type="number" name="internal_port" class="form-control border-2"
-                         value="{{ service.internal_port|default:'' }}" placeholder="Ej: 80, 8080, 5000">
-                  <small class="text-muted">El puerto en el que escucha tu código dentro del contenedor.</small>
-                </div>
-                {% endif %}
-
-                {# Acceso y Tipo - Solo DockerHub o Dockerfile #}
-                {% if service.mode == 'dockerhub' or not service.has_compose %}
-                <div class="mb-4">
-                  <div class="card border-0 bg-light shadow-sm">
-                    <div class="card-body p-3">
-                      <label class="form-label fw-bold d-block mb-3 text-primary">
-                        <i class="fas fa-cog me-2"></i>Personalizar Rol del Contenedor
-                      </label>
-                      <div class="row g-3">
-                        <div class="col-md-7">
-                          <label class="form-label small fw-bold text-muted text-uppercase mb-2">
-                            <i class="fas fa-tag me-1 text-primary"></i>Tipo de Servicio
-                          </label>
-                          <div class="row g-2" id="container-type-selector-buttons">
-                            <div class="col-6">
-                              <button type="button" class="btn w-100 py-2 text-start btn-type-sel {% if service.container_type == 'web' %}btn-info active{% else %}btn-outline-info{% endif %}" data-type="web">
-                                <i class="fas fa-globe me-2"></i><strong>WEB</strong>
-                                <div class="x-small opacity-75 d-block mt-1">Frontend, Sitios estáticos</div>
-                              </button>
-                            </div>
-                            <div class="col-6">
-                              <button type="button" class="btn w-100 py-2 text-start btn-type-sel {% if service.container_type == 'api' %}btn-primary active{% else %}btn-outline-primary{% endif %}" data-type="api">
-                                <i class="fas fa-server me-2"></i><strong>API</strong>
-                                <div class="x-small opacity-75 d-block mt-1">Backend, Microservicios</div>
-                              </button>
-                            </div>
-                            <div class="col-6">
-                              <button type="button" class="btn w-100 py-2 text-start btn-type-sel {% if service.container_type == 'database' %}btn-success active{% else %}btn-outline-success{% endif %}" data-type="database">
-                                <i class="fas fa-database me-2"></i><strong>DB</strong>
-                                <div class="x-small opacity-75 d-block mt-1">Bases de datos, Almacén</div>
-                              </button>
-                            </div>
-                            <div class="col-6">
-                              <button type="button" class="btn w-100 py-2 text-start btn-type-sel {% if service.container_type == 'misc' %}btn-secondary active{% else %}btn-outline-secondary{% endif %}" data-type="misc">
-                                <i class="fas fa-cube me-2"></i><strong>OTRO</strong>
-                                <div class="x-small opacity-75 d-block mt-1">Herramientas, Scripts</div>
-                              </button>
-                            </div>
-                          </div>
-                          <input type="hidden" name="container_type" id="input_container_type" value="{{ service.container_type }}">
-                        </div>
-                        <div class="col-md-5 ps-md-4 border-start d-flex flex-column justify-content-center">
-                          <div class="p-3 rounded-3 bg-white border">
-                            <label class="form-label fw-bold text-dark d-flex align-items-center mb-2">
-                              <i class="fas fa-eye me-2 text-warning"></i>Visibilidad Web
-                            </label>
-                            <div class="form-check form-switch mt-1">
-                              <input class="form-check-input" type="checkbox" name="is_web" id="isWebEdit" 
-                                     {% if service.is_web %}checked{% endif %}>
-                              <label class="form-check-label fw-semibold" for="isWebEdit">Acceso vía navegador</label>
-                            </div>
-                            <p class="text-muted mt-2 mb-0" style="font-size: 0.75rem; line-height: 1.4;">
-                              Determina si PaaSify intentará generar un enlace público y mostrar el botón "Acceder".
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                {% endif %}
-              </div>
-
-              {# SECCIÓN DERECHA: VARIABLES Y AVANZADO #}
-              <div class="col-md-6">
-                <h5 class="fw-bold mb-3"><i class="fas fa-code-branch me-2 text-primary"></i>Entorno</h5>
-                <div class="mb-4">
-                  <label class="form-label fw-bold text-dark">Variables de Entorno</label>
-                  <div class="card border-2">
-                    <div class="card-header bg-dark text-white py-2 d-flex justify-content-between align-items-center">
-                      <small class="font-monospace">JSON Editor</small>
-                      <div>
-                        <button type="button" class="btn btn-sm btn-outline-danger me-1" id="clearJsonBtn" title="Limpiar contenido">
-                          <i class="fas fa-trash-alt"></i>
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-light" id="formatJsonBtn">
-                          <i class="fas fa-magic me-1"></i>Formatear
-                        </button>
-                      </div>
-                    </div>
-                    <div class="card-body p-0">
-                      <textarea name="env_vars" id="envVarsTextarea" 
-                                class="form-control border-0 font-monospace" 
-                                rows="10" 
-                                style="resize: vertical; font-size: 0.9rem;"
-                                placeholder='{
-  "DATABASE_URL": "postgresql://user:pass@db:5432/mydb",
-  "API_KEY": "your-secret-key",
-  "DEBUG": "false"
-}'>{{ env_vars_json|safe }}</textarea>
-                    </div>
-                    <div class="card-footer bg-light py-2">
-                      <small class="text-muted">
-                        <i class="fas fa-info-circle me-1"></i>
-                        Define las variables de entorno en formato JSON válido.
-                      </small>
-                    </div>
-                  </div>
-                  <div id="jsonValidation" class="mt-2"></div>
-                </div>
-              </div>
-
-              {# SECCIÓN: GESTIÓN DE CONTENEDORES (SOLO COMPOSE) #}
-              {% if service.has_compose %}
-              <div class="col-12">
-                <hr class="my-4 opacity-10">
-                <h5 class="fw-bold mb-3 text-primary"><i class="fas fa-cubes me-2"></i>Gestión de Stack (Docker Compose)</h5>
-                <div class="table-responsive rounded-3 border">
-
-                  <table class="table table-hover align-middle mb-0" id="compose-containers-table">
-                    <thead class="bg-light">
-                      <tr class="small text-uppercase fw-bold">
-                        <th>Servicio</th>
-                        <th>Puerto Interno</th>
-                        <th>Puerto Externo</th>
-                        <th style="width: 30%">Tipo</th>
-                        <th class="text-center">Web</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {% for c in containers_info %}
-                      <tr data-service-name="{{ c.name }}">
-                        <td class="fw-bold text-primary">{{ c.name }}</td>
-                        <td>
-                          {% for p in c.internal_ports %}
-                            <span class="badge bg-secondary font-monospace">{{ p.internal }}/{{ p.protocol }}</span>
-                          {% empty %}
-                            <small class="text-muted">No detectado</small>
-                          {% endfor %}
-                        </td>
-                        <td>
-                          {% for p in c.assigned_ports %}
-                            <div class="small fw-bold font-monospace">{{ p.external }} <i class="fas fa-arrow-right mx-1 text-muted"></i> {{ p.internal }}</div>
-                          {% empty %}
-                            <span class="text-muted italic small">No asignado</span>
-                          {% endfor %}
-                        </td>
-                        <td>
-                          <select class="form-select form-select-sm ctr-type border-2" style="width: 100%;">
-                            <option value="web" {% if c.container_type == 'web' %}selected{% endif %}>🌐 &nbsp; Web / Frontend</option>
-                            <option value="api" {% if c.container_type == 'api' %}selected{% endif %}>⚙️ &nbsp; API / Backend</option>
-                            <option value="database" {% if c.container_type == 'database' %}selected{% endif %}>🗄️ &nbsp; Base de Datos</option>
-                            <option value="misc" {% if c.container_type == 'misc' %}selected{% endif %}>🛡️ &nbsp; General</option>
-                          </select>
-                        </td>
-                        <td class="text-center">
-                          <div class="form-check d-inline-block">
-                            <input class="form-check-input ctr-is-web" type="checkbox" {% if c.is_web %}checked{% endif %} style="cursor: pointer; transform: scale(1.2);">
-                          </div>
-                        </td>
-                      </tr>
-                      {% empty %}
-                      <tr>
-                        <td colspan="5" class="text-center py-4 text-muted">
-                          <div class="d-flex flex-column align-items-center">
-                            <i class="fas fa-cubes fa-2x mb-2 text-gray-300"></i>
-                            <span>No se han detectado contenedores aún.</span>
-                            <small>Se detectarán tras el próximo despliegue.</small>
-                          </div>
-                        </td>
-                      </tr>
-                      {% endfor %}
-                    </tbody>
-                  </table>
-                </div>
-                <div class="alert alert-warning mt-3 border-0 shadow-sm d-flex align-items-center">
-                  <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
-                  <div class="small">
-                    Nota: Los puertos externos para servicios de Compose son gestionados automáticamente. Solo puedes cambiar la visibilidad web y el tipo de servicio aquí. Para cambiar puertos internos, edita el archivo <code>docker-compose.yml</code> abajo.
-                  </div>
-                </div>
-              </div>
-              {% endif %}
-
-              <hr class="my-4 opacity-10">
-
-              {# SECCIÓN: ARCHIVOS - Solo para Custom #}
-              {% if service.mode == 'custom' %}
-              <div class="col-12">
-                <h5 class="fw-bold mb-3"><i class="fas fa-file-archive me-2 text-primary"></i>Gestión de Archivos</h5>
-                
-                {# Visualización de archivos actuales #}
-                <div class="row g-4 justify-content-center mb-4">
+            <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
+              <div class="card-body p-5">
+                <div class="row g-5">
+                  
+                  {# 3. Variables de Entorno (Solo para DockerHub/Dockerfile) - AL INICIO #}
                   {% if not service.has_compose %}
-                  <div class="col-md-5">
-                    <div class="p-3 bg-light rounded text-center border h-100 d-flex flex-column justify-content-center">
-                      <i class="fas fa-file-alt fa-2x mb-2 {% if service.dockerfile %}text-success{% else %}text-muted{% endif %}"></i>
-                      <div class="small fw-bold">Dockerfile</div>
-                      <div class="x-small text-muted">{% if service.dockerfile %}✓ Presente{% else %}- Vacío -{% endif %}</div>
+                    {% include 'containers/_partials/edit/_env.html' %}
+                  {% endif %}
+
+                  {# 4. Configuración de Red y Rol #}
+                  {% include 'containers/_partials/edit/_network.html' %}
+
+                  {# 5. Gestión de Stack (Solo Compose) #}
+                  {% include 'containers/_partials/edit/_stack.html' %}
+
+                  {# 6. Gestión de Archivos (Dockerfile/Compose/Code) #}
+                  {% include 'containers/_partials/edit/_files.html' %}
+
+                  {# Botones de Acción #}
+                  <div class="col-12 mt-5 text-center">
+                    <button
+                      type="submit"
+                      id="submitBtn"
+                      class="btn btn-lg px-5 shadow text-white fw-bold rounded-pill"
+                      style="background-color: #d35400; border-color: #d35400"
+                    >
+                      <i class="fas fa-sync-alt me-2"></i>Guardar y Reiniciar Servicio
+                    </button>
+                    <div class="mt-3">
+                      <a
+                        href="{{ return_url }}"
+                        class="text-muted text-decoration-none small"
+                      >
+                        <i class="fas fa-times me-1"></i>Cancelar cambios y volver
+                      </a>
                     </div>
                   </div>
-                  {% endif %}
-                  
-                  {% if service.has_compose %}
-                  <div class="col-md-5">
-                    <div class="p-3 bg-light rounded text-center border h-100 d-flex flex-column justify-content-center">
-                      <i class="fas fa-layer-group fa-2x mb-2 {% if service.compose %}text-primary{% else %}text-muted{% endif %}"></i>
-                      <div class="small fw-bold">Compose</div>
-                      <div class="x-small text-muted">{% if service.compose %}✓ Presente{% else %}- Vacío -{% endif %}</div>
-                    </div>
-                  </div>
-                  {% endif %}
-                  
-                  <div class="col-md-5">
-                    <div class="p-3 bg-light rounded text-center border h-100 d-flex flex-column justify-content-center">
-                      <i class="fas fa-archive fa-2x mb-2 {% if service.code %}text-warning{% else %}text-muted{% endif %}"></i>
-                      <div class="small fw-bold">Código (ZIP)</div>
-                      <div class="x-small text-muted">{% if service.code %}✓ Presente{% else %}- Vacío -{% endif %}</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="alert alert-info border-0 shadow-sm d-flex align-items-start mb-4 mx-auto" style="max-width: 90%;">
-                  <i class="fas fa-info-circle fa-2x me-3 mt-1"></i>
-                  <div>
-                    <h6 class="fw-bold mb-1">Actualización Automática</h6>
-                    PaaSify limpiará el espacio de trabajo actual, eliminará los contenedores existentes y volverá a construir y ejecutar todo con los nuevos archivos proporcionados.
-                  </div>
-                </div>
-
-                <div class="row g-4 justify-content-center">
-                  {% if not service.has_compose %}
-                  <div class="col-md-5">
-                    <label class="form-label small fw-bold text-success text-center d-block">Reemplazar Dockerfile</label>
-                    <input type="file" name="dockerfile" class="form-control">
-                  </div>
-                  {% endif %}
-                  
-                  {% if service.has_compose %}
-                  <div class="col-md-5">
-                    <label class="form-label small fw-bold text-primary text-center d-block">Reemplazar Compose (.yml)</label>
-                    <input type="file" name="compose" class="form-control" accept=".yml,.yaml">
-                  </div>
-                  {% endif %}
-                  
-                  <div class="col-md-5">
-                    <label class="form-label small fw-bold text-warning text-center d-block">Reemplazar Código (.zip)</label>
-                    <input type="file" name="code" class="form-control" accept=".zip">
-                  </div>
-                </div>
-              </div>
-              {% endif %}
-
-              {# Botones de Acción #}
-              <div class="col-12 mt-5 text-center">
-                <button type="submit" class="btn btn-lg px-5 shadow text-white fw-bold rounded-pill" style="background-color: #d35400; border-color: #d35400;">
-                  <i class="fas fa-sync-alt me-2"></i>Guardar y Reiniciar Servicio
-                </button>
-                <div class="mt-3">
-                  <a href="{{ return_url }}" class="text-muted text-decoration-none small">
-                    <i class="fas fa-times me-1"></i>Cancelar cambios y volver
-                  </a>
                 </div>
               </div>
             </div>
@@ -371,228 +75,464 @@
   </div>
 </div>
 
+{# Loading Overlay (Solo Spinner) #}
+<div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center;">
+  <div class="spinner-border text-light" role="status" style="width: 4rem; height: 4rem;"></div>
+</div>
+
+{# Incluir el modal de código reutilizable #}
+{% include 'containers/_partials/panels/_modals.html' %}
+
+{% endblock %}
+
+
+
+
+{% block extrascripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('editServiceForm');
-    const jsonInput = document.getElementById('container_configs_json');
-    const envVarsTextarea = document.getElementById('envVarsTextarea');
-    const formatJsonBtn = document.getElementById('formatJsonBtn');
-    const jsonValidation = document.getElementById('jsonValidation');
-    const customPortInput = document.getElementById('customPortInput');
-    const clearPortBtn = document.getElementById('clearPortBtn');
-    const verifyPortBtn = document.getElementById('verifyPortBtn');
-    const portStatus = document.getElementById('portStatus');
-    
-    // Selectores para Tipo de Servicio (Botones grandes)
-    const typeButtons = document.querySelectorAll('.btn-type-sel');
-    const inputContainerType = document.getElementById('input_container_type');
+  /**
+   * PAASify - Logic for Edit Service
+   */
+  const DEBUG = false;
+  function log(...args) {
+    if (DEBUG) console.log("[PaaSify-Debug]", ...args);
+  }
 
-    if (typeButtons.length > 0 && inputContainerType) {
-        typeButtons.forEach(btn => {
-            btn.addEventListener('click', function() {
-                // Remover active de todos
-                typeButtons.forEach(b => {
-                    b.classList.remove('active');
-                    // Restaurar clases outline
-                    const type = b.dataset.type;
-                    if(type === 'web') b.classList.replace('btn-info', 'btn-outline-info');
-                    if(type === 'api') b.classList.replace('btn-primary', 'btn-outline-primary');
-                    if(type === 'database') b.classList.replace('btn-success', 'btn-outline-success');
-                    if(type === 'misc') b.classList.replace('btn-secondary', 'btn-outline-secondary');
-                });
-
-                // Activar el clickeado
-                this.classList.add('active');
-                const type = this.dataset.type;
-                if(type === 'web') this.classList.replace('btn-outline-info', 'btn-info');
-                if(type === 'api') this.classList.replace('btn-outline-primary', 'btn-primary');
-                if(type === 'database') this.classList.replace('btn-outline-success', 'btn-success');
-                if(type === 'misc') this.classList.replace('btn-outline-secondary', 'btn-secondary');
-
-                // Actualizar input oculto
-                inputContainerType.value = type;
-            });
-        });
-    }
+  /**
+   * 1. FILE VISUALIZATION (Modal)
+   */
+  window.showFileModal = function(fileType, serviceId) {
+    log("showFileModal triggered:", { fileType, serviceId });
     
-    // Limpiar JSON
-    if (clearJsonBtn && envVarsTextarea) {
-        clearJsonBtn.addEventListener('click', function() {
-            envVarsTextarea.value = '{}';
-            envVarsTextarea.dispatchEvent(new Event('input'));
-        });
-    }
+    const modalEl = document.getElementById('codeModal');
+    const codeBody = document.getElementById('code-body');
+    const modalLabel = document.getElementById('codeModalLabel');
     
-    // Validación de JSON en tiempo real
-    if (envVarsTextarea) {
-        envVarsTextarea.addEventListener('input', function() {
-            // ... (lógica existente arriba) ...
-            try {
-                if (this.value.trim() === "") {
-                    jsonValidation.innerHTML = "";
-                    this.classList.remove('is-invalid', 'is-valid');
-                    return;
-                }
-                JSON.parse(this.value);
-                jsonValidation.innerHTML = '<small class="text-success"><i class="fas fa-check-circle me-1"></i>JSON válido</small>';
-                this.classList.remove('is-invalid');
-                this.classList.add('is-valid');
-            } catch (e) {
-                jsonValidation.innerHTML = '<small class="text-danger"><i class="fas fa-exclamation-circle me-1"></i>JSON inválido: ' + e.message + '</small>';
-                this.classList.remove('is-valid');
-                this.classList.add('is-invalid');
-            }
-        });
-        
-        // Trigger inicial si tiene contenido
-        if (envVarsTextarea.value.trim() !== "" && envVarsTextarea.value !== "{}") {
-             envVarsTextarea.dispatchEvent(new Event('input'));
-        }
-    }
-    
-    // Formatear JSON con SweetAlert y Auto-Fix
-    if (formatJsonBtn) {
-        formatJsonBtn.addEventListener('click', function() {
-            const rawValue = envVarsTextarea.value;
-            try {
-                // Intento 1: Parseo directo
-                const parsed = JSON.parse(rawValue);
-                envVarsTextarea.value = JSON.stringify(parsed, null, 2);
-                envVarsTextarea.dispatchEvent(new Event('input'));
-            } catch (e) {
-                // Intento 2: Auto-reparación (Cambiar comillas simples por dobles)
-                try {
-                    console.log("Intentando auto-reparar JSON...");
-                    // Reemplazo básico de comillas simples por dobles
-                    const fixedValue = rawValue.replace(/'/g, '"');
-                    const parsed = JSON.parse(fixedValue);
-                    
-                    envVarsTextarea.value = JSON.stringify(parsed, null, 2);
-                    envVarsTextarea.dispatchEvent(new Event('input'));
-                    
-                    // Notificar reparación exitosa (opcional, pero útil)
-                    swal({
-                        title: "JSON Reparado",
-                        text: "Se detectaron comillas simples y se corrigieron automáticamente.",
-                        icon: "success",
-                        timer: 2000,
-                        buttons: false
-                    });
-                } catch (e2) {
-                    // Fallo definitivo
-                    swal({
-                        title: "Error de Formato",
-                        text: "No se puede formatear. Asegúrate de usar comillas dobles (\") y no dejar comas al final.",
-                        icon: "error",
-                        button: "Entendido",
-                    });
-                }
-            }
-        });
+    if (!modalEl || !codeBody) {
+      log("Error: Modal elements missing from DOM");
+      return;
     }
 
-    // INTERCEPTAR ENVÍO DEL FORMULARIO
-    form.addEventListener('submit', function(e) {
-        // 1. Validar JSON antes de enviar
-        if (envVarsTextarea && envVarsTextarea.classList.contains('is-invalid')) {
-            e.preventDefault(); // Detener envío
-            swal({
-                title: "JSON Inválido",
-                text: "Por favor corrige los errores en el editor de Variables de Entorno antes de guardar.",
-                icon: "error",
-                button: "Revisar",
-            }).then(() => {
-                envVarsTextarea.focus();
-            });
-            return false;
-        }
+    try {
+      const titles = {
+        'dockerfile': 'Visualizando Dockerfile',
+        'compose': 'Visualizando docker-compose.yml'
+      };
+      if (modalLabel) modalLabel.innerText = titles[fileType] || 'Visor de Archivos';
+      
+      codeBody.innerHTML = `
+        <div class="text-center py-5">
+          <div class="spinner-border text-primary" role="status"></div>
+          <p class="mt-3 text-muted">Consultando servidor...</p>
+        </div>`;
+      
+      // Intentar mostrar modal con jQuery o Bootstrap Nativo
+      if (window.jQuery && jQuery.fn.modal) {
+        $(modalEl).modal('show');
+      } else if (typeof bootstrap !== 'undefined') {
+        bootstrap.Modal.getOrCreateInstance(modalEl).show();
+      }
+      
+      const url = `/paasify/containers/view-file/${serviceId}/?type=${fileType}`;
+      log("Fetch URL:", url);
+      
+      fetch(url)
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            log("Content received successfully");
+            const escaped = data.content
+              .replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;');
+            codeBody.innerHTML = '<code>' + escaped + '</code>';
+            if (typeof updateLineNumbers === 'function') setTimeout(updateLineNumbers, 100);
+          } else {
+            log("API Error:", data.error);
+            codeBody.innerHTML = `<div class="alert alert-warning m-4"><i class="fas fa-exclamation-triangle me-2"></i>${data.error}</div>`;
+          }
+        })
+        .catch(err => {
+          log("Fetch Exception:", err);
+          codeBody.innerHTML = `<div class="alert alert-danger m-4">Error de conexión: ${err.message}</div>`;
+        });
+    } catch (e) {
+      log("showFileModal caught exception:", e);
+    }
+  };
 
-        // 2. Sincronizar configs de Compose (si existen)
-        syncContainerConfigs();
+  /**
+   * 2. COMPOSE ANALYSIS RENDERING
+   */
+  function displayComposeAnalysis(data) {
+    const previewContainer = document.getElementById("compose-preview-container");
+    const previewContent = document.getElementById("compose-preview-content");
+    if (!previewContent) return;
+
+    if (!data.containers || data.containers.length === 0) {
+      previewContent.innerHTML = '<div class="alert alert-warning mb-0">No se detectaron servicios en el archivo proporcionado.</div>';
+      return;
+    }
+
+    let html = `
+      <div class="table-responsive rounded border bg-white mt-3 shadow-sm">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="bg-light x-small fw-bold text-uppercase">
+            <tr>
+              <th class="ps-3">Servicio</th>
+              <th>Imagen / Puertos</th>
+              <th>Tipo</th>
+              <th class="text-center">Web</th>
+            </tr>
+          </thead>
+          <tbody id="analysis-table-body">
+    `;
+
+    data.containers.forEach(c => {
+      const typeOptions = [
+        { val: 'web', label: '🌐 Web' },
+        { val: 'api', label: '⚙️ API' },
+        { val: 'database', label: '🗄️ DB' },
+        { val: 'misc', label: '🛡️ Gen' }
+      ];
+      
+      const optionsHtml = typeOptions.map(opt => 
+        `<option value="${opt.val}" ${c.container_type === opt.val ? 'selected' : ''}>${opt.label}</option>`
+      ).join("");
+
+      let portsHtml = '';
+      if (c.ports && c.ports.length > 0) {
+        portsHtml = c.ports.map(p => 
+          `<span class="badge bg-secondary font-monospace me-1 x-small">${p.container}/tcp</span>`
+        ).join('');
+      } else {
+        portsHtml = '<span class="text-muted x-small">Sin puertos</span>';
+      }
+
+      html += `
+        <tr data-container-name="${c.name}">
+          <td class="ps-3 font-monospace small"><strong>${c.name}</strong></td>
+          <td>
+            <div class="x-small text-truncate" style="max-width:150px"><code>${c.image}</code></div>
+            <div>${portsHtml}</div>
+          </td>
+          <td>
+            <select class="form-select form-select-sm container-type-select x-small py-0" style="height:24px">
+              ${optionsHtml}
+            </select>
+          </td>
+          <td class="text-center">
+            <div class="form-check form-switch d-inline-block">
+              <input class="form-check-input is-web-switch" type="checkbox" ${c.is_web ? 'checked' : ''}>
+            </div>
+          </td>
+        </tr>
+      `;
     });
+
+    html += `</tbody></table></div>`;
     
-    // Limpiar puerto
-    if (clearPortBtn) {
-        clearPortBtn.addEventListener('click', function() {
-            customPortInput.value = '';
-            portStatus.innerHTML = '';
-        });
+    if (data.warnings && data.warnings.length > 0) {
+      html += '<div class="mt-2">';
+      data.warnings.forEach(w => {
+        html += `<div class="x-small alert alert-warning py-1 px-2 mb-1"><i class="fas fa-exclamation-triangle me-1"></i>${w}</div>`;
+      });
+      html += '</div>';
     }
+
+    previewContent.innerHTML = html;
+    if (previewContainer) previewContainer.classList.remove("d-none");
+
+    // Listeners para sincronización
+    previewContent.querySelectorAll("select, input").forEach(el => {
+      el.addEventListener("change", syncStackFromPreview);
+    });
+
+    syncStackFromPreview();
+  }
+
+  function syncStackFromPreview() {
+    const jsonInput = document.getElementById("container_configs_json");
+    const tbody = document.getElementById("analysis-table-body");
+    if (!jsonInput || !tbody) return;
+
+    const configs = {};
+    tbody.querySelectorAll("tr[data-container-name]").forEach(row => {
+      const name = row.dataset.containerName;
+      const type = row.querySelector(".container-type-select")?.value;
+      const isWeb = row.querySelector(".is-web-switch")?.checked;
+      if (name) configs[name] = { container_type: type, is_web: isWeb };
+    });
+
+    jsonInput.value = JSON.stringify(configs);
+    log("Stack actualizado desde previsualización:", jsonInput.value);
+  }
+
+  /**
+   * 3. INITIALIZATION
+   */
+  document.addEventListener("DOMContentLoaded", function () {
+    log("DOM Loaded - Initializing...");
     
-    // Verificar puerto
-    if (verifyPortBtn) {
-        verifyPortBtn.addEventListener('click', function() {
-            const port = customPortInput.value;
-            if (!port) {
-                portStatus.innerHTML = '<small class="text-warning"><i class="fas fa-info-circle me-1"></i>Ingresa un puerto para verificar</small>';
-                return;
+    try {
+      const form = document.getElementById("editServiceForm");
+      const jsonInput = document.getElementById("container_configs_json");
+      const envVarsTextarea = document.getElementById("envVarsTextarea");
+      const formatJsonBtn = document.getElementById("formatJsonBtn");
+      const jsonValidation = document.getElementById("jsonValidation");
+      const customPortInput = document.getElementById("customPortInput");
+      const clearPortBtn = document.getElementById("clearPortBtn");
+      const verifyPortBtn = document.getElementById("verifyPortBtn");
+      const portStatus = document.getElementById("portStatus");
+
+      // 1. Env logic (No collapse needed now)
+      if (envVarsTextarea) {
+        log("Env editor initialized");
+      }
+
+      // 2. JSON Editor
+      if (envVarsTextarea) {
+        envVarsTextarea.addEventListener("input", function () {
+          try {
+            if (this.value.trim() === "") {
+              if (jsonValidation) jsonValidation.innerHTML = "";
+              this.classList.remove("is-invalid", "is-valid");
+              return;
             }
-            
-            if (port < 40000 || port > 50000) {
-                portStatus.innerHTML = '<small class="text-danger"><i class="fas fa-times-circle me-1"></i>Puerto fuera de rango (40000-50000)</small>';
-                return;
-            }
-            
-            // Verificar disponibilidad vía API
-            portStatus.innerHTML = '<small class="text-info"><i class="fas fa-spinner fa-spin me-1"></i>Verificando...</small>';
-            
-            fetch(`/paasify/containers/check-port/?port=${port}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.available) {
-                        portStatus.innerHTML = '<small class="text-success"><i class="fas fa-check-circle me-1"></i>Puerto disponible</small>';
-                    } else if (data.success && !data.available) {
-                        let msg = '<small class="text-danger"><i class="fas fa-times-circle me-1"></i>Puerto ocupado';
-                        if (data.used_by) {
-                            msg += ` (usado por: ${data.used_by})`;
-                        }
-                        if (data.suggestions && data.suggestions.length > 0) {
-                            msg += `<br><i class="fas fa-lightbulb me-1"></i>Sugerencias: ${data.suggestions.join(', ')}`;
-                        }
-                        msg += '</small>';
-                        portStatus.innerHTML = msg;
-                    } else {
-                        portStatus.innerHTML = '<small class="text-danger"><i class="fas fa-exclamation-circle me-1"></i>' + (data.error || 'Error al verificar') + '</small>';
-                    }
-                })
-                .catch(error => {
-                    portStatus.innerHTML = '<small class="text-warning"><i class="fas fa-exclamation-circle me-1"></i>No se pudo verificar</small>';
-                });
+            JSON.parse(this.value);
+            if (jsonValidation) jsonValidation.innerHTML = '<small class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Válido</small>';
+            this.classList.replace("is-invalid", "is-valid");
+          } catch (e) {
+            if (jsonValidation) jsonValidation.innerHTML = '<small class="text-danger fw-bold"><i class="fas fa-times-circle me-1"></i>Inválido</small>';
+            this.classList.replace("is-valid", "is-invalid");
+          }
         });
-    }
-    
-    // Función para recolectar configuraciones de contenedores (Compose)
-    function syncContainerConfigs() {
-        const table = document.getElementById('compose-containers-table');
-        if (!table) return;
+
+        if (formatJsonBtn) {
+          formatJsonBtn.addEventListener("click", () => {
+            try {
+              const obj = JSON.parse(envVarsTextarea.value);
+              envVarsTextarea.value = JSON.stringify(obj, null, 2);
+              envVarsTextarea.dispatchEvent(new Event("input"));
+            } catch (e) {
+              if (typeof swal === 'function') swal("JSON Inválido", "No se puede formatear un JSON con errores.", "warning");
+            }
+          });
+        }
         
-        const rows = table.querySelectorAll('tbody tr[data-service-name]');
-        let configs = {};
+        const clearJsonBtn = document.getElementById("clearJsonBtn");
+        if (clearJsonBtn) {
+          clearJsonBtn.addEventListener("click", () => {
+            envVarsTextarea.value = "{}";
+            envVarsTextarea.dispatchEvent(new Event("input"));
+          });
+        }
         
-        rows.forEach(row => {
-            const name = row.dataset.serviceName;
-            const type = row.querySelector('.ctr-type').value;
-            const isWeb = row.querySelector('.ctr-is-web').checked;
-            
-            configs[name] = {
-                container_type: type,
-                is_web: isWeb
-            };
+        const copyTemplateBtn = document.getElementById("copyTemplateBtn");
+        if (copyTemplateBtn) {
+          copyTemplateBtn.addEventListener("click", () => {
+            const template = document.getElementById("envExampleTemplate")?.innerText;
+            if (template) {
+              envVarsTextarea.value = template.trim();
+              envVarsTextarea.dispatchEvent(new Event("input"));
+              if (typeof swal === 'function') swal("Plantilla Copiada", "Se ha cargado el ejemplo en el editor.", "success");
+            }
+          });
+        }
+      }
+
+      // 3. Port Check & Type Selectors
+      if (verifyPortBtn && customPortInput) {
+        verifyPortBtn.addEventListener("click", function() {
+          const port = customPortInput.value;
+          if (!port) return;
+          if (portStatus) portStatus.innerHTML = '<small class="text-info"><i class="fas fa-sync fa-spin me-1"></i>...</small>';
+          
+          fetch(`/paasify/containers/check-port/?port=${port}`)
+            .then(r => r.json())
+            .then(data => {
+              if (portStatus) {
+                if (data.success && data.available) {
+                  portStatus.innerHTML = '<small class="text-success fw-bold">✓ Libre</small>';
+                } else {
+                  portStatus.innerHTML = '<small class="text-danger fw-bold">✗ Ocupado</small>';
+                }
+              }
+            })
+            .catch(() => { if (portStatus) portStatus.innerHTML = ''; });
+        });
+      }
+      
+      if (clearPortBtn && customPortInput) {
+        clearPortBtn.addEventListener("click", () => {
+          customPortInput.value = "";
+          if (portStatus) portStatus.innerHTML = "";
+        });
+      }
+
+      const typeButtons = document.querySelectorAll(".btn-type-sel");
+      if (typeButtons.length > 0) {
+        typeButtons.forEach(btn => {
+          btn.addEventListener("click", function() {
+            typeButtons.forEach(b => {
+              b.classList.remove("active", "btn-info", "btn-primary", "btn-success", "btn-secondary");
+              const t = b.dataset.type;
+              if (t === "web") b.classList.add("btn-outline-info");
+              if (t === "api") b.classList.add("btn-outline-primary");
+              if (t === "database") b.classList.add("btn-outline-success");
+              if (t === "misc") b.classList.add("btn-outline-secondary");
+            });
+
+            this.classList.add("active");
+            this.classList.remove("btn-outline-info", "btn-outline-primary", "btn-outline-success", "btn-outline-secondary");
+            const type = this.dataset.type;
+            if (type === "web") this.classList.add("btn-info");
+            if (type === "api") this.classList.add("btn-primary");
+            if (type === "database") this.classList.add("btn-success");
+            if (type === "misc") this.classList.add("btn-secondary");
+
+            const input = document.getElementById("input_container_type");
+            if (input) input.value = type;
+          });
+        });
+      }
+
+      // 4. Existing Stack Sync (Hacerla global para que el onchange de _stack.html la vea)
+      window.syncExistingStack = function() {
+        const table = document.getElementById("compose-containers-table");
+        if (!table) {
+          log("⚠️ No se encontró la tabla compose-containers-table");
+          return;
+        }
+        if (!jsonInput) {
+          log("⚠️ No se encontró el input container_configs_json");
+          return;
+        }
+        
+        const rows = table.querySelectorAll("tbody tr[data-service-name]");
+        log(`📊 Encontradas ${rows.length} filas en la tabla`);
+        
+        const configs = {};
+        rows.forEach((row, index) => {
+          const name = row.dataset.serviceName;
+          const typeSelect = row.querySelector(".ctr-type");
+          const webCheckbox = row.querySelector(".ctr-is-web");
+          
+          const type = typeSelect?.value;
+          const isWeb = webCheckbox?.checked;
+          
+          log(`  Fila ${index + 1}:`, {
+            name,
+            type,
+            isWeb,
+            typeSelect: !!typeSelect,
+            webCheckbox: !!webCheckbox
+          });
+          
+          if (name) {
+            configs[name] = { container_type: type, is_web: isWeb };
+          }
         });
         
         jsonInput.value = JSON.stringify(configs);
-    }
+        log("✅ Stack guardado en input oculto:", jsonInput.value);
+      }
 
-    const table = document.getElementById('compose-containers-table');
-    if (table) {
-        table.addEventListener('change', function(e) {
-            if (e.target.classList.contains('ctr-type') || e.target.classList.contains('ctr-is-web')) {
-                syncContainerConfigs();
-            }
+      const composeTable = document.getElementById("compose-containers-table");
+      if (composeTable) {
+        composeTable.addEventListener("change", (e) => {
+          if (e.target.matches(".ctr-type, .ctr-is-web")) {
+            log("🔄 Cambio detectado en tabla, sincronizando...");
+            window.syncExistingStack();
+          }
         });
+        // Sincronización inicial inmediata
+        log("🚀 Inicializando container_configs desde tabla existente...");
+        window.syncExistingStack();
+      } else {
+        log("⚠️ No se encontró compose-containers-table en el DOM");
+      }
+
+      // 5. Build/Upload Analysis
+      const composeInput = document.querySelector('input[name="compose"]');
+      if (composeInput) {
+        composeInput.addEventListener("change", function() {
+          if (!this.files || !this.files[0]) return;
+          const formData = new FormData();
+          formData.append('compose_file', this.files[0]);
+          
+          const previewContent = document.getElementById("compose-preview-content");
+          if (previewContent) {
+            previewContent.innerHTML = '<div class="text-center py-4"><div class="spinner-border text-primary spinner-border-sm"></div><p class="mt-2 x-small text-muted">Analizando...</p></div>';
+            
+            fetch("{% url 'containers:analyze_compose' %}", {
+              method: 'POST',
+              body: formData,
+              headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+            })
+            .then(r => r.json())
+            .then(data => {
+              if (data.success) {
+                displayComposeAnalysis(data);
+              } else {
+                previewContent.innerHTML = `<div class="alert alert-danger x-small border-0">${data.message || data.error}</div>`;
+              }
+            })
+            .catch(err => { 
+                previewContent.innerHTML = '<div class="alert alert-danger x-small">Error en conexión</div>'; 
+            });
+          }
+        });
+      }
+
+      // 6. Submit
+      if (form) {
+        form.addEventListener("submit", (e) => {
+          // Validar JSON
+          if (envVarsTextarea && envVarsTextarea.classList.contains("is-invalid")) {
+            e.preventDefault();
+            if (typeof swal === 'function') swal("Error", "Por favor corrige el JSON antes de guardar.", "error");
+            return;
+          }
+          
+          // Asegurar que sincronicemos antes de enviar
+          const previewTbody = document.getElementById("analysis-table-body");
+          if (previewTbody && previewTbody.children.length > 0) {
+            syncStackFromPreview();
+          } else if (window.syncExistingStack) {
+            window.syncExistingStack();
+          }
+          
+          // Debug: Verificar qué se está enviando
+          if (jsonInput) {
+            log("=== ENVIANDO FORMULARIO ===");
+            log("Valor de container_configs_json:", jsonInput.value);
+            try {
+              const parsed = JSON.parse(jsonInput.value || "{}");
+              log("Configuraciones parseadas:", parsed);
+            } catch (err) {
+              log("Error parseando container_configs:", err);
+            }
+          }
+          
+          // Mostrar overlay de carga
+          const overlay = document.getElementById("loadingOverlay");
+          if (overlay) {
+            overlay.style.display = "flex";
+          }
+          
+          // Deshabilitar botón de submit para evitar doble envío
+          const submitBtn = document.getElementById("submitBtn");
+          if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Procesando...';
+          }
+        });
+      }
+
+    } catch (err) {
+      log("Critical error in DOMContentLoaded:", err);
     }
-
-
-});
+  });
 </script>
 {% endblock %}

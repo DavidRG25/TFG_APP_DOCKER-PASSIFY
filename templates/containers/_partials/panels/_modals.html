@@ -199,17 +199,29 @@
 <div class="modal fade" id="codeModal" tabindex="-1" aria-labelledby="codeModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
-      <div class="modal-header border-bottom-0 bg-white py-3 px-4" style="backdrop-filter: blur(10px); background: rgba(255,255,255,0.9) !important;">
+
+      <div class="modal-header border-bottom border-light bg-white py-3 px-4 position-relative">
         <div class="d-flex align-items-center">
-          <i class="fas fa-file-code text-primary fs-3" style="margin-right: 1.5rem;"></i>
-          <h5 class="modal-title fw-bold m-0" id="codeModalLabel" style="color: #1e293b; letter-spacing: -0.5px;">Código Fuente</h5>
+          <i class="fas fa-file-code text-primary fs-3 me-3"></i>
+          <div>
+            <h5 class="modal-title fw-bold m-0" id="codeModalLabel" style="color: #1e293b; letter-spacing: -0.5px;">Visualizador de Código</h5>
+            <small class="text-muted">Vista de solo lectura</small>
+          </div>
         </div>
-        <div class="d-flex align-items-center gap-3">
-          <button type="button" class="btn btn-light btn-sm fw-600 rounded-pill px-3 d-flex align-items-center shadow-sm border" onclick="copyModalCode()" id="btn-copy-modal">
-            <i class="far fa-copy me-2"></i> Copiar
+        
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold" onclick="copyModalCode()" id="btn-copy-modal">
+            <i class="far fa-copy me-1"></i> Copiar
           </button>
-          <button type="button" class="btn-close-custom" data-bs-dismiss="modal" aria-label="Cerrar">
-            <i class="fas fa-times"></i>
+          
+          {# Botón de cierre circular rojo con data-bs-dismiss manual y nativo #}
+          <button type="button" 
+                  class="btn btn-danger rounded-circle d-flex align-items-center justify-content-center shadow-sm" 
+                  data-bs-dismiss="modal" 
+                  aria-label="Cerrar" 
+                  style="width: 36px; height: 36px; border: 2px solid white; transition: all 0.2s ease;"
+                  onclick="$('#codeModal').modal('hide');">
+            <i class="fas fa-times text-white" style="font-size: 14px;"></i>
           </button>
         </div>
       </div>
@@ -249,26 +261,6 @@
   background: #94a3b8;
 }
 
-.btn-close-custom {
-  background: #f1f5f9;
-  border: none;
-  border-radius: 50%;
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #64748b;
-  transition: all 0.2s ease;
-  cursor: pointer;
-  padding: 0;
-}
-
-.btn-close-custom:hover {
-  background: #fee2e2;
-  color: #ef4444;
-  transform: rotate(90deg);
-}
 </style>
 
 <script>
@@ -329,5 +321,14 @@ function copyModalCode() {
       btn.style.borderColor = '';
     }, 2000);
   });
+}
+
+// Función de seguridad para cerrar el modal manualmente
+function hideCodeModal() {
+    const modalEl = document.getElementById('codeModal');
+    if (modalEl && typeof bootstrap !== 'undefined') {
+        const instance = bootstrap.Modal.getInstance(modalEl);
+        if (instance) instance.hide();
+    }
 }
 </script>

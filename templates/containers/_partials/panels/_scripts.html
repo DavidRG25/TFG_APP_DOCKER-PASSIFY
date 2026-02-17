@@ -48,16 +48,18 @@
   // Sincronizacion de eventos para asegurar el refresh
   document.body.addEventListener("htmx:afterRequest", (evt) => {
     const xhr = evt.detail.xhr;
-    // Si la respuesta indica un refresh de tabla o es una accion de control con exito
-    if (xhr.status >= 200 && xhr.status < 300) {
-      const triggers = JSON.parse(xhr.getResponseHeader("HX-Trigger") || "{}");
-      const isTableFragment = evt.detail.pathInfo.path.includes("table-fragment");
-      if (triggers["service:table-refresh"] || (evt.detail.pathInfo.path.includes("/containers/") && !isTableFragment)) {
-        // Provocamos un trigger manual en el cuerpo por si acaso el fragmento tarda
-        setTimeout(() => {
-          htmx.trigger("body", "service:table-refresh");
-        }, 500);
-      }
+    if (xhr && xhr.status >= 200 && xhr.status < 300) {
+      try {
+        const triggers = JSON.parse(xhr.getResponseHeader("HX-Trigger") || "{}");
+        const hxPath = (evt.detail.pathInfo && evt.detail.pathInfo.path) ? evt.detail.pathInfo.path : "";
+        const isTableFragment = hxPath && hxPath.includes("table-fragment");
+        
+        if (triggers["service:table-refresh"] || (hxPath && hxPath.includes("/containers/") && !isTableFragment)) {
+          setTimeout(() => {
+            if (window.htmx) htmx.trigger("body", "service:table-refresh");
+          }, 500);
+        }
+      } catch (e) {}
     }
   });
 
@@ -560,9 +562,27 @@
         `<option value="${opt.val}" ${c.container_type === opt.val ? 'selected' : ''}>${opt.label}</option>`
       ).join("");
 
+      // Generar badges de puertos desde el backend
+      let portsHtml = '';
+      if (c.ports && c.ports.length > 0) {
+        portsHtml = c.ports.map(p => {
+          // p.host puede ser "auto" o un número específico
+          // p.container es el puerto interno
+          if (p.host === 'auto') {
+            return `<span class="badge bg-secondary font-monospace me-1">${p.container}/tcp</span>`;
+          } else {
+            return `<span class="badge bg-primary font-monospace me-1"><i class="fas fa-link me-1"></i>${p.host}→${p.container}</span>`;
+          }
+        }).join('');
+      }
+      if (!portsHtml) {
+        portsHtml = '<span class="text-muted small">Sin puertos</span>';
+      }
+
       row.innerHTML = `
         <td class="ps-3"><strong class="text-primary">${c.name}</strong></td>
         <td><code class="small">${c.image}</code></td>
+        <td>${portsHtml}</td>
         <td>
           <select class="form-select form-select-sm container-type-select">
             ${optionsHtml}

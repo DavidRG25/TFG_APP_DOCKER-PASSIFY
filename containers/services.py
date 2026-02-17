@@ -97,17 +97,19 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> 
     
     workspace = ensure_service_workspace(service)
     
+    # Actualizar objeto desde DB para asegurar rutas de archivos frescas
+    service.refresh_from_db()
+
     # 1. Copiar Dockerfile
     if service.dockerfile:
         dest = workspace / "Dockerfile"
         try:
-            if service.dockerfile: # Check doble por seguridad
-                with service.dockerfile.open("rb") as f_in:
-                    content = f_in.read()
-                    with open(dest, "wb") as f_out:
-                        f_out.write(content)
+            with service.dockerfile.open("rb") as f_in:
+                content = f_in.read()
+                with open(dest, "wb") as f_out:
+                    f_out.write(content)
         except Exception as e:
-            print(f"[ERROR] No se pudo copiar Dockerfile: {e}")
+            print(f"[ERROR] No se pudo copiar Dockerfile para servicio {service.id}: {e}")
 
     # 2. Copiar docker-compose.yml
     if service.compose:
@@ -118,20 +120,17 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> 
                 with open(dest, "wb") as f_out:
                     f_out.write(content)
         except Exception as e:
-            print(f"[ERROR] No se pudo copiar docker-compose: {e}")
+            print(f"[ERROR] No se pudo copiar docker-compose para servicio {service.id}: {e}")
 
     # 3. Copiar y descomprimir Código
     if unpack_code and service.code:
-        # Determinar extensión original
         try:
+            service.refresh_from_db() # Doble seguridad
+            # Determinar extensión original
             ext = os.path.splitext(service.code.name)[1].lower() or ".zip"
-        except:
-            ext = ".zip"
+            archive_name = f"source{ext}"
+            dest_archive = workspace / archive_name
             
-        archive_name = f"source{ext}"
-        dest_archive = workspace / archive_name
-        
-        try:
             # Copiar archivo zip/rar al workspace con nombre estándar
             with service.code.open("rb") as f_in:
                 content = f_in.read()
@@ -996,6 +995,9 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool, c
     service.save(update_fields=["logs"])
     
     # Crear/actualizar ServiceContainer por cada uno
+    if container_configs is None:
+        container_configs = service.container_configs
+
     for ctr in containers:
         svc_name = ctr.labels.get("com.docker.compose.service") or ctr.name
         
@@ -1005,16 +1007,32 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool, c
         
         internal_ports, assigned_ports = _extract_container_port_info(ctr)
         
+        # Imagen del contenedor
+        img_name = ctr.attrs.get('Config', {}).get('Image', 'No especificada')
+
         # Aplicar configuración personalizada si existe
         c_config = (container_configs or {}).get(svc_name, {})
         c_web = c_config.get('is_web', False)
-        c_type = c_config.get('container_type', 'misc')
+        c_type = c_config.get('container_type')
+        
+        # Si no hay tipo manual, intentar detectar por nombre de servicio
+        if not c_type:
+            name_low = svc_name.lower()
+            if any(x in name_low for x in ['db', 'sql', 'mysql', 'postgres', 'mongo', 'mariadb']):
+                c_type = 'database'
+            elif any(x in name_low for x in ['web', 'front', 'nginx', 'apache', 'pwa']):
+                c_type = 'web'
+            elif any(x in name_low for x in ['api', 'back', 'srv', 'app']):
+                c_type = 'api'
+            else:
+                c_type = 'misc'
 
         ServiceContainer.objects.update_or_create(
             service=service,
             name=svc_name,
             defaults={
                 "container_id": ctr.id,
+                "image_name": img_name,
                 "status": ctr.status,
                 "container_type": c_type,
                 "is_web": c_web,
