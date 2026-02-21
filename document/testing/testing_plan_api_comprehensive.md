@@ -1,15 +1,44 @@
 # Plan de Testing Maestro: Verificación Total de la API REST
 
-Este documento es una lista de verificación exhaustiva para validar cada endpoint, parámetro y caso de error de la API de PaaSify.
+Este documento es una lista de verificación exhaustiva para validar cada endpoint, parámetro y caso de error de la API de PaaSify, incluyendo comandos `curl` detallados para su rápida ejecución.
+
+_Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `http://localhost:8000/api`) y `{{TOKEN}}` por un token JWT válido.
 
 ---
 
 ## 🔑 1. Autenticación y Seguridad
 
-- [ ] **Sin Token**: `curl -I {{API_URL}}/containers/` -> Esperado: `401 Unauthorized`.
-- [ ] **Token Mal Formado**: `Authorization: Bearer 12345` -> Esperado: `401 Unauthorized`.
-- [ ] **Obtener Token**: `POST {{API_URL}}/token/` con credenciales válidas.
-- [ ] **Refrescar Token**: `POST {{API_URL}}/token/refresh/` con un refresh token válido.
+- [ ] **Sin Token**:
+
+  ```bash
+  curl -i -X GET {{API_URL}}/containers/
+  # Esperado: 401 Unauthorized
+  ```
+
+- [ ] **Token Mal Formado**:
+
+  ```bash
+  curl -i -X GET {{API_URL}}/containers/ \
+       -H "Authorization: Bearer 12345invalid"
+  # Esperado: 401 Unauthorized
+  ```
+
+- [ ] **Obtener Token**:
+
+  ```bash
+  curl -i -X POST {{API_URL}}/token/ \
+       -H "Content-Type: application/json" \
+       -d '{"username": "admin", "password": "password123"}'
+  # Esperado: 200 OK con 'access' y 'refresh'
+  ```
+
+- [ ] **Refrescar Token**:
+  ```bash
+  curl -i -X POST {{API_URL}}/token/refresh/ \
+       -H "Content-Type: application/json" \
+       -d '{"refresh": "TU_REFRESH_TOKEN"}'
+  # Esperado: 200 OK con nuevo token 'access'
+  ```
 
 ---
 
@@ -17,18 +46,70 @@ Este documento es una lista de verificación exhaustiva para validar cada endpoi
 
 ### 2.1 Recursos Base
 
-- [ ] **Listar Asignaturas**: `GET {{API_URL}}/subjects/`
-- [ ] **Listar Proyectos**: `GET {{API_URL}}/projects/`
-- [ ] **Listar Imágenes del Catálogo**: `GET {{API_URL}}/images/`
-- [ ] **Detalle de Recurso**: `GET {{API_URL}}/subjects/{{ID}}/` (Verificar nombres y categorías).
+- [ ] **Listar Asignaturas**:
+
+  ```bash
+  curl -X GET {{API_URL}}/subjects/ \
+       -H "Authorization: Bearer {{TOKEN}}"
+  ```
+
+- [ ] **Listar Proyectos**:
+
+  ```bash
+  curl -X GET {{API_URL}}/projects/ \
+       -H "Authorization: Bearer {{TOKEN}}"
+  ```
+
+- [ ] **Listar Imágenes del Catálogo**:
+
+  ```bash
+  curl -X GET {{API_URL}}/images/ \
+       -H "Authorization: Bearer {{TOKEN}}"
+  ```
+
+- [ ] **Detalle de Recurso (Asignatura)**:
+  ```bash
+  curl -X GET {{API_URL}}/subjects/1/ \
+       -H "Authorization: Bearer {{TOKEN}}"
+  # Verificar: nombres, categorías y relaciones correctas.
+  ```
 
 ### 2.2 Servicios (Contenedores)
 
-- [ ] **Listado Global**: `GET {{API_URL}}/containers/`
-- [ ] **Filtro por Proyecto**: `GET {{API_URL}}/containers/?project={{ID}}`
-- [ ] **Filtro por Asignatura**: `GET {{API_URL}}/containers/?subject={{ID}}`
-- [ ] **Búsqueda por Nombre**: `GET {{API_URL}}/containers/?search=mi-app`
-- [ ] **Detalle Completo**: `GET {{API_URL}}/containers/{{ID}}/` (Verificar que incluye `assigned_port`, `status` y `container_configs`).
+- [ ] **Listado Global**:
+
+  ```bash
+  curl -X GET {{API_URL}}/containers/ \
+       -H "Authorization: Bearer {{TOKEN}}"
+  ```
+
+- [ ] **Filtro por Proyecto**:
+
+  ```bash
+  curl -X GET "{{API_URL}}/containers/?project=1" \
+       -H "Authorization: Bearer {{TOKEN}}"
+  ```
+
+- [ ] **Filtro por Asignatura**:
+
+  ```bash
+  curl -X GET "{{API_URL}}/containers/?subject=1" \
+       -H "Authorization: Bearer {{TOKEN}}"
+  ```
+
+- [ ] **Búsqueda por Nombre**:
+
+  ```bash
+  curl -X GET "{{API_URL}}/containers/?search=mi-app" \
+       -H "Authorization: Bearer {{TOKEN}}"
+  ```
+
+- [ ] **Detalle Completo**:
+  ```bash
+  curl -X GET {{API_URL}}/containers/1/ \
+       -H "Authorization: Bearer {{TOKEN}}"
+  # Verificar: debe incluir 'assigned_port', 'status' y 'container_configs'.
+  ```
 
 ---
 
@@ -36,67 +117,218 @@ Este documento es una lista de verificación exhaustiva para validar cada endpoi
 
 ### 3.1 Modo Catálogo (Éxito y Error)
 
-- [ ] **Éxito**: Crear con imagen válida del catálogo.
-- [ ] **Error Imagen**: Intentar crear con imagen no permitida -> Esperado: `400 Bad Request`.
-- [ ] **Error Nombre**: Nombre con espacios o mayúsculas -> Esperado: `400 Bad Request`.
+- [ ] **Éxito (DockerHub Oficial)**:
+
+  ```bash
+  curl -i -X POST {{API_URL}}/containers/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -H "Content-Type: application/json" \
+       -d '{"name": "mysql-db", "mode": "dockerhub", "image": "mysql:8", "project": 1, "subject": 1, "env_vars": {"MYSQL_ROOT_PASSWORD": "root"}}'
+  # Esperado: 201 Created
+  ```
+
+- [ ] **Error Nombre (Espacios o Mayúsculas)**:
+  ```bash
+  curl -i -X POST {{API_URL}}/containers/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -H "Content-Type: application/json" \
+       -d '{"name": "Mi App", "mode": "dockerhub", "image": "nginx", "project": 1, "subject": 1}'
+  # Esperado: 400 Bad Request
+  ```
 
 ### 3.2 Modo DockerHub
 
-- [ ] **Éxito Simple**: `{"name": "h-py", "mode": "dockerhub", "image": "python:3.9", "project": 1, "subject": 1}`
-- [ ] **Éxito con Puerto**: Definir `internal_port: 8080`.
-- [ ] **Error Imagen Inexistente**: Poner una imagen que no existe en DockerHub.
+- [ ] **Éxito con Puerto y Entorno**:
 
-### 3.3 Modo Custom (Código Propio)
+  ```bash
+  curl -i -X POST {{API_URL}}/containers/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -H "Content-Type: application/json" \
+       -d '{"name": "api-python", "mode": "dockerhub", "image": "python:3.9", "project": 1, "subject": 1, "internal_port": 8000, "is_web": true}'
+  # Esperado: 201 Created
+  ```
 
-- [ ] **Dockerfile**: Enviar `code` (.zip) y `dockerfile`.
-- [ ] **Docker Compose**: Enviar `code` (.zip) y `compose` (.yml).
-- [ ] **Compose con Configuración**: Enviar `container_configs` como string JSON en el mismo POST.
+- [ ] **Error Imagen Inexistente**:
+  ```bash
+  curl -i -X POST {{API_URL}}/containers/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -H "Content-Type: application/json" \
+       -d '{"name": "fake-app", "mode": "dockerhub", "image": "esto-no-existe-en-dockerhub:latest", "project": 1, "subject": 1}'
+  # Esperado: Puede requerir validación asíncrona o devolver error dependiendo de la implementación.
+  ```
+
+### 3.3 Modo Custom (Código Propio mediante multipart/form-data)
+
+- [ ] **Dockerfile**:
+
+  ```bash
+  curl -i -X POST {{API_URL}}/containers/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -F "name=mi-web" \
+       -F "mode=custom" \
+       -F "project=1" \
+       -F "subject=1" \
+       -F "internal_port=3000" \
+       -F "code=@path/to/codigo.zip" \
+       -F "dockerfile=@path/to/Dockerfile"
+  # Esperado: 201 Created, inicializa build.
+  ```
+
+- [ ] **Docker Compose con Configuración**:
+  ```bash
+  curl -i -X POST {{API_URL}}/containers/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -F "name=mi-stack" \
+       -F "mode=custom" \
+       -F "project=1" \
+       -F "subject=1" \
+       -F "code=@path/to/stack.zip" \
+       -F "compose=@path/to/docker-compose.yml" \
+       -F "container_configs={\"frontend\":{\"is_web\":true,\"container_type\":\"web\"}}"
+  # Esperado: 201 Created
+  ```
 
 ---
 
 ## 🛠️ 4. Modificación (PATCH) - Casuística Completa
 
-### 4.1 Modificaciones Permitidas (DockerHub/Custom)
+### 4.1 Modificaciones Permitidas
 
-- [ ] **Cambio de Nombre**: `PATCH {"name": "nuevo-nombre"}`
-- [ ] **Cambio de Metadatos**: `PATCH {"container_type": "database", "is_web": false}`
-- [ ] **Cambio de Red**: `PATCH {"internal_port": 3000}` (Solo DockerHub/Dockerfile).
-- [ ] **Cambio de Entorno**: `PATCH {"env_vars": {"KEY": "VAL"}}`
-- [ ] **Reemplazo de Archivos**: Enviar nuevo `code` (.zip) o `compose` (.yml).
+- [ ] **Cambio de Imagen (DockerHub)**:
 
-### 4.2 Restricciones (Lo que NO debe permitir)
+  ```bash
+  curl -i -X PATCH {{API_URL}}/containers/1/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -H "Content-Type: application/json" \
+       -d '{"image": "nginx:latest"}'
+  # Esperado: 200 OK y actualización de la imagen del contenedor.
+  ```
 
-- [ ] **Editar Catálogo**: `PATCH` sobre servicio `default` -> Esperado: `403 Forbidden`.
-- [ ] **Cambiar Modo**: `PATCH {"mode": "custom"}` sobre un servicio DockerHub -> Esperado: `400 Bad Request`.
-- [ ] **Cambiar Imagen (DockerHub)**: `PATCH {"image": "nginx"}` sobre DockerHub -> Esperado: `400 Bad Request`.
-- [ ] **Cambiar Proyecto/Asignatura**: Intentar mover un servicio de proyecto -> Esperado: `400 Bad Request`.
+- [ ] **Actualización con Retención de Volúmenes (keep_volumes=True)**:
+
+  ```bash
+  curl -i -X PATCH {{API_URL}}/containers/1/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -H "Content-Type: application/json" \
+       -d '{"keep_volumes": true, "env_vars": {"NEW": "VAL"}}'
+  # Esperado: 200 OK. El contenedor se recrea pero los datos del volumen persisten.
+  ```
+
+- [ ] **Actualización con Eliminación de Volúmenes (keep_volumes=False)**:
+
+  ```bash
+  curl -i -X PATCH {{API_URL}}/containers/1/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -H "Content-Type: application/json" \
+       -d '{"keep_volumes": false, "env_vars": {"NEW": "VAL"}}'
+  # Esperado: 200 OK. El contenedor se recrea desde cero y se pierden los datos anteriores.
+  ```
+
+- [ ] **Cambio de Nombre y Tipo**:
+
+  ```bash
+  curl -i -X PATCH {{API_URL}}/containers/1/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -H "Content-Type: application/json" \
+       -d '{"name": "nuevo-nombre", "container_type": "database", "is_web": false}'
+  # Esperado: 200 OK
+  ```
+
+- [ ] **Cambio de Entorno (Reemplazo de Variables)**:
+
+  ```bash
+  curl -i -X PATCH {{API_URL}}/containers/1/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -H "Content-Type: application/json" \
+       -d '{"env_vars": {"NEW_KEY": "NEW_VAL", "DEBUG": "True"}}'
+  # Esperado: 200 OK y reinicio/recreación de contenedor si aplica.
+  ```
+
+- [ ] **Actualización de Código/Archivos (Custom)**:
+  ```bash
+  curl -i -X PATCH {{API_URL}}/containers/2/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -F "compose=@path/to/new-docker-compose.yml" \
+       -F "code=@path/to/new-code.zip"
+  # Esperado: Purgado de volumen antiguo, reconstrucción y 200 OK.
+  ```
+
+### 4.2 Restricciones (Validación de Seguridad)
+
+- [ ] **Editar Catálogo (Default)**:
+
+  ```bash
+  # Supongamos que el ID 3 es un servicio auto-gestionado de catálogo restringido
+  curl -i -X PATCH {{API_URL}}/containers/3/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -H "Content-Type: application/json" \
+       -d '{"name": "hacked-name"}'
+  # Esperado: 403 Forbidden o mensaje explicativo.
+  ```
+
+- [ ] **Cambiar Modo Indebidamente**:
+
+  ```bash
+  curl -i -X PATCH {{API_URL}}/containers/1/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -H "Content-Type: application/json" \
+       -d '{"mode": "custom"}'
+  # Esperado: 400 Bad Request
+  ```
+
+- [ ] **Cambiar Proyecto/Asignatura**:
+  ```bash
+  curl -i -X PATCH {{API_URL}}/containers/1/ \
+       -H "Authorization: Bearer {{TOKEN}}" \
+       -H "Content-Type: application/json" \
+       -d '{"project": 99}'
+  # Esperado: 400 Bad Request
+  ```
 
 ---
 
-## ⚙️ 5. Acciones y Control (Acciones Especiales)
+## ⚙️ 5. Acciones de Control de Estado
 
-- [ ] **Detener**: `POST {{API_URL}}/containers/{{ID}}/stop/`
-- [ ] **Iniciar**: `POST {{API_URL}}/containers/{{ID}}/start/`
-- [ ] **Reiniciar**: `POST {{API_URL}}/containers/{{ID}}/restart/`
-- [ ] **Logs (Texto)**: `GET {{API_URL}}/containers/{{ID}}/logs/`
-- [ ] **Eliminar**: `DELETE {{API_URL}}/containers/{{ID}}/` (Verificar que devuelve `204 No Content`).
+- [ ] **Detener Servicio**:
+
+  ```bash
+  curl -i -X POST {{API_URL}}/containers/1/stop/ \
+       -H "Authorization: Bearer {{TOKEN}}"
+  # Esperado: 200 OK
+  ```
+
+- [ ] **Iniciar Servicio**:
+
+  ```bash
+  curl -i -X POST {{API_URL}}/containers/1/start/ \
+       -H "Authorization: Bearer {{TOKEN}}"
+  # Esperado: 200 OK
+  ```
+
+- [ ] **Reiniciar Servicio**:
+
+  ```bash
+  curl -i -X POST {{API_URL}}/containers/1/restart/ \
+       -H "Authorization: Bearer {{TOKEN}}"
+  # Esperado: 200 OK
+  ```
+
+- [ ] **Consultar Logs**:
+
+  ```bash
+  curl -s -X GET {{API_URL}}/containers/1/logs/ \
+       -H "Authorization: Bearer {{TOKEN}}"
+  # Esperado: 200 OK con texto plano o JSON de logs.
+  ```
+
+- [ ] **Eliminación Permanente (DELETE)**:
+  ```bash
+  curl -i -X DELETE {{API_URL}}/containers/1/ \
+       -H "Authorization: Bearer {{TOKEN}}"
+  # Esperado: 204 No Content
+  ```
 
 ---
 
-## 📋 6. Matriz de Comandos de Prueba (Cheat Sheet)
-
-| Caso          | Método  | Endpoint                          | Payload sugerido                                                              |
-| :------------ | :------ | :-------------------------------- | :---------------------------------------------------------------------------- |
-| Login         | `POST`  | `/api/token/`                     | `{"username": "...", "password": "..."}`                                      |
-| Listar Todo   | `GET`   | `/api/containers/`                | -                                                                             |
-| Crear Hub     | `POST`  | `/api/containers/`                | `{"name":"test","mode":"dockerhub","image":"alpine","project":1,"subject":1}` |
-| Editar Web    | `PATCH` | `/api/containers/{{ID}}/`         | `{"is_web": true, "container_type": "web"}`                                   |
-| Editar Env    | `PATCH` | `/api/containers/{{ID}}/`         | `{"env_vars": {"FOO": "BAR"}}`                                                |
-| Subir Compose | `PATCH` | `/api/containers/{{ID}}/`         | `-F "compose=@docker-compose.yml" -F "code=@src.zip"`                         |
-| Restart       | `POST`  | `/api/containers/{{ID}}/restart/` | -                                                                             |
-| Ver Logs      | `GET`   | `/api/containers/{{ID}}/logs/`    | -                                                                             |
-
----
-
-**Firmado:** PaaSify Master QA
-**Última Actualización:** 2026-02-18
+**Firmado:** PaaSify Master QA  
+**Última Actualización:** 2026-02-21
