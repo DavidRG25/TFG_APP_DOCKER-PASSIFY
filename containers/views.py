@@ -272,7 +272,8 @@ class ServiceViewSet(viewsets.ModelViewSet):
         
         # Reiniciar contenedor
         try:
-            remove_container(updated_service)
+            keep_vols = getattr(updated_service, '_keep_volumes', True)
+            remove_container(updated_service, keep_files=True, keep_volumes=keep_vols)
             run_container(updated_service)
         except Exception as exc:
             # En API reportamos el error pero permitimos que el objeto se guarde
@@ -1365,12 +1366,20 @@ def view_service_file(request, pk):
         
         # Construir ruta absoluta
         media_root = Path(settings.MEDIA_ROOT)
-        file_path = media_root / file_obj.name
         
+        # 1. Buscar primero en el workspace real de despliegue
+        workspace_path = media_root / "services" / str(service.pk)
+        expected_filename = "docker-compose.yml" if file_type == 'compose' else "Dockerfile"
+        file_path = workspace_path / expected_filename
+        
+        # 2. Fallback a la ruta guardada en el modelo en caso de no haber desplegado
+        if not file_path.exists():
+            file_path = media_root / file_obj.name
+            
         if not file_path.exists():
             return JsonResponse({
                 'success': False, 
-                'error': f"Archivo físico no encontrado en: {file_obj.name}"
+                'error': f"Archivo físico no encontrado en: {file_obj.name} ni en el workspace."
             })
 
         with open(file_path, 'r', encoding='utf-8', errors='replace') as f:

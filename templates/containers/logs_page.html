@@ -317,7 +317,7 @@
                 
                 <button type="button" 
                         id="btn-clear-search" 
-                        class="btn-clear-search-premium {% if not search_text %}d-none{% endif %}" 
+                        class="btn-clear-search-premium {% if search_text %}d-flex{% else %}d-none{% endif %}" 
                         onclick="clearSearch()"
                         title="Limpiar búsqueda">
                     <i class="fas fa-broom"></i> Limpiar
@@ -450,7 +450,13 @@
 // Mostrar/ocultar botón de limpiar
 function toggleClearBtn(input) {
     const btn = document.getElementById('btn-clear-search');
-    btn.style.display = input.value.length > 0 ? 'flex' : 'none';
+    if (input.value.length > 0) {
+        btn.classList.remove('d-none');
+        btn.classList.add('d-flex');
+    } else {
+        btn.classList.remove('d-flex');
+        btn.classList.add('d-none');
+    }
 }
 
 // Limpiar búsqueda
@@ -458,7 +464,8 @@ function clearSearch() {
     const input = document.getElementById('logs-search-input');
     const btn = document.getElementById('btn-clear-search');
     input.value = '';
-    btn.style.display = 'none';
+    btn.classList.remove('d-flex');
+    btn.classList.add('d-none');
     
     // Forzamos una recarga limpia pidiendo refresh=true para limpiar la caché
     const level = document.querySelector('select[name="level"]').value;

@@ -61,6 +61,7 @@ class ServiceSerializer(serializers.ModelSerializer):
     volumes = serializers.JSONField(required=False)
     internal_port = serializers.IntegerField(required=False, allow_null=True)
     container_configs = EmptyStringJSONField(required=False, write_only=True)
+    keep_volumes = serializers.BooleanField(required=False, write_only=True, default=True)
 
     # Permitir enlazar asignatura
     subject = serializers.PrimaryKeyRelatedField(queryset=Subject.objects.all(), required=True)
@@ -108,6 +109,7 @@ class ServiceSerializer(serializers.ModelSerializer):
             "has_compose",
             "containers",
             "container_configs", # Campo para configuraciones de contenedores en compose
+            "keep_volumes",      # Campo de control para preservacion de volumenes en PATCH
         )
         read_only_fields = ("id", "assigned_port", "status", "has_compose", "containers")
 
@@ -574,12 +576,8 @@ class ServiceSerializer(serializers.ModelSerializer):
         validated_data.pop("owner", None)
         validated_data.pop("mode", None)
         
-        # VALIDACIÓN ESPECIAL: No permitir cambiar imagen en modo DockerHub
-        if instance.mode == 'dockerhub' and 'image' in validated_data:
-            if validated_data['image'] != instance.image:
-                raise serializers.ValidationError({
-                    "image": _("La imagen no se puede modificar en servicios DockerHub. Crea un nuevo servicio si necesitas cambiar la imagen.")
-                })
+        # Guardar en memoria el valor transitorio de keep_volumes (por defecto True en edición)
+        instance._keep_volumes = validated_data.pop('keep_volumes', True)
         
         # Permitir image y container_configs en la actualización
         return super().update(instance, validated_data)

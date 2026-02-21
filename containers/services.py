@@ -1417,7 +1417,7 @@ def stop_container_async(service: Service) -> None:
     EXECUTOR.submit(_stop_container_worker, service.pk)
 
 
-def remove_container(service: Service, keep_files: bool = False):
+def remove_container(service: Service, keep_files: bool = False, keep_volumes: bool = False):
     """
     Elimina el servicio completamente.
     
@@ -1445,8 +1445,9 @@ def remove_container(service: Service, keep_files: bool = False):
                     "-f", str(compose_path),
                     "down",
                     "--rmi", "local",  # Solo eliminar imágenes construidas localmente
-                    "--volumes"         # Eliminar volúmenes
                 ]
+                if not keep_volumes:
+                    cmd.append("--volumes") # Eliminar volúmenes solo si keep_volumes es False
                 
                 subprocess.run(
                     cmd,
@@ -1468,21 +1469,22 @@ def remove_container(service: Service, keep_files: bool = False):
             # Eliminar registros de ServiceContainer
             service.containers.all().delete()
             
-            # Limpiar volúmenes huérfanos (anónimos no eliminados por --volumes)
-            try:
-                prune_cmd = ["docker", "volume", "prune", "-f"]
-                subprocess.run(
-                    prune_cmd,
-                    check=False,  # No fallar si no hay volúmenes que limpiar
-                    capture_output=True,
-                    text=True,
-                    encoding='utf-8',
-                    errors='replace'
-                )
-                _append_log(service, "Volúmenes huérfanos limpiados")
-            except Exception as e:
-                # No es crítico si falla
-                _append_log(service, f"Advertencia al limpiar volúmenes: {str(e)}")
+            # Limpiar volúmenes huérfanos solo si NO se preservan (para compose default down --volumes suele limpiarlos de todos modos)
+            if not keep_volumes:
+                try:
+                    prune_cmd = ["docker", "volume", "prune", "-f"]
+                    subprocess.run(
+                        prune_cmd,
+                        check=False,  # No fallar si no hay volúmenes que limpiar
+                        capture_output=True,
+                        text=True,
+                        encoding='utf-8',
+                        errors='replace'
+                    )
+                    _append_log(service, "Volúmenes huérfanos limpiados")
+                except Exception as e:
+                    # No es crítico si falla
+                    _append_log(service, f"Advertencia al limpiar volúmenes: {str(e)}")
             
         except subprocess.CalledProcessError as e:
             error_msg = (e.stderr or e.stdout or str(e)).strip()
@@ -1514,7 +1516,7 @@ def remove_container(service: Service, keep_files: bool = False):
         _release_port(service.assigned_port)
 
         # Eliminar volumen
-        if service.volume_name:
+        if service.volume_name and not keep_volumes:
             try:
                 volume = docker_client.volumes.get(service.volume_name)
                 volume.remove(force=True)
