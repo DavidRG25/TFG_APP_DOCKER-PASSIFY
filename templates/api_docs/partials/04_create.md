@@ -1,157 +1,285 @@
-# Crear Servicio
+# 🚀 Crear Servicio
 
-Permite desplegar nuevos servicios, ya sea desde imágenes del catálogo o usando DockerHub.
+Endpoint para desplegar servicios en PaaSify. Soporta tres modos principales de despliegue.
 
 **Endpoint:** `POST /api/containers/`
-
-### Parámetros del Body (JSON)
-
-| Campo             | Tipo   | Obligatorio | Descripción                                           |
-| :---------------- | :----- | :---------- | :---------------------------------------------------- |
-| **name**          | string | **Sí**      | Nombre único para el servicio (minúsculas y guiones). |
-| **image**         | string | **Sí**      | Imagen del catálogo o de DockerHub (nombre:tag).      |
-| **mode**          | string | **Sí**      | `default` (catálogo) o `dockerhub`.                   |
-| **internal_port** | int    | No          | Puerto interno que usa la app (ej: 80, 5000).         |
-| **environment**   | object | No          | Mapa de variables de entorno (key: value).            |
-| **project**       | int    | **Sí**      | ID del proyecto al que se asocia este despliegue.     |
-| **subject**       | int    | **Sí**      | ID de la asignatura a la que pertenece este servicio. |
-
-### Imagen de Catálogo
-
-Si quieres desplegar una imagen estándar disponible en PaaSify.
-
-**🐳 Imágenes disponibles en el catálogo:**
-[[IMAGENES_CATALOGO]]
-
-```bash
-curl -X POST {{ PAASIFY_API_URL }}/containers/ \
-  -H "Authorization: Bearer <TU_API_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "mi-app-catalogo",
-    "image": "nginx:latest",
-    "mode": "default",
-    "internal_port": 80,
-    "project": 1,
-    "subject": 1
-  }'
-```
 
 ---
 
-### DockerHub Personalizado
+## 📋 Parámetros Comunes
 
-Desplegar cualquier imagen pública desde DockerHub. PaaSify la descargará automáticamente.
+Campos disponibles en **todos** los modos de despliegue:
 
-<div style="background-color: #e7f3ff; border-left: 5px solid #2196F3; padding: 15px; border-radius: 4px; margin: 20px 0;">
-    <h5 style="margin-top: 0; color: #0c5460;"><i class="fas fa-lightbulb"></i> ¿Es necesario environment?</h5>
-    <p style="margin-bottom: 0; font-size: 0.9rem;">Solo si tu aplicación requiere configuraciones externas (como credenciales de base de datos o claves de API) para funcionar correctamente.</p>
-</div>
+| Campo              | Tipo   | Obligatorio | Descripción                                                                          |
+| :----------------- | :----- | :---------- | :----------------------------------------------------------------------------------- |
+| **name**           | string | ✅ **Sí**   | Nombre del servicio (slug: minúsculas, números y guiones).                           |
+| **project**        | int    | ✅ **Sí**   | ID del proyecto.                                                                     |
+| **subject**        | int    | ✅ **Sí**   | ID de la asignatura.                                                                 |
+| **container_type** | string | ⭕ No       | Clasificación del servicio. Valores: `web` (default), `api`, `database`, `misc`.     |
+| **is_web**         | bool   | ⭕ No       | `true` (default) o `false`. Si es `true`, aparece el botón "Acceder" en la interfaz. |
+| **keep_volumes**   | bool   | ⭕ No       | `true` (default) o `false`. Conserva los datos en futuras recargas si hay volúmenes. |
+
+> 💡 **Nota sobre Tipos:**
+>
+> - 🌐 **web**: Frontends, sitios estáticos, proxies (Nginx, React, Vue).
+> - ⚙️ **api**: Backends, servicios REST/GraphQL (Django, Node, Spring).
+> - 🗄️ **database**: Motores de base de datos (Postgres, MySQL, Mongo).
+> - 📦 **misc**: Workers, caches (Redis), scripts o herramientas.
+
+---
+
+## 🎯 Modos de Despliegue
+
+### 📚 Modo Catálogo (Default)
+
+Despliega una imagen pre-aprobada del catálogo oficial de PaaSify.
+
+#### Parámetros Específicos:
+
+| Campo              | Valor              | Descripción                                  |
+| :----------------- | :----------------- | :------------------------------------------- |
+| **mode**           | `default`          | (Opcional, es el valor por defecto).         |
+| **image**          | ej: `nginx:latest` | Nombre exacto de la imagen en el catálogo.   |
+| **container_type** | string             | `web`, `api`, `database`, `misc` (opcional). |
+| **is_web**         | bool               | `true` o `false` (opcional).                 |
+
+#### 📝 Ejemplo cURL:
 
 ```bash
 curl -X POST {{ PAASIFY_API_URL }}/containers/ \
-  -H "Authorization: Bearer <TU_API_TOKEN>" \
+  -H "Authorization: Bearer <TOKEN>" \
   -H "Content-Type: application/json" \
   -d '{
-    "name": "mi-app-externa",
-    "image": "python:3.9-slim",
-    "mode": "dockerhub",
-    "internal_port": 5000,
-    "environment": {
-        "ENV": "production",
-        "DEBUG": "false"
-    },
+    "name": "mi-blog",
+    "image": "wordpress:latest",
     "project": 1,
-    "subject": 1
+    "subject": 1,
+    "container_type": "web"
   }'
 ```
 
-<details class="api-errors">
-<summary>Códigos de error de este endpoint</summary>
-<div class="api-error-content">
-    <strong>401 Unauthorized:</strong> Permiso denegado.<br>
-    <strong>400 Bad Request:</strong> Parámetros inválidos o nombre duplicado.<br>
-    <strong>404 Not Found:</strong> La imagen especificada no existe en DockerHub.<br>
-    <strong>500 Internal Server Error:</strong> Error del sistema al contactar con DockerHub o Docker Daemon.
-</div>
-</details>
+#### ✅ Ventajas:
 
-### Código Personalizado (ZIP)
+- ⚡ Despliegue rápido
+- 🔒 Imágenes verificadas y seguras
+- 📖 Documentación incluida
 
-Permite subir tu propio código y definir cómo se construye o despliega mediante un archivo de configuración.
+---
 
-**Endpoint:** `POST /api/containers/`
+### 🐳 Modo DockerHub
 
-| Campo          | Tipo   | Obligatorio | Descripción                                                     |
-| :------------- | :----- | :---------- | :-------------------------------------------------------------- |
-| **mode**       | string | **Sí**      | `custom`                                                        |
-| **name**       | string | **Sí**      | Nombre único para el servicio.                                  |
-| **code**       | file   | **Sí**      | Archivo `.zip` o `.rar` con el código fuente.                   |
-| **dockerfile** | file   | No\*        | Archivo `Dockerfile` para construir la imagen.                  |
-| **compose**    | file   | No\*        | Archivo `docker-compose.yml` para despliegues multi-contenedor. |
-| **project**    | int    | **Sí**      | ID del proyecto al que se asocia este despliegue.               |
-| **subject**    | int    | **Sí**      | ID de la asignatura a la que pertenece este servicio.           |
+Despliega **cualquier imagen pública** desde DockerHub.
 
-_\*Se requiere exactamente uno de los dos: `dockerfile` o `compose`._
+#### Parámetros Específicos:
+
+| Campo              | Valor            | Descripción                                       |
+| :----------------- | :--------------- | :------------------------------------------------ |
+| **mode**           | `dockerhub`      | ✅ **Requerido**.                                 |
+| **image**          | ej: `python:3.9` | Imagen pública (usuario/imagen:tag o imagen:tag). |
+| **env_vars**       | objeto           | Variables de entorno (opcional).                  |
+| **internal_port**  | entero           | Puerto donde escucha el contenedor (ej: 3000).    |
+| **container_type** | string           | `web`, `api`, `database`, `misc` (opcional).      |
+| **is_web**         | bool             | `true` o `false` (opcional).                      |
+
+#### 📝 Ejemplo cURL:
 
 ```bash
-# Ejemplo usando Dockerfile y código fuente (multipart/form-data)
 curl -X POST {{ PAASIFY_API_URL }}/containers/ \
-  -H "Authorization: Bearer <TU_API_TOKEN>" \
-  -F "name=mi-app-custom" \
-  -F "mode=custom" \
-  -F "code=@proyecto.zip" \
-  -F "dockerfile=@Dockerfile" \
-  -F "project=1" \
-  -F "subject=1"
+  -H "Authorization: Bearer <TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "mi-api-python",
+    "mode": "dockerhub",
+    "image": "python:3.9-slim",
+    "internal_port": 5000,
+    "env_vars": {
+      "DEBUG": "True",
+      "SECRET_KEY": "xyz"
+    },
+    "project": 1,
+    "subject": 1,
+    "container_type": "api"
+  }'
 ```
 
-<details class="api-errors">
-<summary>Códigos de error de este endpoint</summary>
-<div class="api-error-content">
-    <strong>401 Unauthorized:</strong> Permiso denegado.<br>
-    <strong>400 Bad Request:</strong> <br>
-    - Falta el archivo de código fuente.<br>
-    - No se ha proporcionado ni Dockerfile ni Compose.<br>
-    - El archivo Compose contiene configuraciones no permitidas (bind mounts).<br>
-    <strong>500 Internal Server Error:</strong> Error al procesar los archivos o al iniciar el despliegue.
-</div>
-</details>
+#### ✅ Ventajas:
 
-### Escenarios Avanzados
+- 🌍 Acceso a millones de imágenes públicas
+- 🔄 Actualizaciones automáticas disponibles
+- 🎨 Flexibilidad total
 
-PaaSify soporta despliegues complejos que incluyen múltiples servicios, bases de datos y configuraciones de seguridad recomendadas.
+#### ⚠️ Consideraciones:
 
-#### Multi-contenedor (Docker Compose)
+- La imagen debe existir y ser pública en DockerHub
+- PaaSify verificará la existencia antes de desplegar
+- **No se puede cambiar la imagen después** (crear nuevo servicio)
 
-Puedes desplegar una arquitectura completa (ej: Web + Base de Datos) subiendo un archivo `docker-compose.yml`.
+---
+
+### 🛠️ Modo Custom: Código Propio
+
+Sube tu código fuente (`.zip`) y define cómo construirlo. Requiere `multipart/form-data`.
+
+#### Parámetros Base:
+
+- **mode**: `custom` ✅
+- **code**: Archivo `.zip` con el código ✅
+
+---
+
+#### 🔧 Opción A: Dockerfile Único
+
+Para servicios simples definidos en un `Dockerfile`.
+
+| Campo          | Tipo   | Descripción                                                          |
+| :------------- | :----- | :------------------------------------------------------------------- |
+| **dockerfile** | File   | Archivo `Dockerfile` (debe estar en la raíz o coincidir con el zip). |
+| **code**       | File   | Archivo `.zip` con tu código fuente.                                 |
+| **env_vars**   | objeto | Variables de entorno (opcional, en formato JSON).                    |
+
+#### 📝 Ejemplo 1: Básico (Sin variables)
+
+Para despliegues estándar que no requieren configuración externa:
 
 ```bash
-# Despliegue de una App Flask + Base de Datos Postgres
 curl -X POST {{ PAASIFY_API_URL }}/containers/ \
-  -H "Authorization: Bearer <TU_API_TOKEN>" \
-  -F "name=mi-web-db" \
+  -H "Authorization: Bearer <TOKEN>" \
+  -F "name=mi-app-node" \
   -F "mode=custom" \
-  -F "code=@proyecto_completo.zip" \
+  -F "code=@app.zip" \
+  -F "dockerfile=@Dockerfile" \
+  -F "project=1" \
+  -F "subject=1" \
+  -F "container_type=web"
+```
+
+#### 📝 Ejemplo 2: Avanzado (Con variables de entorno)
+
+Usa el campo `env_vars` con un objeto JSON para configurar tu aplicación:
+
+```bash
+curl -X POST {{ PAASIFY_API_URL }}/containers/ \
+  -H "Authorization: Bearer <TOKEN>" \
+  -F "name=mi-app-configurada" \
+  -F "mode=custom" \
+  -F "code=@app.zip" \
+  -F "dockerfile=@Dockerfile" \
+  -F "project=1" \
+  -F "subject=1" \
+  -F 'env_vars={"DEBUG":"true", "PORT":"8080", "API_KEY":"xyz789"}'
+```
+
+#### ✅ Ideal para:
+
+- 🎯 Aplicaciones single-container
+- 🚀 Microservicios individuales
+- 📱 Apps Node.js, Python, Go, etc.
+
+---
+
+#### 📦 Opción B: Docker Compose (Multi-contenedor)
+
+Para stacks completos definidos en `docker-compose.yml`.
+
+| Campo                 | Tipo        | Obligatorio | Descripción                          |
+| :-------------------- | :---------- | :---------- | :----------------------------------- |
+| **compose**           | File        | ✅ **Sí**   | Archivo `docker-compose.yml` válido. |
+| **code**              | File        | ✅ **Sí**   | Archivo `.zip` con tu código fuente. |
+| **container_configs** | JSON String | ⭕ No       | Configuración manual por servicio.   |
+
+#### 🤖 Autoconfiguración Inteligente:
+
+Si no envías `container_configs`, PaaSify analizará tu YAML y detectará automáticamente:
+
+- 🏷️ **Tipo de servicio**: Basado en nombres de imagen y servicio (ej: `postgres` → database).
+- 👁️ **Visibilidad Web**: Determina si aparecerá el botón **"Acceder"** en la interfaz (`is_web=true`).
+
+> 💡 **Nota:** Si `is_web=false`, el servicio seguirá siendo accesible vía terminal, logs o conectando al puerto asignado.
+
+#### 📝 Ejemplo 1: Configuración Automática (Recomendado)
+
+Simplemente sube el archivo, el sistema se encargará del resto.
+
+```bash
+curl -X POST {{ PAASIFY_API_URL }}/containers/ \
+  -H "Authorization: Bearer <TOKEN>" \
+  -F "name=mi-stack-auto" \
+  -F "mode=custom" \
+  -F "code=@proyecto.zip" \
   -F "compose=@docker-compose.yml" \
   -F "project=1" \
   -F "subject=1"
 ```
 
-> **Buenas Prácticas Incluidas**:
->
-> - **Persistencia**: Uso de volúmenes nombrados para la base de datos.
-> - **Orquestación**: Uso de `depends_on` con `condition: service_healthy`.
-> - **Seguridad**: Los contenedores deben correr como usuarios no root (appuser).
+#### 📝 Ejemplo 2: Configuración Manual (Avanzado)
 
-#### Healthchecks y Robustez
+Si deseas forzar tipos específicos o visibilidad (ej: ocultar un panel de administración):
 
-Se recomienda incluir instrucciones `HEALTHCHECK` tanto en tu `Dockerfile` como en tu `docker-compose.yml`. PaaSify utiliza estos checks para monitorizar el estado real de tu aplicación y gestionar reinicios automáticos si el servicio deja de responder.
-
-```dockerfile
-# Ejemplo de Healthcheck en Dockerfile
-HEALTHCHECK --interval=30s --timeout=3s \
-  CMD curl -f http://localhost/ || exit 1
+```bash
+curl -X POST {{ PAASIFY_API_URL }}/containers/ \
+  -H "Authorization: Bearer <TOKEN>" \
+  -F "name=stack-custom" \
+  -F "mode=custom" \
+  -F "code=@proyecto.zip" \
+  -F "compose=@docker-compose.yml" \
+  -F "project=1" \
+  -F "subject=1" \
+  -F 'container_configs={"frontend":{"container_type":"web"},"db":{"container_type":"database","is_web":false}}'
 ```
+
+#### ✅ Ideal para:
+
+- 🏗️ Aplicaciones full-stack (frontend + backend + DB)
+- 🔗 Servicios interdependientes
+- 🌐 Arquitecturas de microservicios
+
+---
+
+## 📊 Tabla Comparativa de Modos
+
+| Característica       | 📚 Catálogo | 🐳 DockerHub | 🛠️ Custom (Dockerfile) | 📦 Custom (Compose) |
+| -------------------- | ----------- | ------------ | ---------------------- | ------------------- |
+| **Velocidad**        | ⚡⚡⚡      | ⚡⚡         | ⚡                     | ⚡                  |
+| **Flexibilidad**     | ⭐          | ⭐⭐⭐       | ⭐⭐⭐⭐               | ⭐⭐⭐⭐⭐          |
+| **Complejidad**      | 🟢 Baja     | 🟡 Media     | 🟡 Media               | 🔴 Alta             |
+| **Código propio**    | ❌          | ❌           | ✅                     | ✅                  |
+| **Multi-contenedor** | ❌          | ❌           | ❌                     | ✅                  |
+
+---
+
+## 📬 Códigos de Respuesta
+
+| Código               | Descripción                                                  |
+| -------------------- | ------------------------------------------------------------ |
+| **201 Created**      | ✅ Servicio validado y encolado para despliegue.             |
+| **400 Bad Request**  | ❌ Faltan archivos, nombre inválido o configuración errónea. |
+| **401 Unauthorized** | 🔒 Token no válido.                                          |
+| **500 Server Error** | ⚠️ Error interno al procesar la solicitud.                   |
+
+---
+
+## 💡 Buenas Prácticas
+
+1. 📝 **Nombres descriptivos** - Usa nombres claros como `frontend-react` en lugar de `app1`
+2. 🏷️ **Clasifica correctamente** - Asigna el `container_type` adecuado para mejor organización
+3. 🔐 **Variables de entorno** - Usa `env_vars` para configuración sensible
+4. 📦 **Comprime eficientemente** - Excluye `node_modules`, `.git`, etc. del ZIP
+5. 🧪 **Prueba localmente** - Valida tu Dockerfile/Compose antes de subir
+6. 📖 **Documenta** - Incluye un README en tu código ZIP
+
+---
+
+## 🚨 Errores Comunes
+
+<details class="api-errors">
+<summary>Errores frecuentes y soluciones</summary>
+<div class="api-error-content">
+    <strong>❌ "Imagen no encontrada en DockerHub":</strong> Verifica que la imagen existe y es pública.<br>
+    <strong>❌ "Nombre de servicio inválido":</strong> Solo usa minúsculas, números y guiones.<br>
+    <strong>❌ "Puerto ya en uso":</strong> El puerto externo ya está ocupado, deja que PaaSify lo asigne automáticamente.<br>
+    <strong>❌ "Archivo ZIP corrupto":</strong> Asegúrate de que el ZIP está bien formado.<br>
+    <strong>❌ "Docker Compose inválido":</strong> Valida tu YAML con un linter antes de subir.
+</div>
+</details>
 
 ---

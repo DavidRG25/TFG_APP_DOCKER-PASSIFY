@@ -13,10 +13,9 @@
       <div>
         <h1 class="h3 mb-1 text-white fw-bold"><i class="fas fa-folder-open me-2"></i>{{ project.place }}</h1>
         <p class="text-white-50 mb-0">
-          Alumno: {{ project.user_profile.nombre }}{% if project.user_profile.user %} (@{{ project.user_profile.user.username }}){% endif %} · 
-          Asignatura: {{ project.subject.name }}
+          Asignatura: {{ project.subject.name }} · 
+          <i class="far fa-clock ms-2 me-1"></i>Actualización: {{ project.date|date:"d M Y" }}
         </p>
-        <p class="text-white-50 small mb-0"><i class="far fa-clock me-1"></i>Última actualización: {{ project.date|date:"d M Y" }}</p>
       </div>
       <div class="d-flex gap-2">
         <a href="{% url 'professor_dashboard' %}" class="btn btn-light shadow-sm">
@@ -29,27 +28,77 @@
   {# Tabla de Servicios del Proyecto #}
   <div class="card border-0 shadow-sm overflow-hidden mt-4">
     <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
-      <h5 class="mb-0 fw-bold"><i class="fas fa-cubes text-primary me-2"></i>Servicios Asociados a este Proyecto</h5>
+      <h5 class="mb-0 fw-bold"><i class="fas fa-cubes text-primary me-2"></i>Servicios del Estudiante</h5>
+    </div>
+    <div class="card-body p-3 border-bottom bg-light bg-opacity-10">
+      <form class="row g-3 align-items-end" id="filter-form">
+        <div class="col-md-5">
+          <label class="form-label small fw-bold text-muted mb-1"><i class="fas fa-search me-1"></i>Nombre/Imagen</label>
+          <div class="input-group shadow-sm">
+            <span class="input-group-text bg-white border-end-0 text-primary"><i class="fas fa-filter"></i></span>
+            <input type="text" name="q" class="form-control border-start-0" placeholder="Filtrar servicios..." 
+                   hx-get="{% url 'containers:service_table' %}?project={{ project.id }}" 
+                   hx-trigger="keyup changed delay:500ms" 
+                   hx-target="#service-table"
+                   hx-include="#filter-form"
+                   style="border-radius: 0 8px 8px 0;">
+          </div>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small fw-bold text-muted mb-1"><i class="fas fa-info-circle me-1"></i>Estado</label>
+          <select name="status" class="form-select shadow-sm" 
+                  hx-get="{% url 'containers:service_table' %}?project={{ project.id }}" 
+                  hx-trigger="change"
+                  hx-target="#service-table"
+                  hx-include="#filter-form"
+                  style="border-radius: 8px; cursor: pointer;">
+            <option value="">Cualquier estado</option>
+            <option value="running">🟢 Ejecución</option>
+            <option value="stopped">🔴 Detenido</option>
+            <option value="starting">🟡 Iniciando</option>
+            <option value="error">❌ Error</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small fw-bold text-muted mb-1"><i class="fas fa-rocket me-1"></i>Tipo</label>
+          <select name="mode" class="form-select shadow-sm" 
+                  hx-get="{% url 'containers:service_table' %}?project={{ project.id }}" 
+                  hx-trigger="change"
+                  hx-target="#service-table"
+                  hx-include="#filter-form"
+                  style="border-radius: 8px; cursor: pointer;">
+            <option value="">Cualquier tipo</option>
+            <option value="default">Oficial</option>
+            <option value="dockerhub">DockerHub</option>
+            <option value="custom">Personalizado</option>
+          </select>
+        </div>
+      </form>
     </div>
     <div class="card-body p-0">
       {% if related_services %}
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
-            <thead style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+            <thead style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%); cursor: pointer;">
               <tr class="text-white small text-uppercase">
-                <th class="py-3 ps-4">Proyecto</th>
-                <th class="py-3">Dueño</th>
-                <th class="py-3">Nombre</th>
-                <th class="py-3">Imagen</th>
+                <th class="py-3 ps-4" hx-get="{% url 'containers:service_table' %}?project={{ project.id }}&ordering=name" hx-target="#service-table" hx-include="#filter-form">
+                    Nombre <i class="fas fa-sort ms-1 opacity-50"></i>
+                </th>
+                <th class="py-3" hx-get="{% url 'containers:service_table' %}?project={{ project.id }}&ordering=image" hx-target="#service-table" hx-include="#filter-form">
+                    Imagen <i class="fas fa-sort ms-1 opacity-50"></i>
+                </th>
                 <th class="py-3">Puerto</th>
-                <th class="py-3">Estado</th>
+                <th class="py-3" hx-get="{% url 'containers:service_table' %}?project={{ project.id }}&ordering=status" hx-target="#service-table" hx-include="#filter-form">
+                    Estado <i class="fas fa-sort ms-1 opacity-50"></i>
+                </th>
                 <th class="py-3 pe-4 text-end">Acciones</th>
               </tr>
             </thead>
             <tbody class="bg-white" id="service-table"
                    hx-get="{% url 'containers:service_table' %}?project={{ project.id }}"
-                   hx-trigger="service:table-refresh from:body">
-              {% include "containers/_service_rows.html" with services=related_services %}
+                   hx-trigger="load, every 3s, service:table-refresh from:body"
+                   hx-include="#filter-form">
+              {% include "containers/_service_rows.html" with services=related_services hide_redundant=True %}
             </tbody>
           </table>
         </div>
@@ -63,5 +112,9 @@
   </div>
 </div>
 {% include "containers/_partials/panels/_modals.html" %}
+{% endblock %}
+
+{% block extrascripts %}
+{% include "containers/_partials/panels/_scripts.html" %}
 {% endblock %}
 

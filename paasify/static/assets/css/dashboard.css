@@ -21,12 +21,20 @@
 }
 .stat-card {
   border: 1px solid #e6ebf5;
-  box-shadow: 0 6px 18px rgba(17,24,39,0.06);
+  box-shadow: 0 6px 18px rgba(17, 24, 39, 0.06);
   border-radius: 12px;
   padding: 12px 14px;
 }
-.stat-label { font-size: 13px; color: #6b7280; margin: 0; }
-.stat-value { font-size: 20px; font-weight: 800; margin: 0; }
+.stat-label {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+}
+.stat-value {
+  font-size: 20px;
+  font-weight: 800;
+  margin: 0;
+}
 .badge-soft {
   background: #f8fafc;
   border: 1px solid #e6ebf5;
@@ -50,8 +58,46 @@
 }
 .card-elevated {
   border: 1px solid #e6ebf5;
-  box-shadow: 0 8px 24px rgba(15,23,42,0.08);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
   border-radius: 12px;
 }
-.table-sticky thead th { position: sticky; top: 0; background: #fff; z-index: 2; }
-.table-hover tbody tr:hover { background: #f8fafc; }
+.table-sticky thead th {
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 2;
+}
+.table-hover tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* Soft Badges */
+.bg-info-soft {
+  background-color: rgba(13, 202, 240, 0.15) !important;
+}
+.bg-primary-soft {
+  background-color: rgba(78, 115, 223, 0.15) !important;
+}
+.bg-success-soft {
+  background-color: rgba(28, 200, 138, 0.15) !important;
+}
+.bg-secondary-soft {
+  background-color: rgba(133, 135, 150, 0.15) !important;
+}
+.bg-purple-soft {
+  background-color: rgba(111, 66, 193, 0.15) !important;
+}
+.text-purple {
+  color: #6f42c1 !important;
+}
+.border-purple {
+  border-color: #6f42c1 !important;
+}
+
+/* Custom sizes */
+.smaller {
+  font-size: 0.7rem;
+}
+.italic {
+  font-style: italic;
+}

@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "80"
+  worker:
+    image: redis:alpine
+    ports:
+      - "6379"

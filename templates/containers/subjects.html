@@ -1,50 +1,179 @@
 {% extends "base.html" %}
 
 {% block body %}
-{# Header con degradado azul y sin morado #}
-<div class="rounded-3 p-4 mb-4 shadow-sm" style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
-  <div class="d-flex align-items-center gap-2">
-    <div>
-      <h1 class="h3 mb-1 text-white fw-bold">Mis asignaturas</h1>
-      <p class="text-white-50 mb-0">Tu lista de cursos activos y acceso a sus servicios.</p>
+<style>
+  .subject-card {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid rgba(0,0,0,0.05);
+    border-radius: 1.25rem;
+    overflow: hidden;
+    height: 100%;
+    cursor: pointer;
+    background: white;
+  }
+  .subject-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1) !important;
+    border-color: var(--subject-color, #4e73df);
+  }
+  .subject-icon {
+    width: 50px;
+    height: 50px;
+    background: #f1f5f9;
+    border-radius: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    color: var(--subject-color, #4e73df);
+    transition: all 0.3s ease;
+    overflow: hidden;
+  }
+  .subject-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .subject-card:hover .subject-icon {
+    background: var(--subject-color, #4e73df);
+    color: white;
+    transform: scale(1.1);
+  }
+  .category-pill {
+    padding: 0.25rem 0.75rem;
+    border-radius: 2rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: #eef2ff;
+    color: var(--subject-color, #4e73df);
+    border: 1px solid rgba(0,0,0,0.02);
+  }
+</style>
+
+{# Header con degradado Premium #}
+<div class="rounded-4 p-5 mb-5 shadow-lg text-center position-relative overflow-hidden" 
+     style="background: linear-gradient(135deg, #3730a3 0%, #1e1b4b 100%); min-height: 200px; display: flex; align-items: center; justify-content: center;">
+  
+  {# Elementos decorativos animados y Branding #}
+  <div class="position-absolute" style="top: -40px; right: -40px; width: 180px; height: 180px; background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%); border-radius: 50%;"></div>
+  <i class="fas fa-cloud position-absolute" style="font-size: 15rem; bottom: -5rem; left: -2rem; color: rgba(255,255,255,0.03); transform: rotate(-15deg);"></i>
+
+  {# Patrón de fondo #}
+  <div class="position-absolute top-0 start-0 w-100 h-100" 
+       style="background-image: radial-gradient(circle at 2px 2px, rgba(255,255,255,0.08) 1px, transparent 0); background-size: 32px 32px; opacity: 0.5;"></div>
+
+  <div class="position-relative z-1 w-100">
+    <div class="animate-fade-in">
+        <span class="badge rounded-pill px-4 py-2 border mb-3" 
+              style="background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); color: #e0e7ff; font-weight: 600; letter-spacing: 1px; font-size: 0.7rem; border-color: rgba(255,255,255,0.2) !important; text-transform: uppercase;">
+            <i class="fas fa-graduation-cap me-2"></i>Área de Formación
+        </span>
     </div>
+    <h1 class="display-4 mb-2 text-white fw-bold tracking-tighter" style="text-shadow: 0 10px 25px rgba(0,0,0,0.2); letter-spacing: -1px;">Mis Asignaturas</h1>
+    <p class="lead text-white-50 mb-0 mx-auto fw-medium fs-5 opacity-75" style="max-width: 650px;">
+        Explora tus cursos, gestiona despliegues y accede a tus recursos académicos.
+    </p>
   </div>
 </div>
 
-{% if subjects %}
-  <div class="list-group">
-    {% for s in subjects %}
-      <a
-        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-        href="{% url 'containers:student_services_in_subject' s.id %}">
-        <div>
-          <div class="fw-semibold d-flex align-items-center gap-2">
-            <i class="fas fa-book text-primary"></i>
-            <span class="ms-2">{{ s.name }}</span>
+<style>
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+    animation: fadeIn 0.8s ease-out forwards;
+}
+.tracking-tighter {
+    letter-spacing: -0.05em;
+}
+</style>
+
+<div class="container-fluid px-0">
+  {% if subjects %}
+    <div class="row g-4" id="subject-cards-container">
+      {% for s in subjects %}
+        <div class="col-md-6 col-lg-4 col-xl-3">
+          <div class="subject-card clickable-card shadow-sm p-4 d-flex flex-column h-100" 
+               data-url="{% url 'containers:student_services_in_subject' s.id %}"
+               data-subject-color="{{ s.color|default:'#4e73df' }}">
+            
+            <div class="d-flex justify-content-between align-items-start mb-4">
+              <div class="subject-icon shadow-sm">
+                {% if s.logo %}
+                  <img src="{{ s.logo.url }}" alt="{{ s.name }} logo">
+                {% else %}
+                  <i class="fas fa-book" style="color: var(--subject-color);"></i>
+                {% endif %}
+              </div>
+              <div class="category-pill shadow-xs" style="background-color: rgba(0,0,0,0.05);">
+                {{ s.get_category_display|default:s.category|default:"General" }}
+              </div>
+            </div>
+
+            <h4 class="h5 fw-bold text-dark mb-2">{{ s.name }}</h4>
+            <p class="text-muted small mb-4 flex-grow-1">
+                Explora los proyectos vinculados y despliega tus contenedores para las prácticas de este curso.
+            </p>
+
+            <div class="pt-3 border-top d-flex justify-content-between align-items-center">
+              <div class="d-flex align-items-center">
+                {% if s.teacher_user %}
+                <div class="bg-light rounded-circle d-flex align-items-center justify-content-center me-2" style="width: 24px; height: 24px;">
+                    <i class="fas fa-user-tie text-secondary small"></i>
+                </div>
+                <span class="text-muted x-small">Prof. {{ s.teacher_user.get_username }}</span>
+                {% endif %}
+              </div>
+              
+              <div class="badge rounded-pill px-3 py-2 subject-badge" 
+                   style="color: white; border: 1px solid rgba(255,255,255,0.2);">
+                <i class="fas fa-layer-group me-1"></i>
+                {{ s.projects.count }} Proy.
+              </div>
+            </div>
           </div>
-          <small class="text-muted">
-            {{ s.get_category_display|default:s.category }}
-            · Curso {{ s.genero }}
-            {% if s.teacher_user %} · Prof.: {{ s.teacher_user.get_username }}{% endif %}
-          </small>
         </div>
-
-        <div class="d-flex align-items-center gap-3">
-          {% if s.projects.all %}
-            <span class="badge bg-secondary">
-              {{ s.projects.count }} proyecto{{ s.projects.count|pluralize:"s" }}
-            </span>
-          {% endif %}
-          <span class="ms-1">&rsaquo;</span>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="card border-0 shadow-sm rounded-4 p-5 text-center">
+        <div class="mb-4 text-muted">
+            <i class="fas fa-folder-open display-1 opacity-25"></i>
         </div>
-      </a>
-    {% endfor %}
-  </div>
-{% else %}
-  <div class="alert alert-info mt-3">
-    No tienes asignaturas asignadas todavía. Pide a tu profesor o al administrador que te matriculen en una.
-  </div>
-{% endif %}
+        <h3 class="fw-bold">No hay asignaturas activas</h3>
+        <p class="text-muted">Pide a tu profesor o administrador que te matricule en alguna asignatura para empezar.</p>
+    </div>
+  {% endif %}
+</div>
 
-<a href="{% url 'containers:student_subjects' %}" class="btn btn-outline-secondary mt-3">Volver</a>
+<div class="mt-5 pt-3 text-center">
+    <a href="{% url 'containers:student_panel' %}" class="btn btn-outline-secondary rounded-pill px-4">
+        <i class="fas fa-arrow-left me-2"></i>Ir a Mis Servicios
+    </a>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.clickable-card').forEach(card => {
+            const color = card.dataset.subjectColor || '#4e73df';
+            card.style.setProperty('--subject-color', color);
+            
+            // Apply color to pill background with transparency
+            const pill = card.querySelector('.category-pill');
+            if (pill) pill.style.backgroundColor = color + '15';
+            
+            // Apply color to badges
+            const badge = card.querySelector('.subject-badge');
+            if (badge) badge.style.backgroundColor = color;
+            
+            card.addEventListener('click', () => {
+                const url = card.dataset.url;
+                if (url) window.location.href = url;
+            });
+        });
+    });
+</script>
 {% endblock %}

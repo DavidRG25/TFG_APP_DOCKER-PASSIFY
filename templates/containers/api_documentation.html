@@ -427,7 +427,7 @@
                 <a href="{% url 'containers:api_docs_section' section.slug %}"
                     class="api-nav-link nav-link-item {% if current_slug == section.slug %}active{% endif %}">
                     <i
-                        class="fas fa-{% if section.slug == 'introduccion' %}home{% elif section.slug == 'autenticacion' %}key{% elif section.slug == 'gets' %}search{% elif section.slug == 'crear' %}plus-circle{% elif section.slug == 'acciones' %}cogs{% elif section.slug == 'ci-cd' %}terminal{% else %}exclamation-triangle{% endif %}"></i>
+                        class="fas fa-{% if section.slug == 'introduccion' %}home{% elif section.slug == 'autenticacion' %}key{% elif section.slug == 'gets' %}search{% elif section.slug == 'crear' %}plus-circle{% elif section.slug == 'modificar' %}edit{% elif section.slug == 'acciones' %}cogs{% elif section.slug == 'logs' %}file-alt{% elif section.slug == 'ci-cd' %}terminal{% else %}exclamation-triangle{% endif %}"></i>
                     {{ section.title }}
                 </a>
 
@@ -534,6 +534,7 @@
 
         let processedMd = source
             .replace(/\{\{\s*PAASIFY_API_URL\s*\}\}/g, apiUrl)
+            .replace(/\{\{\s*host\s*\}\}/g, apiUrl.replace('/api', ''))
             .replace(/\{\{\s*TU_API_TOKEN\s*\}\}/g, '<TU_API_TOKEN>')
             .replace(/<TU_API_TOKEN>/g, '<TU_API_TOKEN>');
 

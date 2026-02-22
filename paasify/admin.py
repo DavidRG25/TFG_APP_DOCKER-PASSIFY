@@ -377,7 +377,30 @@ class UserProfileAdminForm(forms.ModelForm):
             if password1 or password2:
                 if password1 != password2:
                     raise forms.ValidationError("Las contraseñas no coinciden")
+
+        # --- VALIDACIÓN DE UNICIDAD DE NOMBRE ---
+        # Calculamos el nombre final que tendrá el perfil para evitar duplicados
+        first_name = cleaned.get("first_name", "").strip()
+        last_name = cleaned.get("last_name", "").strip()
+        username = cleaned.get("username", "")
         
+        if first_name or last_name:
+            full_name = f"{first_name} {last_name}".strip()
+        else:
+            full_name = username
+            
+        # Comprobar si ya existe alguien CON USUARIO ACTIVO con ese nombre (case-insensitive)
+        # Nota: Usamos UserProfile importado arriba. Ignoramos perfiles huérfanos (user__isnull=True).
+        qs = UserProfile.objects.filter(nombre__iexact=full_name, user__isnull=False)
+        if self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+            
+        if qs.exists():
+            raise forms.ValidationError(
+                f"Ya existe un usuario registrado con el nombre '{full_name}'. "
+                "El sistema requiere nombres únicos. Por favor, añade una inicial o segundo apellido."
+            )
+
         return cleaned
 
     def save(self, commit=True):

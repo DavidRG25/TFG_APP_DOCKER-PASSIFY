@@ -3,63 +3,210 @@
 {% load static %}
 
 {% block body %}
-<div class="container">
-  <div class="row justify-content-center">
-    <div class="col-md-9 col-lg-12 col-xl-10">
-      <div class="card shadow-lg o-hidden border-0 my-5">
-        <div class="card-body p-0">
-          <div class="row">
-            <div class="col-lg-6 d-none d-lg-flex">
-              <div class="flex-grow-1 bg-login-image"
-                   style="background: url('{% static 'assets/img/logo.png' %}') center / contain no-repeat;"></div>
-            </div>
-            <div class="col-lg-6">
-              <div class="p-5">
-                <div class="text-center">
-                  <h4 class="text-dark mb-4">Bienvenido</h4>
+<div class="login-outer-container">
+    {# Tech Background Elements #}
+    <div class="tech-bg">
+        <div class="grid-overlay"></div>
+        <div class="scan-line-fast"></div>
+        
+        <i class="fab fa-docker tech-icon-float" style="top: 15%; left: 10%; opacity: 0.08; font-size: 6rem; animation-delay: 0s;"></i>
+        <i class="fas fa-server tech-icon-float" style="top: 70%; left: 85%; opacity: 0.1; font-size: 5rem; animation-delay: 2s;"></i>
+        <i class="fas fa-network-wired tech-icon-float" style="top: 20%; left: 80%; opacity: 0.07; font-size: 4rem; animation-delay: 4s;"></i>
+        <i class="fas fa-terminal tech-icon-float" style="top: 80%; left: 15%; opacity: 0.09; font-size: 4.5rem; animation-delay: 1s;"></i>
+    </div>
+
+    <div class="container h-100 d-flex align-items-center justify-content-center py-5">
+        <div class="login-auth-card">
+            <div class="glass-login shadow-lg p-4 p-md-5">
+                <div class="text-center mb-4">
+                    <div class="login-brand-logo mb-2" style="margin-top: -30px;">
+                        <img src="{% static 'assets/img/logo.png' %}" alt="PaaSify Logo" style="width: 280px; max-width: 85%; height: auto; filter: drop-shadow(0 0 20px rgba(78, 115, 223, 0.4)); transition: all 0.5s ease;">
+                    </div>
+                    <h2 class="fw-bold mb-1" style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 50%, #06b6d4 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -1px;">
+                        PaaSify Login
+                    </h2>
+                    <p class="text-muted small fw-medium">Plataforma Cloud-Native para la Educación</p>
                 </div>
 
                 {% if form.errors %}
-                  <div class="alert alert-danger" role="alert">
-                    Usuario o contraseña incorrectos.
+                  <div class="alert alert-danger border-0 shadow-sm mb-4 d-flex align-items-center" role="alert" style="border-radius: 12px; font-size: 0.9rem; background: rgba(220, 38, 38, 0.05); color: #dc2626;">
+                    <i class="fas fa-exclamation-triangle me-3"></i>
+                    <div><strong>Error:</strong> Credenciales incorrectas.</div>
                   </div>
                 {% endif %}
 
-                <form class="user" method="post" action="{% url 'login' %}">
+                <form class="auth-form" method="post" action="{% url 'login' %}">
                   {% csrf_token %}
                   {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 
-                  <div class="form-group">
-                    <input class="form-control form-control-user"
-                           type="text"
-                           id="id_username"
-                           name="username"
-                           placeholder="Nombre de usuario"
-                           required
-                           autofocus>
+                  <div class="mb-3">
+                    <label class="form-label small fw-bold text-muted ps-2">Usuario</label>
+                    <div class="input-group-modern">
+                        <span class="input-icon"><i class="fas fa-user-astronaut"></i></span>
+                        <input class="form-control-tech" type="text" id="id_username" name="username" placeholder="Tu nombre de usuario" required autofocus>
+                    </div>
                   </div>
 
-                  <div class="form-group">
-                    <input class="form-control form-control-user"
-                           type="password"
-                           id="id_password"
-                           name="password"
-                           placeholder="Contraseña"
-                           required>
+                  <div class="mb-4">
+                    <label class="form-label small fw-bold text-muted ps-2">Contraseña</label>
+                    <div class="input-group-modern">
+                        <span class="input-icon"><i class="fas fa-key"></i></span>
+                        <input class="form-control-tech" type="password" id="id_password" name="password" placeholder="••••••••" required>
+                    </div>
                   </div>
 
-                  <button class="btn btn-primary btn-block text-white btn-user" type="submit">
-                    Entrar
+                  <button class="btn-tech-primary btn-ripple w-100 py-3 rounded-pill fw-bold" type="submit">
+                    ACCEDER A LA NUBE <i class="fas fa-chevron-right ms-2 small"></i>
                   </button>
                 </form>
 
-                {# El login clásico no necesita JS; redirige a next o LOGIN_REDIRECT_URL (/my-services/) #}
-              </div>
+                <div class="text-center mt-4 pt-3 border-top border-light">
+                    <a href="{% url 'index' %}" class="text-decoration-none text-primary small fw-bold hover-underline">
+                        <i class="fas fa-arrow-left me-2"></i> Volver a Inicio
+                    </a>
+                </div>
             </div>
-          </div>
         </div>
-      </div>
     </div>
-  </div>
 </div>
+
+<style>
+    :root {
+        --tech-blue: #4e73df;
+        --tech-cyan: #06b6d4;
+    }
+
+    .login-outer-container {
+        min-height: calc(100vh - 140px);
+        position: relative;
+        background: #f8fafc;
+        overflow: hidden;
+        margin-top: -20px;
+    }
+
+    .tech-bg {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+    }
+
+    .grid-overlay {
+        position: absolute;
+        inset: 0;
+        background-image: 
+            linear-gradient(rgba(78, 115, 223, 0.04) 1.5px, transparent 1.5px),
+            linear-gradient(90deg, rgba(78, 115, 223, 0.04) 1.5px, transparent 1.5px);
+        background-size: 50px 50px;
+    }
+
+    .scan-line-fast {
+        position: absolute;
+        width: 100%;
+        height: 100px;
+        background: linear-gradient(180deg, transparent, rgba(78, 115, 223, 0.05), transparent);
+        animation: login-scan 10s linear infinite;
+        z-index: 1;
+    }
+
+    @keyframes login-scan {
+        from { transform: translateY(-100%); }
+        to { transform: translateY(1000%); }
+    }
+
+    .tech-icon-float {
+        position: absolute;
+        color: var(--tech-blue);
+        animation: float-rotate 12s ease-in-out infinite;
+        z-index: 1;
+    }
+
+    @keyframes float-rotate {
+        0%, 100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+        50% { transform: translate(20px, -30px) rotate(15deg) scale(1.1); }
+    }
+
+    .login-auth-card {
+        width: 100%;
+        max-width: 480px;
+        position: relative;
+        z-index: 10;
+        animation: card-in 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes card-in {
+        from { opacity: 0; transform: translateY(30px) scale(0.95); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .glass-login {
+        background: rgba(255, 255, 255, 0.92);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        border-radius: 28px;
+    }
+
+    .input-group-modern {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+
+    .input-icon {
+        position: absolute;
+        left: 1.25rem;
+        color: #94a3b8;
+        z-index: 10;
+        transition: color 0.3s ease;
+    }
+
+    .form-control-tech {
+        width: 100%;
+        padding: 0.85rem 1rem 0.85rem 3.25rem;
+        border-radius: 16px;
+        border: 2px solid #e2e8f0;
+        background: white;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+
+    .form-control-tech:focus {
+        outline: none;
+        border-color: var(--tech-blue);
+        box-shadow: 0 0 0 4px rgba(78, 115, 223, 0.1);
+    }
+
+    .form-control-tech:focus + .input-icon, 
+    .input-group-modern:focus-within .input-icon {
+        color: var(--tech-blue);
+    }
+
+    .btn-tech-primary {
+        background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+        color: white;
+        border: none;
+        box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.4);
+        transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    .btn-tech-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 20px 30px -8px rgba(37, 99, 235, 0.5);
+    }
+
+    .login-logo-pulsating {
+        animation: logo-glow 4s infinite alternate;
+    }
+
+    @keyframes logo-glow {
+        from { transform: scale(1); filter: drop-shadow(0 0 5px rgba(78, 115, 223, 0.2)); }
+        to { transform: scale(1.05); filter: drop-shadow(0 0 25px rgba(78, 115, 223, 0.6)); }
+    }
+
+    .hover-underline:hover {
+        text-decoration: underline !important;
+    }
+</style>
 {% endblock %}

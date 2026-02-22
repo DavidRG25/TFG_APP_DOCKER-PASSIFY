@@ -1,0 +1,151 @@
+{# SECCIÓN: CONFIGURACIÓN BÁSICA #}
+<div class="col-12">
+  {# Configuración de Red - Solo para servicios NO Compose #}
+  {% if not service.has_compose %}
+  <h5 class="fw-bold mb-3">
+    <i class="fas fa-sliders-h me-2 text-primary"></i>Configuración de Red
+  </h5>
+
+  {# Puerto Externo con botones #}
+  <div class="mb-4">
+    <label class="form-label fw-bold text-dark">
+      <i class="fas fa-plug me-2 text-primary"></i>Puerto Externo Principal
+    </label>
+    <div class="input-group">
+      <input
+        type="number"
+        name="custom_port"
+        id="customPortInput"
+        class="form-control form-control-lg border-2"
+        min="40000"
+        max="50000"
+        value="{{ service.assigned_port|default:'' }}"
+        placeholder="Auto-asignado"
+      />
+      <button
+        type="button"
+        class="btn btn-outline-secondary"
+        id="clearPortBtn"
+        title="Limpiar puerto"
+      >
+        <i class="fas fa-eraser"></i>
+      </button>
+      <button
+        type="button"
+        class="btn btn-outline-primary"
+        id="verifyPortBtn"
+        title="Verificar disponibilidad"
+      >
+        <i class="fas fa-check-circle"></i> Verificar
+      </button>
+    </div>
+    <small class="text-muted">Rango: 40000 - 50000. Si se deja vacío, PaaSify asignará uno.</small>
+    <div id="portStatus" class="mt-2"></div>
+  </div>
+  {% endif %}
+
+  {# Puerto Interno - Solo DockerHub o Dockerfile #}
+  {% if service.mode == 'dockerhub' or not service.has_compose %}
+  <div class="mb-4">
+    <label class="form-label fw-bold text-dark">
+      <i class="fas fa-sign-in-alt me-2 text-primary"></i>Puerto Interno de la App
+    </label>
+    <input
+      type="number"
+      name="internal_port"
+      class="form-control border-2"
+      value="{{ service.internal_port|default:'' }}"
+      placeholder="Ej: 80, 8080, 5000"
+    />
+    <small class="text-muted">El puerto en el que escucha tu código dentro del contenedor.</small>
+  </div>
+  {% endif %}
+  
+  {# Acceso y Tipo - Solo DockerHub o Dockerfile #}
+  {% if service.mode == 'dockerhub' or not service.has_compose %}
+  <div class="mb-4">
+    <div class="card border-0 bg-light shadow-sm">
+      <div class="card-body p-3">
+        <label class="form-label fw-bold d-block mb-3 text-primary">
+          <i class="fas fa-cog me-2"></i>Personalizar Rol del Contenedor
+        </label>
+        <div class="row g-3">
+          <div class="col-md-7">
+            <label class="form-label small fw-bold text-muted text-uppercase mb-2">
+              <i class="fas fa-tag me-1 text-primary"></i>Tipo de Servicio
+            </label>
+            <div class="row g-2" id="container-type-selector-buttons">
+              <div class="col-6">
+                <button
+                  type="button"
+                  class="btn w-100 py-2 text-start btn-type-sel {% if service.container_type == 'web' %}btn-info active{% else %}btn-outline-info{% endif %}"
+                  data-type="web"
+                >
+                  <i class="fas fa-globe me-2"></i><strong>WEB</strong>
+                  <div class="x-small opacity-75 d-block mt-1">Frontend, Sitios estáticos</div>
+                </button>
+              </div>
+              <div class="col-6">
+                <button
+                  type="button"
+                  class="btn w-100 py-2 text-start btn-type-sel {% if service.container_type == 'api' %}btn-primary active{% else %}btn-outline-primary{% endif %}"
+                  data-type="api"
+                >
+                  <i class="fas fa-server me-2"></i><strong>API</strong>
+                  <div class="x-small opacity-75 d-block mt-1">Backend, Microservicios</div>
+                </button>
+              </div>
+              <div class="col-6">
+                <button
+                  type="button"
+                  class="btn w-100 py-2 text-start btn-type-sel {% if service.container_type == 'database' %}btn-success active{% else %}btn-outline-success{% endif %}"
+                  data-type="database"
+                >
+                  <i class="fas fa-database me-2"></i><strong>DB</strong>
+                  <div class="x-small opacity-75 d-block mt-1">Bases de datos, Almacén</div>
+                </button>
+              </div>
+              <div class="col-6">
+                <button
+                  type="button"
+                  class="btn w-100 py-2 text-start btn-type-sel {% if service.container_type == 'misc' %}btn-secondary active{% else %}btn-outline-secondary{% endif %}"
+                  data-type="misc"
+                >
+                  <i class="fas fa-cube me-2"></i><strong>OTRO</strong>
+                  <div class="x-small opacity-75 d-block mt-1">Herramientas, Scripts</div>
+                </button>
+              </div>
+            </div>
+            <input
+              type="hidden"
+              name="container_type"
+              id="input_container_type"
+              value="{{ service.container_type }}"
+            />
+          </div>
+          <div class="col-md-5 ps-md-4 border-start d-flex flex-column justify-content-center">
+            <div class="p-3 rounded-3 bg-white border">
+              <label class="form-label fw-bold text-dark d-flex align-items-center mb-2">
+                <i class="fas fa-eye me-2 text-warning"></i>Visibilidad Web
+              </label>
+              <div class="form-check form-switch mt-1">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  name="is_web"
+                  id="isWebEdit"
+                  {% if service.is_web %}checked{% endif %}
+                />
+                <label class="form-check-label fw-semibold" for="isWebEdit">Acceso vía navegador</label>
+              </div>
+              <p class="text-muted mt-2 mb-0" style="font-size: 0.75rem; line-height: 1.4">
+                Determina si PaaSify intentará generar un enlace público y mostrar el botón "Acceder".
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>

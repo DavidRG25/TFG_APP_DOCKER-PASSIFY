@@ -1,0 +1,102 @@
+{# SECCIÓN: GESTIÓN DE CONTENEDORES (SOLO COMPOSE) #}
+{% if service.has_compose %}
+<div class="col-12 mt-4">
+  <div class="card border-0 shadow-sm rounded-4 overflow-hidden border">
+    <div class="card-header bg-white py-3 border-bottom">
+      <h6 class="mb-0 text-dark fw-bold">
+        <i class="fas fa-cubes text-primary" style="margin-right: 0.5rem;"></i>Gestión de Stack (Docker Compose)
+      </h6>
+    </div>
+    
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" id="compose-containers-table">
+          <thead class="bg-light">
+            <tr class="x-small text-uppercase fw-bold text-muted">
+              <th class="ps-4" style="width: 25%">Servicio</th>
+              <th style="width: 35%">Imagen / Puertos</th>
+              <th style="width: 25%">Tipo de Servicio</th>
+              <th class="text-center pe-4" style="width: 15%">Acceso Web</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in containers_info %}
+            <tr data-service-name="{{ c.name }}" class="border-bottom">
+              <td class="ps-4">
+                <div class="fw-bold text-dark">{{ c.name }}</div>
+                <div class="x-small text-muted font-monospace opacity-75">docker-service</div>
+              </td>
+              <td>
+                <div class="d-flex align-items-center mb-1">
+                  <div style="width: 28px;" class="text-center me-3">
+                    <i class="fas fa-box text-muted fs-5"></i>
+                  </div>
+                  <div class="small text-truncate" style="max-width: 250px;" title="{{ c.image }}">
+                    {% if c.image %}
+                      <code class="text-dark fw-bold" style="font-size: 0.9em;">{{ c.image }}</code>
+                    {% else %}
+                      <span class="text-danger x-small fw-bold">No detectada</span>
+                      <i class="fas fa-question-circle ms-1 text-muted" title="La imagen aparecerá tras el primer despliegue"></i>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="d-flex flex-wrap gap-1 ms-4">
+                  {% for p in c.internal_ports %}
+                  <span class="badge bg-light text-dark border font-monospace x-small" title="Interno">
+                    {{ p.internal }}/{{ p.protocol }}
+                  </span>
+                  {% endfor %}
+                  
+                  {% for p in c.assigned_ports %}
+                  <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 font-monospace x-small" title="Mapeo Externo">
+                    <i class="fas fa-link me-1"></i>{{ p.external }}
+                  </span>
+                  {% endfor %}
+                </div>
+              </td>
+              <td>
+                <select class="form-select form-select-sm ctr-type border-light shadow-none x-small" style="background-color: #f8fafc;">
+                  <option value="web" {% if c.container_type == "web" %}selected{% endif %}>🌐 Web / Frontend</option>
+                  <option value="api" {% if c.container_type == "api" %}selected{% endif %}>⚙️ API / Backend</option>
+                  <option value="database" {% if c.container_type == "database" %}selected{% endif %}>🗄️ Base de Datos</option>
+                  <option value="misc" {% if c.container_type == "misc" %}selected{% endif %}>🛡️ General / Otros</option>
+                </select>
+              </td>
+              <td class="text-center pe-4">
+                <div class="form-check form-switch d-inline-block">
+                  <input class="form-check-input ctr-is-web" type="checkbox" 
+                    {% if c.is_web %}checked{% endif %} 
+                    style="cursor: pointer; width: 2.5em; height: 1.25em;"
+                    onclick="if(window.syncExistingStack) window.syncExistingStack()">
+                </div>
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="text-center py-5">
+                <div class="text-muted">
+                  <i class="fas fa-layer-group fa-3x mb-3 opacity-25"></i>
+                  <p class="mb-0 fw-bold">No hay información de contenedores</p>
+                  <small>Estará disponible tras el primer despliegue exitoso.</small>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+    <div class="card-footer bg-light bg-opacity-50 py-3 px-4 border-top-0">
+      <div class="d-flex align-items-start">
+        <i class="fas fa-info-circle text-primary mt-1 me-3"></i>
+        <p class="mb-0 x-small text-muted" style="line-height: 1.5">
+          <strong>Nota sobre puertos:</strong> Los puertos externos para servicios Compose se gestionan automáticamente. 
+          Aquí puedes definir qué contenedores son accesibles vía web. Para cambiar los puertos internos, modifica el archivo 
+          <code class="text-primary">docker-compose.yml</code> en la sección de archivos.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}

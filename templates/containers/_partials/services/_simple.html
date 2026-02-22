@@ -15,6 +15,7 @@
             <i class="fas fa-stop"></i>
         </button>
 
+        {% if not is_supervisor or service.owner == request.user %}
         <button class="btn btn-danger" 
             hx-post="{% url 'service-remove' service.id %}"
             hx-target="#service-{{ service.id }}" 
@@ -27,11 +28,18 @@
             <i class="fas fa-trash"></i>
         </button>
 
-        <button class="btn btn-secondary" hx-get="{% url 'service-logs' service.id %}"
-            hx-target="#genericModalContent" hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#genericModal"
-            title="Ver logs">
+        {% if service.mode != 'default' %}
+        <a href="{% url 'containers:edit_service' service.id %}" class="btn text-white" style="background-color: #fd7e14; border-color: #fd7e14;"
+            title="Editar servicio">
+            <i class="fas fa-pen"></i>
+        </a>
+        {% endif %}
+        {% endif %}
+
+        <a href="{% url 'containers:logs_page' service.id %}" class="btn btn-secondary"
+            title="Ver logs en página dedicada">
             <i class="fas fa-history"></i>
-        </button>
+        </a>
     </div>
 
     {# 3. BOTONES CONDICIONALES (dependen del estado) #}
@@ -51,17 +59,32 @@
         {% endif %}
 
         {% if service.container_id and service.status == 'running' %}
-            {% if host and service.assigned_port %}
-            <a href="http://{{ host }}:{{ service.assigned_port }}" class="btn btn-primary" target="_blank"
-                rel="noopener" title="Acceder a la Web">
-                <i class="fas fa-external-link-alt"></i>
-            </a>
+            {% if host and service.assigned_port and service.is_web %}
+                {% with p_int=service.internal_port|default:80 %}
+                    {# Solo mostrar si no es un puerto tipico de DB/Worker y no tiene nombre de DB/Worker #}
+                    {% if p_int != 6379 and p_int != 5432 and p_int != 3306 and p_int != 27017 and 'redis' not in service.name|lower and 'worker' not in service.name|lower and 'db' not in service.name|lower %}
+                        <a href="http://{{ host }}:{{ service.assigned_port }}" class="btn btn-primary" target="_blank"
+                            rel="noopener" title="Acceder a la Web">
+                            <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    {% endif %}
+                {% endwith %}
             {% endif %}
-            <a href="{% url 'containers:terminal_view' service.id %}" class="btn btn-dark"
-                title="Consola Terminal">
+            <a href="{% url 'containers:terminal_v2' service.id %}" class="btn btn-dark"
+                title="Terminal Web Mejorada">
                 <i class="fas fa-terminal"></i>
             </a>
         {% else %}
+            {% if host and service.assigned_port and service.is_web %}
+                {% with p_int=service.internal_port|default:80 %}
+                    {# Solo mostrar si no es un puerto tipico de DB/Worker y no tiene nombre de DB/Worker #}
+                    {% if p_int != 6379 and p_int != 5432 and p_int != 3306 and p_int != 27017 and 'redis' not in service.name|lower and 'worker' not in service.name|lower and 'db' not in service.name|lower %}
+                        <button class="btn btn-primary" disabled title="Acceso Web disponible solo cuando el servicio esta en ejecucion">
+                            <i class="fas fa-external-link-alt"></i>
+                        </button>
+                    {% endif %}
+                {% endwith %}
+            {% endif %}
             <button class="btn btn-dark" disabled title="Terminal disponible solo cuando el servicio esta en ejecucion">
                 <i class="fas fa-terminal"></i>
             </button>

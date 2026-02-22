@@ -1,0 +1,112 @@
+{# SECCIÓN: VARIABLES DE ENTORNO - Diseño Claro y Moderno #}
+<div class="col-12 mt-4 mb-5">
+  <div class="card border-0 shadow-sm rounded-4 overflow-hidden border">
+    {# Cabecera Estilo Claro #}
+    <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center border-bottom">
+      <h6 class="mb-0 text-dark fw-bold">
+        <i class="fas fa-terminal me-2 text-primary"></i>Variables de Entorno (JSON)
+        <span class="ms-2 badge bg-light text-muted border fw-normal">Opcional</span>
+      </h6>
+      <div class="d-flex align-items-center">
+        <span class="text-muted small me-2">Editor de configuración</span>
+        <i class="fas fa-edit text-muted opacity-50"></i>
+      </div>
+    </div>
+
+    {# Cuerpo del Editor #}
+    <div id="envPanel" class="bg-white">
+      <div class="card-body p-0">
+        <div class="row g-0">
+          
+          {# Columna Izquierda: Editor Principal #}
+          <div class="col-md-7 border-end">
+            <div class="p-3 bg-light d-flex justify-content-between align-items-center border-bottom">
+              <span class="text-muted small fw-bold text-uppercase">Configuración Actual</span>
+              <div class="btn-group shadow-sm">
+                <button type="button" class="btn btn-white btn-sm border text-primary fw-bold" id="formatJsonBtn">
+                  <i class="fas fa-magic me-1"></i>Formatear
+                </button>
+                <button type="button" class="btn btn-white btn-sm border text-danger" id="clearJsonBtn" title="Limpiar todo">
+                  <i class="fas fa-eraser"></i>
+                </button>
+              </div>
+            </div>
+            
+            <div class="position-relative">
+              <textarea
+                name="env_vars"
+                id="envVarsTextarea"
+                class="form-control border-0 font-monospace p-4"
+                rows="10"
+                style="background-color: #fdfdfd; color: #2d3748; resize: vertical; font-size: 0.9rem; border-radius: 0; min-height: 300px; tab-size: 4;"
+                placeholder='{ "KEY": "VALUE" }'
+              >{{ env_vars_json|safe }}</textarea>
+            </div>
+            
+            <div id="jsonValidation" class="px-3 py-2 bg-light border-top small">
+              {# Cargado por JS #}
+            </div>
+          </div>
+
+          {# Columna Derecha: Guía y Ayuda #}
+          <div class="col-md-5 bg-light bg-opacity-25">
+            <div class="p-3 d-flex justify-content-between align-items-center border-bottom bg-light">
+              <span class="text-secondary small fw-bold text-uppercase">Ejemplo / Plantilla</span>
+              <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm fw-bold" id="copyTemplateBtn">
+                <i class="fas fa-copy me-1"></i>Usar Ejemplo
+              </button>
+            </div>
+            
+            <div class="p-4">
+              <div class="bg-white rounded-3 border p-3 shadow-sm mb-4">
+                <pre class="mb-0 text-dark small font-monospace" id="envExampleTemplate" style="font-size: 0.8rem; line-height: 1.5;">
+{
+  "DB_HOST": "mi-db-host",
+  "API_SECRET": "xxxx-xxxx",
+  "DEBUG": "true",
+  "PORT": "8080"
+}</pre>
+              </div>
+              
+              <div class="instruction-box">
+                <h7 class="text-dark small fw-bold d-block mb-2">Consejos rápidos:</h7>
+                <div class="d-flex align-items-start mb-2">
+                  <i class="fas fa-check-circle text-success mt-1 me-2 x-small"></i>
+                  <span class="text-muted x-small">Usa siempre <strong>comillas dobles</strong> para claves y valores.</span>
+                </div>
+                <div class="d-flex align-items-start mb-2">
+                  <i class="fas fa-check-circle text-success mt-1 me-2 x-small"></i>
+                  <span class="text-muted x-small">El formato debe ser un <strong>objeto JSON</strong> válido {}.</span>
+                </div>
+                <div class="d-flex align-items-start">
+                  <i class="fas fa-info-circle text-primary mt-1 me-2 x-small"></i>
+                  <span class="text-muted x-small">Estas variables estarán disponibles en el entorno de ejecución de tus contenedores.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  #envVarsTextarea {
+    transition: background-color 0.2s ease;
+  }
+  #envVarsTextarea:focus {
+    box-shadow: none;
+    background-color: #ffffff;
+    outline: none;
+  }
+  .x-small { font-size: 0.75rem; }
+  .btn-white {
+    background: #fff;
+    color: #4a5568;
+  }
+  .btn-white:hover {
+    background: #f7fafc;
+    color: #2d3748;
+  }
+</style>

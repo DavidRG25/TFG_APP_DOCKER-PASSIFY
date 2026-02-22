@@ -48,16 +48,18 @@
   // Sincronizacion de eventos para asegurar el refresh
   document.body.addEventListener("htmx:afterRequest", (evt) => {
     const xhr = evt.detail.xhr;
-    // Si la respuesta indica un refresh de tabla o es una accion de control con exito
-    if (xhr.status >= 200 && xhr.status < 300) {
-      const triggers = JSON.parse(xhr.getResponseHeader("HX-Trigger") || "{}");
-      const isTableFragment = evt.detail.pathInfo.path.includes("table-fragment");
-      if (triggers["service:table-refresh"] || (evt.detail.pathInfo.path.includes("/containers/") && !isTableFragment)) {
-        // Provocamos un trigger manual en el cuerpo por si acaso el fragmento tarda
-        setTimeout(() => {
-          htmx.trigger("body", "service:table-refresh");
-        }, 500);
-      }
+    if (xhr && xhr.status >= 200 && xhr.status < 300) {
+      try {
+        const triggers = JSON.parse(xhr.getResponseHeader("HX-Trigger") || "{}");
+        const hxPath = (evt.detail.pathInfo && evt.detail.pathInfo.path) ? evt.detail.pathInfo.path : "";
+        const isTableFragment = hxPath && hxPath.includes("table-fragment");
+        
+        if (triggers["service:table-refresh"] || (hxPath && hxPath.includes("/containers/") && !isTableFragment)) {
+          setTimeout(() => {
+            if (window.htmx) htmx.trigger("body", "service:table-refresh");
+          }, 500);
+        }
+      } catch (e) {}
     }
   });
 
@@ -131,11 +133,39 @@
       }
     });
     if (typeof applyMode === 'function') applyMode();
-    if (typeof syncExclusion === 'function') syncExclusion();
     document.querySelectorAll('[data-bs-toggle="popover"]').forEach((el) => {
       const inst = bootstrap.Popover.getInstance(el);
       if (inst) inst.hide();
     });
+  }
+
+  function clearFile(name) {
+    const input = document.querySelector(`input[name="${name}"]`);
+    if (input) {
+      input.value = "";
+      // Disparar evento de cambio para que syncExclusion se entere
+      input.dispatchEvent(new Event("change"));
+    }
+  }
+
+  function clearCustomPort() {
+    const input = document.getElementById("service-port");
+    if (input) input.value = "";
+    const feedback = document.getElementById("port-availability-feedback");
+    if (feedback) {
+      feedback.innerHTML = "";
+      feedback.style.display = "none";
+    }
+  }
+
+  function clearDockerHubField() {
+    const input = document.getElementById("service-dockerhub");
+    if (input) input.value = "";
+    const feedback = document.getElementById("dockerhub-feedback");
+    if (feedback) {
+      feedback.innerHTML = "";
+      feedback.style.display = "none";
+    }
   }
 
   document.body.addEventListener("service:modal-close", (evt) => {
@@ -198,77 +228,129 @@
     }
   });
 
+  // Funcion para actualizar el resaltado de las cards de modo
+  function updateModeCardSelection() {
+    document.querySelectorAll(".mode-card").forEach((card) => {
+      const radio = card.querySelector('input[type="radio"]');
+      if (radio && radio.checked) {
+        card.classList.add("selected");
+      } else {
+        card.classList.remove("selected");
+      }
+    });
+  }
+
   function applyMode() {
-    const mode = document.querySelector('input[name="mode"]:checked')?.value || "default";
-    const imgSel = document.getElementById("service-image");
-    const dockerhubInput = document.getElementById("service-dockerhub");
-    const dockerfile = document.querySelector('input[name="dockerfile"]');
-    const compose = document.querySelector('input[name="compose"]');
-    const code = document.querySelector('input[name="code"]');
-    const internalPort = document.querySelector('input[name="internal_port"]');
-    const imageContainer = document.getElementById("block-default-image");
-    const customBlocks = document.querySelectorAll(".custom-block");
-    const dockerhubBlock = document.getElementById("block-dockerhub-mode");
+    try {
+      const mode = document.querySelector('input[name="mode"]:checked')?.value || "default";
+      const submode = document.querySelector('input[name="custom_subtype"]:checked')?.value || "dockerfile";
+      
+      const imgSel = document.getElementById("service-image");
+      const dockerhubInput = document.getElementById("service-dockerhub");
+      const dockerfile = document.querySelector('input[name="dockerfile"]');
+      const compose = document.querySelector('input[name="compose"]');
+      const code = document.querySelector('input[name="code"]');
+      const internalPort = document.querySelector('input[name="internal_port"]');
+      const customPort = document.querySelector('input[name="custom_port"]');
+      
+      const imageContainer = document.getElementById("block-default-image");
+      const dockerhubBlock = document.getElementById("block-dockerhub-mode");
+      const customSubtypeBlock = document.getElementById("block-custom-subtype");
+      const dockerfileBlock = document.getElementById("block-dockerfile");
+      const composeBlock = document.getElementById("block-compose");
+      const codeBlock = document.getElementById("block-code");
+      const analysisBlock = document.getElementById("block-analysis");
+      const envVarsBlock = document.getElementById("block-env-vars");
 
-    if (mode === "default") {
-      if (imageContainer) imageContainer.style.display = "block";
-      if (dockerhubBlock) dockerhubBlock.style.display = "none";
-      if (imgSel) imgSel.disabled = false;
-      if (dockerhubInput) {
-        dockerhubInput.disabled = true;
-        dockerhubInput.removeAttribute("required");
-      }
-      customBlocks.forEach(b => b.style.display = "none");
-      [dockerfile, compose, code].forEach(input => { if (input) input.disabled = true; });
-    } else if (mode === "dockerhub") {
-      if (imageContainer) imageContainer.style.display = "none";
-      if (dockerhubBlock) dockerhubBlock.style.display = "block";
-      if (imgSel) imgSel.disabled = true;
-      if (dockerhubInput) {
-        dockerhubInput.disabled = false;
-        dockerhubInput.required = true;
-      }
-      customBlocks.forEach(b => b.style.display = "none");
-      [dockerfile, compose, code].forEach(input => { if (input) input.disabled = true; });
-    } else if (mode === "custom") {
-      if (imageContainer) imageContainer.style.display = "none";
-      if (dockerhubBlock) dockerhubBlock.style.display = "none";
-      if (imgSel) imgSel.disabled = true;
-      if (dockerhubInput) {
-        dockerhubInput.disabled = true;
-        dockerhubInput.removeAttribute("required");
-      }
-      customBlocks.forEach(b => b.style.display = "block");
-      [dockerfile, compose, code].forEach(input => { if (input) input.disabled = false; });
-    }
+      // Limpieza de estados visuales
+      [imageContainer, dockerhubBlock, customSubtypeBlock, dockerfileBlock, composeBlock, codeBlock, analysisBlock, envVarsBlock].forEach(el => {
+        if (el) el.style.display = "none";
+      });
 
-    const internalPortBlock = document.getElementById("block-internal-port");
-    if (internalPortBlock) {
-      internalPortBlock.style.display = (mode === "dockerhub" || mode === "custom") ? "block" : "none";
+      // --- LOGICA DE LIMPIEZA Y HABILITACION ---
+      
+      if (mode === "default") {
+        if (imageContainer) imageContainer.style.display = "block";
+        if (imgSel) { imgSel.disabled = false; imgSel.required = true; }
+        
+        if (dockerhubInput) { dockerhubInput.disabled = true; dockerhubInput.required = false; }
+        if (dockerfile) { dockerfile.disabled = true; }
+        if (compose) { compose.disabled = true; }
+        if (code) { code.required = false; }
+      } else if (mode === "dockerhub") {
+        if (dockerhubBlock) dockerhubBlock.style.display = "block";
+        if (dockerhubInput) {
+          dockerhubInput.disabled = false;
+          dockerhubInput.required = true;
+        }
+        if (imgSel) { imgSel.disabled = true; imgSel.required = false; }
+        if (dockerfile) { dockerfile.disabled = true; }
+        if (code) { code.required = false; }
+      } else if (mode === "custom") {
+        if (customSubtypeBlock) customSubtypeBlock.style.display = "block";
+        if (codeBlock) codeBlock.style.display = "block";
+        if (code) { code.required = true; }
+        
+        // Deshabilitar selectores de imagen no usados en modo custom
+        if (imgSel) { imgSel.disabled = true; imgSel.required = false; }
+        if (dockerhubInput) { dockerhubInput.disabled = true; dockerhubInput.required = false; }
+        
+        if (submode === "dockerfile") {
+          if (dockerfileBlock) dockerfileBlock.style.display = "block";
+          if (dockerfile) dockerfile.disabled = false;
+          if (compose) compose.disabled = true;
+        } else { // submode === "compose"
+          if (composeBlock) composeBlock.style.display = "block";
+          if (compose) compose.disabled = false;
+          if (dockerfile) dockerfile.disabled = true;
+        }
+      }
+
+      // Gestion de Visibilidad y Tipado (Simple vs Advanced)
+      const simpleAccessBlock = document.getElementById("block-simple-access-config");
+      const portConfigBlock = document.getElementById("block-port-config");
+
+      if (mode === "dockerhub" || (mode === "custom" && submode === "dockerfile")) {
+          // Relocalización dinámica según UX solicitada
+          if (simpleAccessBlock) {
+              if (mode === "dockerhub" && portConfigBlock) {
+                  portConfigBlock.parentNode.insertBefore(simpleAccessBlock, portConfigBlock);
+              } else if (mode === "custom" && codeBlock) {
+                  codeBlock.parentNode.insertBefore(simpleAccessBlock, codeBlock);
+              }
+              simpleAccessBlock.style.display = "block";
+          }
+          if (envVarsBlock) envVarsBlock.style.display = "block";
+          if (analysisBlock) analysisBlock.style.display = "none";
+          if (portConfigBlock) portConfigBlock.style.display = "block";
+      } else if (mode === "custom" && submode === "compose") {
+          if (simpleAccessBlock) simpleAccessBlock.style.display = "none";
+          if (portConfigBlock) portConfigBlock.style.display = "none";
+          // El analysisBlock se muestra tras el fetch exitoso
+          if (compose && compose.files && compose.files.length > 0) {
+              requestComposeAnalysis(compose.files[0]);
+          }
+      } else {
+          if (simpleAccessBlock) simpleAccessBlock.style.display = "none";
+          if (analysisBlock) analysisBlock.style.display = "none";
+          if (portConfigBlock) portConfigBlock.style.display = "none";
+      }
+
+      // Gestion de Ejemplos en Sidebar
+      document.querySelectorAll(".example-block").forEach(b => b.style.display = "none");
+      const exampleId = mode === "default" ? "example-default" : 
+                        mode === "dockerhub" ? "example-dockerhub" :
+                        submode === "dockerfile" ? "example-custom-dockerfile" : "example-custom-compose";
+      const ex = document.getElementById(exampleId);
+      if (ex) ex.style.display = "block";
+
+      if (internalPort) internalPort.disabled = (mode === "default");
+    } catch (e) {
+      console.error("Error in applyMode:", e);
     }
-    if (internalPort) internalPort.disabled = (mode === "default");
   }
 
-  function syncExclusion() {
-    const dockerfile = document.querySelector('input[name="dockerfile"]');
-    const compose = document.querySelector('input[name="compose"]');
-    const dockerfileBlock = document.getElementById("block-dockerfile");
-    const composeBlock = document.getElementById("block-compose");
-    const mode = document.querySelector('input[name="mode"]:checked')?.value;
 
-    if (mode !== "custom") return;
-
-    if (dockerfile?.files?.length) {
-      if (composeBlock) composeBlock.style.display = "none";
-      if (compose) compose.value = "";
-    } else if (compose?.files?.length) {
-      if (dockerfileBlock) dockerfileBlock.style.display = "none";
-      if (dockerfile) dockerfile.value = "";
-    } else {
-      if (dockerfileBlock) dockerfileBlock.style.display = "block";
-      if (composeBlock) composeBlock.style.display = "block";
-    }
-  }
 
   async function verifyDockerHubImage() {
     const input = document.getElementById("service-dockerhub");
@@ -344,32 +426,250 @@
   }
 
   document.addEventListener("DOMContentLoaded", () => {
+    // Inicializacion de estado
+    updateModeCardSelection();
+    applyMode();
+
     document.querySelectorAll('input[name="mode"]').forEach(radio => {
-      radio.addEventListener("change", applyMode);
+      radio.addEventListener("change", () => {
+        updateModeCardSelection();
+        applyMode();
+      });
+    });
+
+    // Hacer que toda la card sea clickeable
+    document.querySelectorAll(".mode-card").forEach((card) => {
+      card.addEventListener("click", function () {
+        const radio = this.querySelector('input[type="radio"]');
+        if (radio) {
+          radio.checked = true;
+          radio.dispatchEvent(new Event("change"));
+        }
+      });
+    });
+
+    // Manejar selección de tipo de contenedor vía botones
+    document.querySelectorAll(".btn-type-sel").forEach(btn => {
+      btn.addEventListener("click", function() {
+        // Quitar active de todos
+        document.querySelectorAll(".btn-type-sel").forEach(b => b.classList.remove("active"));
+        // Poner active al actual
+        this.classList.add("active");
+        // Actualizar input oculto
+        const type = this.getAttribute("data-type");
+        const input = document.getElementById("input_container_type");
+        if (input) input.value = type;
+        
+        // Auto-sincronizar is_web (opcional: si es DB, desactivar web por defecto)
+        const webSwitch = document.getElementById("is_web_simple");
+        if (webSwitch) {
+            if (type === "database") {
+                webSwitch.checked = false;
+            } else if (type === "web") {
+                webSwitch.checked = true;
+            }
+        }
+      });
     });
     
     const dockerfile = document.querySelector('input[name="dockerfile"]');
     const compose = document.querySelector('input[name="compose"]');
-    if (dockerfile) dockerfile.addEventListener("change", syncExclusion);
-    if (compose) compose.addEventListener("change", syncExclusion);
+    if (dockerfile) dockerfile.addEventListener("change", applyMode);
+    if (compose) {
+        compose.addEventListener("change", function(e) {
+            if (this.files.length > 0) {
+                requestComposeAnalysis(this.files[0]);
+            } else {
+                const analysisBlock = document.getElementById("block-analysis");
+                if (analysisBlock) analysisBlock.style.display = "none";
+            }
+        });
+    }
 
     const form = document.getElementById("newServiceForm");
     if (form) {
-      form.addEventListener("submit", function (e) {
-        const mode = document.querySelector('input[name="mode"]:checked')?.value;
-        if (mode === "dockerhub") {
-          const dhInput = document.querySelector('input[name="dockerhub_image"]');
-          const imgSelect = document.querySelector('select[name="image"]');
-          if (dhInput && imgSelect && dhInput.value.trim()) {
-            const opt = document.createElement("option");
-            opt.value = dhInput.value.trim();
-            opt.selected = true;
-            imgSelect.appendChild(opt);
-            imgSelect.disabled = false;
-          }
+        form.addEventListener("submit", function(e) {
+            // Recolectar configuraciones de contenedores (si es modo compose)
+            const analysisBlock = document.getElementById("block-analysis");
+            if (analysisBlock && analysisBlock.style.display !== "none") {
+                const configs = {};
+                const rows = document.querySelectorAll("#analysis-table-body tr");
+                rows.forEach(row => {
+                    const name = row.dataset.containerName;
+                    const type = row.querySelector(".container-type-select").value;
+                    const isWeb = row.querySelector(".is-web-switch").checked;
+                    configs[name] = { container_type: type, is_web: isWeb };
+                });
+                const hiddenInput = document.getElementById("final-container-configs");
+                if (hiddenInput) hiddenInput.value = JSON.stringify(configs);
+            }
+        });
+    }
+
+  async function requestComposeAnalysis(file) {
+    const analysisBlock = document.getElementById("block-analysis");
+    const tbody = document.getElementById("analysis-table-body");
+    const warningsDiv = document.getElementById("analysis-warnings");
+    const errorsDiv = document.getElementById("analysis-errors");
+
+    if (!analysisBlock || !tbody) return;
+
+    analysisBlock.style.display = "block";
+    tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4"><i class="fas fa-spinner fa-spin me-2"></i>Analizando docker-compose...</td></tr>';
+    warningsDiv.innerHTML = "";
+    errorsDiv.innerHTML = "";
+
+    const formData = new FormData();
+    formData.append("compose_file", file);
+
+    try {
+      const response = await fetch("/paasify/containers/analyze-compose/", {
+        method: "POST",
+        body: formData,
+        headers: {
+          'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]')?.value
         }
       });
+      const data = await response.json();
+      
+      if (data.success) {
+        displayComposeAnalysis(data);
+      } else {
+        analysisBlock.style.display = "none";
+        // Limpiar el input para que pueda volver a elegirlo tras corregir
+        document.querySelector('input[name="compose"]').value = "";
+        
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: 'Error en Docker Compose',
+                html: `
+                  <div class="text-danger small mb-2">${data.message || data.error || 'Syntax error'}</div>
+                  <p class="mb-0 small text-muted">Por favor, revisa que el archivo esté correctamente escrito, prestando especial atención a la <b>indentación</b>.</p>
+                `,
+                icon: 'error',
+                confirmButtonColor: '#4e73df'
+            });
+        } else {
+            showToast((data.message || data.error) + " - Por favor, revisa la indentación.", "text-bg-danger", "Error de Análisis");
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error de red al analizar archivo</td></tr>';
     }
+  }
+
+  function displayComposeAnalysis(data) {
+    const tbody = document.getElementById("analysis-table-body");
+    const warningsDiv = document.getElementById("analysis-warnings");
+    tbody.innerHTML = "";
+
+    data.containers.forEach(c => {
+      const row = document.createElement("tr");
+      row.dataset.containerName = c.name;
+      
+      const typeOptions = [
+        { val: 'web', label: '🌐 &nbsp; Web / Frontend' },
+        { val: 'api', label: '⚙️ &nbsp; API / Backend' },
+        { val: 'database', label: '🗄️ &nbsp; Base de Datos' },
+        { val: 'misc', label: '🛡️ &nbsp; General' }
+      ];
+
+      const optionsHtml = typeOptions.map(opt => 
+        `<option value="${opt.val}" ${c.container_type === opt.val ? 'selected' : ''}>${opt.label}</option>`
+      ).join("");
+
+      // Generar badges de puertos desde el backend
+      let portsHtml = '';
+      if (c.ports && c.ports.length > 0) {
+        portsHtml = c.ports.map(p => {
+          // p.host puede ser "auto" o un número específico
+          // p.container es el puerto interno
+          if (p.host === 'auto') {
+            return `<span class="badge bg-secondary font-monospace me-1">${p.container}/tcp</span>`;
+          } else {
+            return `<span class="badge bg-primary font-monospace me-1"><i class="fas fa-link me-1"></i>${p.host}→${p.container}</span>`;
+          }
+        }).join('');
+      }
+      if (!portsHtml) {
+        portsHtml = '<span class="text-muted small">Sin puertos</span>';
+      }
+
+      row.innerHTML = `
+        <td class="ps-3"><strong class="text-primary">${c.name}</strong></td>
+        <td><code class="small">${c.image}</code></td>
+        <td>${portsHtml}</td>
+        <td>
+          <select class="form-select form-select-sm container-type-select">
+            ${optionsHtml}
+          </select>
+        </td>
+        <td class="text-center">
+          <div class="form-check form-switch d-inline-block">
+            <input class="form-check-input is-web-switch" type="checkbox" ${c.is_web ? 'checked' : ''}>
+          </div>
+        </td>
+      `;
+      tbody.appendChild(row);
+
+      if (c.warnings && c.warnings.length > 0) {
+        c.warnings.forEach(w => {
+            const al = document.createElement("div");
+            al.className = "alert alert-info py-1 px-2 small mb-1";
+            al.innerHTML = `<i class="fas fa-info-circle me-2"></i><strong>${c.name}:</strong> ${w}`;
+            warningsDiv.appendChild(al);
+        });
+      }
+    });
+
+    if (data.warnings && data.warnings.length > 0) {
+        data.warnings.forEach(w => {
+            const al = document.createElement("div");
+            al.className = "alert alert-warning py-1 px-2 small mb-1";
+            al.innerHTML = `<i class="fas fa-exclamation-triangle me-2"></i> ${w}`;
+            warningsDiv.appendChild(al);
+        });
+    }
+
+    // Listener para actualizar el JSON en tiempo real al cambiar cualquier input
+    tbody.querySelectorAll("select, input").forEach(el => {
+        el.addEventListener("change", updateContainerConfigsJson);
+    });
+
+    // Actualizar el JSON inicial con los valores detectados
+    updateContainerConfigsJson();
+  }
+
+  function updateContainerConfigsJson() {
+    const analysisBlock = document.getElementById("block-analysis");
+    if (!analysisBlock || analysisBlock.style.display === "none") return;
+
+    const configs = {};
+    const rows = document.querySelectorAll("#analysis-table-body tr");
+    rows.forEach(row => {
+        const name = row.dataset.containerName;
+        // Protección contra filas sin datos
+        if (!name) return;
+        
+        const typeSelect = row.querySelector(".container-type-select");
+        const webSwitch = row.querySelector(".is-web-switch");
+        
+        if (typeSelect && webSwitch) {
+            configs[name] = { 
+                container_type: typeSelect.value, 
+                is_web: webSwitch.checked 
+            };
+        }
+    });
+
+    const hiddenInput = document.getElementById("final-container-configs");
+    if (hiddenInput) {
+        hiddenInput.value = JSON.stringify(configs);
+        console.log("Configs actualizados:", hiddenInput.value); // Depuración
+    }
+  }
+
 
     // Filtrar proyectos por asignatura
     const subjectSelect = document.getElementById("service-subject");
@@ -402,6 +702,28 @@
       });
       if (subjectSelect.value) subjectSelect.dispatchEvent(new Event("change"));
     }
+
+    // Lógica para las cards de sub-tipo
+    document.querySelectorAll('input[name="custom_subtype"]').forEach((radio) => {
+      radio.addEventListener("change", () => {
+        document.querySelectorAll(".subtype-card").forEach((card) => {
+          const r = card.querySelector('input[type="radio"]');
+          if (r && r.checked) card.classList.add("selected");
+          else card.classList.remove("selected");
+        });
+        applyMode();
+      });
+    });
+
+    document.querySelectorAll(".subtype-card").forEach((card) => {
+      card.addEventListener("click", function () {
+        const radio = this.querySelector('input[type="radio"]');
+        if (radio) {
+          radio.checked = true;
+          radio.dispatchEvent(new Event("change"));
+        }
+      });
+    });
 
     // Notificacion de exito al crear
     const params = new URLSearchParams(window.location.search);

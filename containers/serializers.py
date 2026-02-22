@@ -17,6 +17,8 @@ class ServiceContainerSerializer(serializers.ModelSerializer):
             "name",
             "container_id",
             "status",
+            "container_type",
+            "is_web",
             "internal_ports",
             "assigned_ports",
             "created_at",
@@ -24,6 +26,16 @@ class ServiceContainerSerializer(serializers.ModelSerializer):
         )
         read_only_fields = fields  # Todos son de solo lectura
 
+
+class EmptyStringJSONField(serializers.JSONField):
+    """
+    JSONField que trata cadenas vacías "" como None o dict vacío.
+    Necesario para multipart/form-data donde los campos vacíos se envían como "".
+    """
+    def to_internal_value(self, data):
+        if data == "":
+            return None
+        return super().to_internal_value(data)
 
 class ServiceSerializer(serializers.ModelSerializer):
     """
@@ -48,6 +60,8 @@ class ServiceSerializer(serializers.ModelSerializer):
     env_vars = serializers.JSONField(required=False)
     volumes = serializers.JSONField(required=False)
     internal_port = serializers.IntegerField(required=False, allow_null=True)
+    container_configs = EmptyStringJSONField(required=False, write_only=True)
+    keep_volumes = serializers.BooleanField(required=False, write_only=True, default=True)
 
     # Permitir enlazar asignatura
     subject = serializers.PrimaryKeyRelatedField(queryset=Subject.objects.all(), required=True)
@@ -88,10 +102,14 @@ class ServiceSerializer(serializers.ModelSerializer):
             "env_vars",
             "volumes",
             "subject",
-            "project",      # Anadido
+            "project",
             "internal_port",
-            "has_compose",  # Anadido
-            "containers",    # Anadido
+            "container_type",
+            "is_web",
+            "has_compose",
+            "containers",
+            "container_configs", # Campo para configuraciones de contenedores en compose
+            "keep_volumes",      # Campo de control para preservacion de volumenes en PATCH
         )
         read_only_fields = ("id", "assigned_port", "status", "has_compose", "containers")
 
@@ -317,8 +335,9 @@ class ServiceSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         user = getattr(request, "user", None)
 
-        mode = attrs.get("mode", "default").lower()
-        image = attrs.get("image")
+        # En PATCH, usar valores de la instancia existente si no se proporcionan
+        mode = attrs.get("mode", getattr(self.instance, "mode", "default")).lower()
+        image = attrs.get("image") or getattr(self.instance, "image", None)
         dockerfile = attrs.get("dockerfile")
         compose = attrs.get("compose")
         subject = attrs.get("subject")
@@ -329,91 +348,98 @@ class ServiceSerializer(serializers.ModelSerializer):
         has_dockerfile = bool(dockerfile)
         has_compose = bool(compose)
         has_code = bool(attrs.get("code"))
+        
+        # Detectar si es una actualización (PATCH) o creación (POST)
+        is_update = self.instance is not None
 
         # ---- Reglas de modo ----
         if mode == "custom":
-            # Modo Custom: exactamente uno entre dockerfile / compose
-            if has_image:
+            # Modo Custom: ignorar imagen si se envió por error
+            attrs.pop('image', None)
+            has_image = False
+            
+            # Si no hay ni dockerfile ni compose, DEBE haber código (ZIP) para intentar buscar dentro
+            # PERO: en PATCH, si ya existe el servicio, no es necesario volver a enviar estos archivos
+            if not is_update and not (has_dockerfile or has_compose or has_code):
                 raise serializers.ValidationError(
-                    {"image": _("No debe indicar imagen cuando usa Dockerfile o docker-compose.")}
+                    {"mode": _("El modo 'custom' requiere subir un Dockerfile, un docker-compose.yml o un archivo ZIP con el proyecto.")}
                 )
-            if not (has_dockerfile or has_compose):
-                raise serializers.ValidationError(
-                    {"mode": _("El modo 'custom' requiere subir un Dockerfile o un docker-compose.yml.")}
-                )
+            
             if has_dockerfile and has_compose:
                 raise serializers.ValidationError(
                     {"compose": _("Use Dockerfile o docker-compose, pero no ambos a la vez.")}
                 )
-            if not has_code:
-                raise serializers.ValidationError(
-                    {"code": "Debes adjuntar un archivo .zip o .rar con el código fuente."}
-                )
         
         elif mode == "dockerhub":
             # Modo DockerHub: permite imágenes externas
-            if not has_image:
+            # En PATCH, si no se envía imagen, usar la existente
+            if not has_image and not is_update:
                 raise serializers.ValidationError(
                     {"image": _("Debe indicar el nombre de la imagen de DockerHub.")}
                 )
+            
             if has_dockerfile or has_compose:
                 raise serializers.ValidationError(
                     {"mode": _("El modo DockerHub no permite subir Dockerfile o compose.")}
                 )
-            # Validación básica del nombre de imagen (nombre:tag)
-            if ":" not in image:
+            
+            # Validación básica del nombre de imagen (nombre:tag) solo si se envió
+            if has_image and ":" not in image:
                 attrs["image"] = f"{image}:latest"
                 image = attrs["image"]
             
-            # VALIDACIÓN OBLIGATORIA: Verificar que la imagen existe en DockerHub
-            import requests
-            try:
-                parts = image.split(':')
-                repo = parts[0]
-                tag = parts[1] if len(parts) > 1 else 'latest'
-                
-                # Construir URL de la API de DockerHub
-                if '/' in repo:
-                    url = f'https://hub.docker.com/v2/repositories/{repo}/tags/{tag}'
-                else:
-                    url = f'https://hub.docker.com/v2/repositories/library/{repo}/tags/{tag}'
-                
-                response = requests.get(url, timeout=10)
-                
-                if response.status_code == 404:
+            # Verificar que la imagen existe en DockerHub (solo si se envió una nueva imagen)
+            if has_image:
+                import requests
+                try:
+                    parts = image.split(':')
+                    repo = parts[0]
+                    tag = parts[1] if len(parts) > 1 else 'latest'
+                    
+                    # Construir URL de la API de DockerHub
+                    if '/' in repo:
+                        url = f'https://hub.docker.com/v2/repositories/{repo}/tags/{tag}'
+                    else:
+                        url = f'https://hub.docker.com/v2/repositories/library/{repo}/tags/{tag}'
+                    
+                    response = requests.get(url, timeout=10)
+                    
+                    if response.status_code == 404:
+                        raise serializers.ValidationError(
+                            {"image": f"La imagen '{image}' no existe en DockerHub. Verifica el nombre y el tag."}
+                        )
+                    elif response.status_code != 200:
+                        raise serializers.ValidationError(
+                            {"image": f"Error al verificar la imagen en DockerHub (código {response.status_code}). Intenta de nuevo."}
+                        )
+                except requests.exceptions.Timeout:
                     raise serializers.ValidationError(
-                        {"image": f"La imagen '{image}' no existe en DockerHub. Verifica el nombre y el tag."}
+                        {"image": "Timeout al consultar DockerHub. Verifica tu conexión e intenta de nuevo."}
                     )
-                elif response.status_code != 200:
+                except requests.exceptions.RequestException as e:
                     raise serializers.ValidationError(
-                        {"image": f"Error al verificar la imagen en DockerHub (código {response.status_code}). Intenta de nuevo."}
+                        {"image": f"Error de conexión al verificar la imagen: {str(e)}"}
                     )
-            except requests.exceptions.Timeout:
-                raise serializers.ValidationError(
-                    {"image": "Timeout al consultar DockerHub. Verifica tu conexión e intenta de nuevo."}
-                )
-            except requests.exceptions.RequestException as e:
-                raise serializers.ValidationError(
-                    {"image": f"Error de conexión al verificar la imagen: {str(e)}"}
-                )
         
         
         else:
             # Modo Catálogo (default): requiere imagen del catálogo
-            if not has_image:
+            # En PATCH, si no se envía imagen, usar la existente
+            if not has_image and not is_update:
                 raise serializers.ValidationError(
                     {"image": _("Debe seleccionar una imagen del catálogo o aportar Dockerfile/compose.")}
                 )
             
-            # Validar AllowedImage SOLO en modo catálogo
-            try:
-                img_name, img_tag = image.split(":")
-                if not AllowedImage.objects.filter(name=img_name, tag=img_tag).exists():
-                    raise serializers.ValidationError(
-                        {"image": _("Imagen no permitida en el catálogo. Use el modo DockerHub para imágenes externas.")}
-                    )
-            except ValueError:
-                raise serializers.ValidationError({"image": "Formato de imagen inválido (nombre:tag)."})
+            # Validar AllowedImage SOLO en modo catálogo y solo si se envió imagen
+            if has_image:
+                try:
+                    img_name, img_tag = image.split(":")
+                    if not AllowedImage.objects.filter(name=img_name, tag=img_tag).exists():
+                        raise serializers.ValidationError(
+                            {"image": _("Imagen no permitida en el catálogo. Use el modo DockerHub para imágenes externas.")}
+                        )
+                except ValueError:
+                    raise serializers.ValidationError({"image": "Formato de imagen inválido (nombre:tag)."})
 
         # ---- Subject: si se indica, el usuario debe tener permiso ----
         # - Si el usuario está en el grupo 'teacher/profesor' y es el teacher de la asignatura, OK.
@@ -461,7 +487,15 @@ class ServiceSerializer(serializers.ModelSerializer):
         """
         # Mapear custom_port a assigned_port (para Dockerfile/DockerHub)
         custom_port = validated_data.pop('custom_port', None)
-        validated_data.pop('mode', None)  # Extraer modo antes de crear el objeto
+        mode = validated_data.pop('mode', 'default')  # Extraer modo para procesarlo
+        validated_data.pop('container_configs', None) # Extraer configs antes de crear el objeto
+        
+        # Guardar el modo en el objeto
+        validated_data['mode'] = mode
+        
+        # Eliminar kwargs que no pertenecen al modelo
+        validated_data.pop('keep_volumes', None)
+        
         if custom_port:
             validated_data['assigned_port'] = custom_port
         
@@ -541,8 +575,14 @@ class ServiceSerializer(serializers.ModelSerializer):
             return []
 
     def update(self, instance, validated_data):
-        # Evitar que alguien cambie el owner
+        # Evitar que alguien cambie el owner o el modo una vez creado
         validated_data.pop("owner", None)
+        validated_data.pop("mode", None)
+        
+        # Guardar en memoria el valor transitorio de keep_volumes (por defecto True en edición)
+        instance._keep_volumes = validated_data.pop('keep_volumes', True)
+        
+        # Permitir image y container_configs en la actualización
         return super().update(instance, validated_data)
 
 
