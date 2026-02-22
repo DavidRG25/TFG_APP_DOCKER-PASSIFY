@@ -118,9 +118,11 @@ class ServiceViewSet(viewsets.ModelViewSet):
     def _render_table_fragment(self, request) -> str:
         services = self.get_queryset()
         host = request.get_host().split(":")[0]
+        # Detectar si el usuario debe ver la vista de supervisor (propietario o profesor)
+        is_supervisor = user_is_teacher(request.user) or user_is_admin(request.user)
         return render_to_string(
             "containers/_service_rows.html",
-            {"services": services, "host": host},
+            {"services": services, "host": host, "is_supervisor": is_supervisor},
             request=request,
         )
 
@@ -183,9 +185,50 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if status:
             qs = qs.filter(status=status)
 
+        mode = self.request.query_params.get('mode')
+        if mode:
+            qs = qs.filter(mode=mode)
+
+        q = self.request.query_params.get('q')
+        if q:
+            from django.db.models import Q
+            qs = qs.filter(Q(name__icontains=q) | Q(image__icontains=q))
+
         for s in qs:
             sync_service_status(s)
         return qs.exclude(status="removed")
+
+    @action(detail=True, methods=["post"], url_path="remove")
+    def remove(self, request, pk=None):
+        service = self.get_object()
+        
+        # Restricción: Los profesores no pueden eliminar contenedores de alumnos
+        if not request.user.is_superuser and service.owner != request.user:
+            if user_is_teacher(request.user):
+                if self._is_htmx(request):
+                    return self._htmx_response(request, status=403, message="No puedes eliminar contenedores de alumnos.", level="text-bg-danger")
+                raise PermissionDenied("Los profesores no pueden eliminar contenedores de los alumnos.")
+        
+        try:
+            from .services import remove_container_async
+            remove_container_async(service)
+        except Exception as exc:
+            if self._is_htmx(request):
+                return self._htmx_response(
+                    request,
+                    status=500,
+                    message=str(exc),
+                    level="text-bg-danger",
+                )
+            return DRF_Response({"status": "error", "message": str(exc)}, status=500)
+
+        if self._is_htmx(request):
+            return self._htmx_response(
+                request,
+                message="El servicio está siendo eliminado...",
+                level="text-bg-success",
+            )
+        return DRF_Response({"status": "deleting", "message": "Servicio eliminando."})
 
     def create(self, request, *args, **kwargs):
         """
@@ -372,30 +415,24 @@ class ServiceViewSet(viewsets.ModelViewSet):
             )
         return DRF_Response({"status": "stopping", "message": "Servicio deteniendo."})
 
-    @action(detail=True, methods=["post"], url_path="remove")
-    def remove(self, request, pk=None):
+    @action(detail=True, methods=["post"])
+    def restart(self, request, pk=None):
         service = self.get_object()
-        
         try:
-            from .services import remove_container_async
-            remove_container_async(service)
+            from .services import run_container
+            run_container(service)
         except Exception as exc:
             if self._is_htmx(request):
-                return self._htmx_response(
-                    request,
-                    status=500,
-                    message=str(exc),
-                    level="text-bg-danger",
-                )
+                return self._htmx_response(request, status=500, message=str(exc), level="text-bg-danger")
             return DRF_Response({"status": "error", "message": str(exc)}, status=500)
 
         if self._is_htmx(request):
             return self._htmx_response(
                 request,
-                message="El servicio está siendo eliminado...",
-                level="text-bg-success",
+                message="El servicio está siendo enviado a reiniciar...",
+                level="text-bg-warning",
             )
-        return DRF_Response({"status": "deleting", "message": "Servicio eliminando."})
+        return DRF_Response({"status": "restarting", "message": "Servicio reiniciando."})
 
     @action(detail=True, methods=["get"])
     def logs(self, request, pk=None):
@@ -988,6 +1025,23 @@ def service_table(request):
         qs = qs.filter(subject_id=subject_id)
     if project_id:
         qs = qs.filter(project_id=project_id)
+        
+    status = request.GET.get("status")
+    if status:
+        qs = qs.filter(status=status)
+        
+    mode = request.GET.get("mode")
+    if mode:
+        qs = qs.filter(mode=mode)
+        
+    q = request.GET.get("q")
+    if q:
+        from django.db.models import Q
+        qs = qs.filter(Q(name__icontains=q) | Q(image__icontains=q) | Q(owner__username__icontains=q) | Q(owner__first_name__icontains=q) | Q(owner__last_name__icontains=q))
+        
+    ordering = request.GET.get("ordering")
+    if ordering:
+        qs = qs.order_by(ordering)
 
     # Sincronizar estados con Docker antes de renderizar
     for s in qs:
@@ -1132,6 +1186,28 @@ def professor_dashboard(request):
     if not (user_is_teacher(request.user) or request.user.is_superuser):
         return HttpResponse("No tienes permiso para acceder a esta pÃƒÂ¡gina.", status=403)
 
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_subject":
+            name = request.POST.get("name")
+            category = request.POST.get("category", "optativa")
+            genero = request.POST.get("genero", "2024")
+            color = request.POST.get("color", "#4e73df")
+            if name:
+                new_sub = Subject.objects.create(
+                    name=name, 
+                    category=category, 
+                    genero=genero, 
+                    color=color,
+                    teacher_user=request.user
+                )
+                if "logo" in request.FILES:
+                    new_sub.logo = request.FILES["logo"]
+                    new_sub.save()
+                from django.contrib import messages
+                messages.success(request, f"Asignatura '{name}' creada con éxito.")
+            return redirect("professor_dashboard")
+
     subjects = Subject.objects.filter(teacher_user=request.user)
     if request.user.is_superuser:
         subjects = Subject.objects.all()
@@ -1141,7 +1217,18 @@ def professor_dashboard(request):
         if not request.user.is_superuser
         else UserProject.objects.all()
     )
-    projects = projects_qs.select_related("subject", "user_profile")
+
+    # Filtrado dinámico
+    q = request.GET.get('q')
+    if q:
+        from django.db.models import Q
+        projects_qs = projects_qs.filter(Q(place__icontains=q) | Q(user_profile__nombre__icontains=q) | Q(user_profile__user__username__icontains=q))
+
+    sub_id = request.GET.get('subject')
+    if sub_id:
+        projects_qs = projects_qs.filter(subject_id=sub_id)
+
+    projects = projects_qs.select_related("subject", "user_profile").order_by("-id")
 
     # Estadísticas para el profesor
     total_students = subjects.values('students').distinct().count()
@@ -1160,6 +1247,9 @@ def professor_dashboard(request):
         }
     }
 
+    if request.headers.get('HX-Request'):
+        return render(request, "professor/_project_table.html", context)
+
     return render(request, "professor/dashboard.html", context)
 
 
@@ -1170,6 +1260,92 @@ def professor_subject_detail(request, subject_id):
 
     base_qs = Subject.objects.all() if request.user.is_superuser else Subject.objects.filter(teacher_user=request.user)
     subject = get_object_or_404(base_qs.select_related("teacher_user"), pk=subject_id)
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "stop_all":
+            active_services = Service.objects.filter(subject=subject).exclude(status__in=["removed", "stopped"])
+            for svc in active_services:
+                try:
+                    stop_container(svc)
+                except Exception:
+                    pass
+            from django.contrib import messages
+            messages.success(request, "Se ha ordenado la parada de todos los contenedores de la asignatura.")
+        elif action == "create_student":
+            username = request.POST.get("username")
+            email = request.POST.get("email")
+            nombre = request.POST.get("nombre")
+            password = request.POST.get("password")
+            if username and email and nombre and password:
+                from django.contrib.auth import get_user_model
+                from paasify.models.StudentModel import UserProfile
+                from django.contrib.auth.models import Group
+                User = get_user_model()
+                try:
+                    if User.objects.filter(username=username).exists():
+                        from django.contrib import messages
+                        messages.error(request, "El nombre de usuario ya existe.")
+                    else:
+                        new_user = User.objects.create_user(username=username, email=email, password=password)
+                        student_group, _ = Group.objects.get_or_create(name='StudentGroup')
+                        new_user.groups.add(student_group)
+                        player = UserProfile.objects.create(user=new_user, nombre=nombre, year=email)
+                        subject.students.add(new_user)
+                        from django.contrib import messages
+                        messages.success(request, f"Alumno '{nombre}' creado y matriculado con éxito.")
+                except Exception as e:
+                    from django.contrib import messages
+                    messages.error(request, f"Error creando el alumno: {str(e)}")
+        elif action == "create_project":
+            place = request.POST.get("place")
+            student_id = request.POST.get("student_id")
+            if place and student_id:
+                from django.contrib.auth import get_user_model
+                from paasify.models.StudentModel import UserProfile
+                User = get_user_model()
+                try:
+                    student_user = User.objects.get(pk=student_id)
+                    user_profile = UserProfile.objects.get(user=student_user)
+                    UserProject.objects.create(place=place, subject=subject, user_profile=user_profile)
+                    from django.contrib import messages
+                    messages.success(request, "Proyecto asignado con éxito.")
+                except Exception as e:
+                    from django.contrib import messages
+                    messages.error(request, f"Error creando el proyecto: {str(e)}")
+        elif action == "edit_student":
+            student_id = request.POST.get("student_id")
+            email = request.POST.get("email")
+            password = request.POST.get("password")
+            if student_id:
+                try:
+                    from django.contrib.auth import get_user_model
+                    from paasify.models.StudentModel import UserProfile
+                    User = get_user_model()
+                    st_user = User.objects.get(pk=student_id)
+                    if email:
+                        st_user.email = email
+                        st_user.user_profile.year = email
+                        st_user.user_profile.save()
+                    if password:
+                        st_user.set_password(password)
+                    st_user.save()
+                    from django.contrib import messages
+                    messages.success(request, f"Alumno modificado con éxito.")
+                except Exception as e:
+                    from django.contrib import messages
+                    messages.error(request, f"Error modificando al alumno: {str(e)}")
+        elif action == "edit_subject":
+            color = request.POST.get("color")
+            if color:
+                subject.color = color
+            if "logo" in request.FILES:
+                subject.logo = request.FILES["logo"]
+            subject.save()
+            from django.contrib import messages
+            messages.success(request, "Diseño de la asignatura actualizado.")
+
+        return redirect("professor_subject_detail", subject_id=subject.id)
 
     students = subject.students.all().order_by("username")
     services = (
@@ -1205,11 +1381,24 @@ def professor_project_detail(request, project_id):
 
     project = get_object_or_404(base_qs, pk=project_id)
 
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "stop_all":
+            active_services = Service.objects.filter(project=project).exclude(status__in=["removed", "stopped"])
+            for svc in active_services:
+                try:
+                    stop_container(svc)
+                except Exception:
+                    pass
+            from django.contrib import messages
+            messages.success(request, "Se ha ordenado la parada de todos los contenedores activos de este proyecto.")
+        return redirect("professor_project_detail", project_id=project.id)
+
     student_user = getattr(project.user_profile, "user", None)
     related_services = Service.objects.none()
     if student_user is not None:
         related_services = (
-            Service.objects.filter(owner=student_user)
+            Service.objects.filter(project=project)
             .exclude(status="removed")
             .select_related("owner", "subject")
         )
@@ -1218,16 +1407,33 @@ def professor_project_detail(request, project_id):
     return render(
         request,
         "professor/project_detail.html",
-        {"project": project, "related_services": related_services, "host": host},
+        {"project": project, "related_services": related_services, "host": host, "is_supervisor": True},
     )
 
 
 # Editar servicio (env/archivos) y reiniciar
 @login_required
 def edit_service(request, pk):
-    service = get_object_or_404(Service, pk=pk, owner=request.user)
+    if request.user.is_superuser:
+        service = get_object_or_404(Service, pk=pk)
+    elif user_is_teacher(request.user):
+        from paasify.models import Subject
+        from django.db.models import Q
+        teacher_subjects = Subject.objects.filter(teacher_user=request.user)
+        service = get_object_or_404(Service.objects.filter(Q(owner=request.user) | Q(subject__in=teacher_subjects)), pk=pk)
+    else:
+        service = get_object_or_404(Service, pk=pk, owner=request.user)
 
     # Restricción: No se pueden editar servicios del catálogo (default)
+    # Restricción: Los profesores no pueden editar servicios de alumnos
+    if not request.user.is_superuser and service.owner != request.user:
+        if user_is_teacher(request.user):
+            return render(request, 'containers/edit_service_forbidden.html', {
+                'service': service,
+                'title': 'No Permitido - Editar Servicio de Alumno',
+                'reason': 'Los profesores no pueden modificar la configuración de los contenedores de los alumnos.'
+            })
+
     if service.mode == 'default':
         return render(request, 'containers/edit_service_forbidden.html', {
             'service': service,
