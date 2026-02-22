@@ -6,11 +6,19 @@ from django.urls import include, path
 from django.views.generic import RedirectView
 from django.contrib.admin.views.decorators import staff_member_required
 from django.conf import settings
+from django.shortcuts import render
+from django.http import HttpResponse
 from django.conf.urls.static import static
 
 from containers.views import ServiceViewSet, AllowedImageViewSet, SubjectViewSet, ProjectViewSet
 from containers import views as container_views
 from paasify.views import ProfileView
+
+from django.conf.urls import handler404, handler500, handler403
+
+handler404 = 'paasify.views.ErrorViews.handler404'
+handler500 = 'paasify.views.ErrorViews.handler500'
+handler403 = 'paasify.views.ErrorViews.handler403'
 
 # Django REST framework & JWT
 from rest_framework import routers
@@ -56,14 +64,20 @@ urlpatterns = [
     path('api/token/',         TokenObtainPairView.as_view(), name='token_obtain'),
     path('api/token/refresh/', TokenRefreshView.as_view(),   name='token_refresh'),
     
+    # Silenciar peticiones de navegador (Chrome DevTools / SourceMaps)
+    path('.well-known/appspecific/com.chrome.devtools.json', lambda r: HttpResponse(status=204)),
+    path('static/assets/bootstrap/js/bootstrap.bundle.min.js.map', lambda r: HttpResponse(status=204)),
+    
     # Docs restringidas a STAFF (Admin)
     path('api/schema/',  staff_member_required(SpectacularAPIView.as_view()),        name='schema'),
     path('api/docs/',    staff_member_required(SpectacularSwaggerView.as_view(url_name='schema')), name='docs'),
+
 ]
 
-# Servir estáticos en desarrollo (DEBUG=True)
+# Servir estáticos y media en desarrollo (DEBUG=True)
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 admin.site.site_url = None
 admin.site.site_header = "PaaSify Administration"

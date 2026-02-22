@@ -6,51 +6,85 @@
 {% endblock %}
 
 {% block body %}
-<section class="hero-section">
-  <div class="hero-shape shape-1"></div>
-  <div class="hero-shape shape-2"></div>
-  <div class="hero-shape shape-3"></div>
+<section class="hero-section position-relative overflow-hidden" style="background: #ffffff; padding: 120px 0 80px;">
+  <div class="hero-bg-shapes">
+    <div class="blob-1"></div>
+    <div class="blob-2"></div>
+    <div class="scan-line"></div>
+    
+    <!-- Floating Tech Icons -->
+    <i class="fab fa-docker tech-icon-float icon-docker"></i>
+    <i class="fas fa-cloud tech-icon-float icon-cloud"></i>
+    <i class="fas fa-server tech-icon-float icon-server"></i>
+    <i class="fas fa-code tech-icon-float icon-code"></i>
+    <i class="fas fa-terminal tech-icon-float icon-terminal" style="top: 40%; left: 88%; opacity: 0.1; font-size: 2rem;"></i>
+    <i class="fas fa-database tech-icon-float icon-db" style="top: 85%; left: 45%; opacity: 0.1; font-size: 2.2rem;"></i>
+    <i class="fas fa-microchip tech-icon-float icon-cpu" style="top: 10%; left: 40%; opacity: 0.08; font-size: 1.8rem;"></i>
+    <i class="fas fa-network-wired tech-icon-float icon-net" style="top: 55%; left: 5%; opacity: 0.1; font-size: 2rem;"></i>
+  </div>
 
-  <div class="container hero-grid">
+  <div class="container hero-grid position-relative" style="z-index: 2;">
     <div class="hero-left">
-      <div class="eyebrow">Aprende despliegue con Docker en menos pasos</div>
-      <h1 class="hero-title">Plataforma educativa para lanzar contenedores sin fricción</h1>
-      <p class="hero-subtitle">Sube tu código, define puertos y despliega en segundos. Ideal para prácticas de alumnos y revisiones de profesores.</p>
-      <div class="hero-actions">
-        {% if not user.is_authenticated %}
-          <a href="{% url 'login' %}" class="btn-hero"><i class="fas fa-rocket"></i> Comenzar ahora</a>
-        {% else %}
-          <a href="{% url 'profile' %}" class="btn-hero"><i class="fas fa-user-circle"></i> Ir a mi perfil</a>
-        {% endif %}
-        <a href="#roles" class="btn-ghost">Ver roles</a>
-      </div>
-      <div class="hero-stats">
-        <div class="stat-pill">
-          <span class="stat-number">3</span>
-          <span class="stat-label">Modos de despliegue: imagen del catálogo, Dockerfile propio o docker-compose propio</span>
+      <div class="hero-brand-intro mb-4 d-flex align-items-center" style="overflow: visible;">
+        <img src="{% static 'assets/img/logo.png' %}" alt="PaaSify" style="width: 220px; height: auto !important; object-fit: contain; transform: scale(1.1); transform-origin: left center; margin-right: 0px; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));">
+        <div class="eyebrow-badge">
+          <span class="badge-text">PaaS para Educación 🔥</span>
         </div>
-        <div class="stat-pill">
-          <span class="stat-number">24/7</span>
-          <span class="stat-label">Terminal web y logs disponibles todo el día</span>
+      </div>
+      <h1 class="hero-title display-3 fw-black text-dark mb-4">
+        Lanza contenedores <br><span class="gradient-text">sin complicaciones</span>
+      </h1>
+      <p class="hero-subtitle fs-5 text-secondary mb-5 leading-relaxed">
+        Sube tu código, define puertos y despliega en segundos. <br>
+        La herramienta definitiva para clases de Docker, DevOps y revisiones ágiles.
+      </p>
+      
+      <div class="hero-actions d-flex flex-wrap gap-3 mb-5">
+        {% if not user.is_authenticated %}
+          <a href="{% url 'login' %}" class="btn btn-primary-premium">
+            <i class="fas fa-rocket me-2"></i> Comenzar ahora
+          </a>
+        {% else %}
+          <a href="{% url 'containers:student_panel' %}" class="btn btn-primary-premium">
+            <i class="fas fa-th-large me-2"></i> Mi Panel de Control
+          </a>
+        {% endif %}
+        <a href="#roles" class="btn btn-outline-premium">Ver roles</a>
+      </div>
+
+      <div class="hero-stats-row d-flex gap-4">
+        <div class="stat-mini">
+          <span class="stat-val">3+</span>
+          <span class="stat-txt">Métodos de<br>despliegue</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-mini">
+          <span class="stat-val">24/7</span>
+          <span class="stat-txt">Soporte y<br>Terminal Web</span>
         </div>
       </div>
     </div>
 
-    <div class="hero-right card shadow-sm">
-      <div class="card-body">
-        <div class="checklist-title">Flujo rápido</div>
-        <ul class="checklist">
-          <li><i class="fas fa-check-circle"></i> Selecciona imagen o sube tu Dockerfile/compose</li>
-          <li><i class="fas fa-check-circle"></i> Define puertos y variables en un paso</li>
-          <li><i class="fas fa-check-circle"></i> Abre la terminal web y prueba tu app</li>
-        </ul>
-        <div class="mini-cta">
-          <div>
-            <p class="mini-cta-title">Portafolio listo</p>
-            <p class="mini-cta-text">Comparte servicios en clase y obtén feedback inmediato.</p>
+    <div class="hero-right">
+      <div class="glass-card-hero">
+        <div class="glass-header">
+          <div class="dots-group">
+            <span class="dot red"></span>
+            <span class="dot yellow"></span>
+            <span class="dot green"></span>
           </div>
-          <div class="mini-cta-icon">
-            <i class="fas fa-terminal"></i>
+          <div class="glass-title"><i class="fas fa-terminal me-2"></i> deploy_workflow.yml</div>
+        </div>
+        <div class="glass-body p-4">
+          <ul class="checklist-premium">
+            <li><i class="fas fa-check-circle"></i> <span>Despliega stacks Docker Compose</span></li>
+            <li><i class="fas fa-check-circle"></i> <span>Terminal web interactiva</span></li>
+            <li><i class="fas fa-check-circle"></i> <span>Configuración .env dinámica</span></li>
+            <li><i class="fas fa-check-circle"></i> <span>Revisión de código integrada</span></li>
+          </ul>
+          <div class="status-banner mt-4">
+            <div class="pulse-indicator"></div>
+            <span>Sistema listo para el aula</span>
           </div>
         </div>
       </div>
@@ -60,30 +94,30 @@
 
 <section class="features-section">
   <div class="container">
-    <div class="text-center mb-4">
+    <div class="text-center mb-5">
       <h2 class="section-title">¿Qué puedes hacer con PaaSify?</h2>
-      <p class="text-muted">Pensado para clases de DevOps, revisión de prácticas y demos rápidas.</p>
+      <p class="text-secondary fs-5">Pensado para clases de DevOps, revisión de prácticas y demos rápidas.</p>
     </div>
-    <div class="row">
-      <div class="col-md-4 mb-4">
+    <div class="row g-4">
+      <div class="col-md-4">
         <div class="feature-card">
-          <i class="fas fa-cloud-upload-alt feature-icon"></i>
-          <h3 class="h4 card-title mb-3">Despliegue simple</h3>
-          <p class="card-text text-muted">Sube tu código o Dockerfile y despliega en segundos sin configurar servidores.</p>
+          <div class="feature-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+          <h3 class="h4 fw-bold mb-3">Despliegue simple</h3>
+          <p class="text-muted">Sube tu código o Dockerfile y despliega en segundos sin configurar servidores tediosos.</p>
         </div>
       </div>
-      <div class="col-md-4 mb-4">
+      <div class="col-md-4">
         <div class="feature-card">
-          <i class="fas fa-project-diagram feature-icon"></i>
-          <h3 class="h4 card-title mb-3">Gestión por asignaturas</h3>
-          <p class="card-text text-muted">Organiza prácticas por curso y revisa servicios de alumnos en un mismo panel.</p>
+          <div class="feature-icon"><i class="fas fa-project-diagram"></i></div>
+          <h3 class="h4 fw-bold mb-3">Gestión por asignaturas</h3>
+          <p class="text-muted">Organiza prácticas por curso y revisa servicios de alumnos en un mismo panel unificado.</p>
         </div>
       </div>
-      <div class="col-md-4 mb-4">
+      <div class="col-md-4">
         <div class="feature-card">
-          <i class="fab fa-docker feature-icon"></i>
-          <h3 class="h4 card-title mb-3">Poder de Docker</h3>
-          <p class="card-text text-muted">Compatible con imágenes oficiales, Docker Compose y terminal web integrada.</p>
+          <div class="feature-icon"><i class="fab fa-docker"></i></div>
+          <h3 class="h4 fw-bold mb-3">Poder de Docker</h3>
+          <p class="text-muted">Inmágenes oficiales, Docker Compose y terminal web integrada para máxima flexibilidad.</p>
         </div>
       </div>
     </div>
@@ -121,31 +155,32 @@
   </div>
 </section>
 
-<section id="roles" class="roles-section">
+<section id="roles" class="roles-section" style="background: #f8fafc;">
   <div class="container">
-    <div class="text-center mb-4">
+    <div class="text-center mb-5">
       <h2 class="section-title">Roles en la plataforma</h2>
+      <p class="text-secondary fs-5">Un ecosistema diseñado para potenciar el aprendizaje colectivo.</p>
     </div>
-    <div class="row justify-content-center">
-      <div class="col-md-4 mb-4">
-        <div class="role-card shadow-sm h-100">
-          <div class="role-icon text-primary"><i class="fas fa-user-shield"></i></div>
-          <h4>Administrador</h4>
-          <p class="text-muted small">Gestión global de usuarios, asignaturas y recursos.</p>
+    <div class="row g-4 justify-content-center">
+      <div class="col-md-4">
+        <div class="role-card">
+          <div class="role-icon"><i class="fas fa-user-shield"></i></div>
+          <h4 class="fw-bold">Administrador</h4>
+          <p class="text-muted small mb-0">Gestión global de recursos, usuarios y supervisión del clúster educativo.</p>
         </div>
       </div>
-      <div class="col-md-4 mb-4">
-        <div class="role-card shadow-sm h-100">
+      <div class="col-md-4">
+        <div class="role-card">
           <div class="role-icon text-success"><i class="fas fa-chalkboard-teacher"></i></div>
-          <h4>Profesor</h4>
-          <p class="text-muted small">Crea proyectos, asigna prácticas y revisa despliegues de alumnos.</p>
+          <h4 class="fw-bold">Profesor</h4>
+          <p class="text-muted small mb-0">Crea proyectos, asigna prácticas y revisa despliegues en tiempo real.</p>
         </div>
       </div>
-      <div class="col-md-4 mb-4">
-        <div class="role-card shadow-sm h-100">
+      <div class="col-md-4">
+        <div class="role-card">
           <div class="role-icon text-info"><i class="fas fa-user-graduate"></i></div>
-          <h4>Estudiante</h4>
-          <p class="text-muted small">Despliega aplicaciones, gestiona contenedores y aprende DevOps.</p>
+          <h4 class="fw-bold">Estudiante</h4>
+          <p class="text-muted small mb-0">Despliega aplicaciones, gestiona contenedores y domina el mundo DevOps.</p>
         </div>
       </div>
     </div>

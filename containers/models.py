@@ -17,14 +17,38 @@ class PortReservation(models.Model):
     @classmethod
     def reserve_free_port(cls) -> int:
         """Devuelve un puerto libre dentro del rango y lo marca como reservado."""
+        import socket
         for port in range(PORT_RANGE_START, PORT_RANGE_END):
+            # 1. Comprobar disponibilidad en Base de Datos
+            if cls.objects.filter(port=port).exists():
+                continue
+
+            # 2. Comprobar disponibilidad real en el Host (especialmente para Windows)
+            # Esto detecta puertos reservados por Hyper-V, Windows Update, etc.
+            is_usable = False
+            temp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                # Intentar bindear el puerto
+                temp_socket.bind(("0.0.0.0", port))
+                is_usable = True
+            except socket.error:
+                # Puerto en uso o reservado por el sistema (Error 10013 en Windows)
+                is_usable = False
+            finally:
+                temp_socket.close()
+
+            if not is_usable:
+                continue
+
+            # 3. Intentar reservar de forma atómica
             try:
                 with transaction.atomic():
                     cls.objects.create(port=port)
                 return port
             except IntegrityError:
+                # Alguien lo reservó justo ahora
                 continue
-        raise RuntimeError("No free ports available")
+        raise RuntimeError("No free ports available in the defined range (checked DB and Host)")
 
     def __str__(self) -> str:
         return str(self.port)
@@ -84,11 +108,24 @@ class Service(models.Model):
     code = models.FileField("Codigo fuente (zip)", upload_to=get_service_upload_path, blank=True, null=True)
     volumes = models.JSONField("Volumenes", blank=True, null=True)
     env_vars = models.JSONField("Variables de entorno", blank=True, null=True)
+    container_configs = models.JSONField("Configuración de contenedores", blank=True, null=True)
     build_context_dir = models.CharField("Directorio de build (tmp)", max_length=300, blank=True, null=True)
+    mode = models.CharField(
+        "Modo de despliegue",
+        max_length=20,
+        default="default",
+        choices=[
+            ("default", "Catálogo Oficial"),
+            ("dockerhub", "DockerHub"),
+            ("custom", "Personalizado"),
+        ]
+    )
     created_at = models.DateTimeField("Creado", auto_now_add=True)
     updated_at = models.DateTimeField("Actualizado", auto_now=True)
 
-    # Opciones
+    # Opciones de tipado y visibilidad
+    container_type = models.CharField("Tipo de contenedor", max_length=20, default='misc')
+    is_web = models.BooleanField("¿Es una web accesible?", default=True)
     volume_name = models.CharField("Nombre del volumen", max_length=255, blank=True, null=True)
 
     class Meta:
@@ -138,7 +175,10 @@ class ServiceContainer(models.Model):
     )
     name = models.CharField("Nombre del contenedor", max_length=100)
     container_id = models.CharField("ID Docker", max_length=100, blank=True, null=True)
+    image_name = models.CharField("Imagen", max_length=255, blank=True, null=True)
     status = models.CharField("Estado", max_length=20, default="unknown")
+    container_type = models.CharField("Tipo de contenedor", max_length=20, default='misc')
+    is_web = models.BooleanField("¿Es una web accesible?", default=False)
     internal_ports = models.JSONField("Puertos internos", blank=True, null=True)
     assigned_ports = models.JSONField("Puertos asignados", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)

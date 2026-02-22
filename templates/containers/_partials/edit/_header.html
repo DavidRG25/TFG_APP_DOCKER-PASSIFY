@@ -1,0 +1,29 @@
+{# Header con degradado #}
+<div
+  class="rounded-3 p-4 mb-4 shadow-sm"
+  style="background: linear-gradient(135deg, #fd7e14 0%, #d35400 100%)"
+>
+  <div class="d-flex justify-content-between align-items-center">
+    <div>
+      <h1 class="h3 mb-1 text-white fw-bold">
+        Editar servicio: {{ service.name }}
+      </h1>
+      <p class="text-white-50 mb-0">
+        Modo: {% if service.mode == 'custom' %}
+        <strong>Personalizado</strong>
+        <span class="ms-1 opacity-75">
+          {% if service.has_compose %}<i class="fas fa-layer-group me-1"></i>Stack Compose{% else %}<i class="fas fa-file-code me-1"></i>Dockerfile{% endif %}
+        </span>
+        {% else %}
+        <strong>{{ service.get_mode_display }}</strong>
+        {% endif %} | Estado: {{ service.status }}
+      </p>
+    </div>
+    <a
+      href="{{ return_url }}"
+      class="btn btn-outline-light d-flex align-items-center"
+    >
+      <i class="fas fa-arrow-left me-2"></i>Volver
+    </a>
+  </div>
+</div>

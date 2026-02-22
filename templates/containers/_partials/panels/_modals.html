@@ -195,17 +195,140 @@
   </div>
 </div>
 
-<!-- Modal para Dockerfile / docker-compose.yml -->
+<!-- Modal para Dockerfile / docker-compose.yml (White IDE Premium) -->
 <div class="modal fade" id="codeModal" tabindex="-1" aria-labelledby="codeModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="codeModalLabel">Código</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+  <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden;">
+
+      <div class="modal-header border-bottom border-light bg-white py-3 px-4 position-relative">
+        <div class="d-flex align-items-center">
+          <i class="fas fa-file-code text-primary fs-3 me-3"></i>
+          <div>
+            <h5 class="modal-title fw-bold m-0" id="codeModalLabel" style="color: #1e293b; letter-spacing: -0.5px;">Visualizador de Código</h5>
+            <small class="text-muted">Vista de solo lectura</small>
+          </div>
+        </div>
+        
+        <div class="d-flex align-items-center gap-2 ms-auto">
+          <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3 fw-bold" onclick="copyModalCode()" id="btn-copy-modal">
+            <i class="far fa-copy me-1"></i> Copiar
+          </button>
+          
+          {# Botón de cierre circular rojo con data-bs-dismiss manual y nativo #}
+          <button type="button" 
+                  class="btn btn-danger rounded-circle d-flex align-items-center justify-content-center shadow-sm" 
+                  data-bs-dismiss="modal" 
+                  aria-label="Cerrar" 
+                  style="width: 36px; height: 36px; border: 2px solid white; transition: all 0.2s ease;"
+                  onclick="$('#codeModal').modal('hide');">
+            <i class="fas fa-times text-white" style="font-size: 14px;"></i>
+          </button>
+        </div>
       </div>
-      <div class="modal-body">
-        <pre id="code-body"><code>Cargando...</code></pre>
+      <div class="modal-body p-0" style="background: #ffffff;">
+        <div class="code-editor-wrapper" style="max-height: 75vh; overflow: auto; position: relative; border-top: 1px solid #f1f5f9;">
+          <div class="code-editor-container" style="display: flex; min-height: 100%; font-family: 'JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', monospace; font-size: 13.5px; line-height: 1.6;">
+            <!-- Números de línea STICKY -->
+            <div id="line-numbers" class="line-numbers text-end px-3 py-3" style="background: #f8fafc; color: #94a3b8; border-right: 1px solid #e2e8f0; user-select: none; min-width: 55px; font-weight: 500; position: sticky; left: 0; z-index: 10;">
+              <!-- Generado dinámicamente -->
+            </div>
+            <!-- Contenido del Código -->
+            <div class="code-content flex-grow-1 p-3" style="background: #ffffff; min-width: 0;">
+              <pre id="code-body" class="mb-0" style="white-space: pre; color: #334155; margin: 0;"><code>Cargando...</code></pre>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </div>
+
+<style>
+/* Estilos extra para el White IDE */
+.code-editor-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.code-editor-wrapper::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.code-editor-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+.code-editor-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+</style>
+
+<script>
+// Función para generar números de línea dinámicos
+function updateLineNumbers() {
+    const codeBody = document.getElementById('code-body');
+    const lineNumbersDiv = document.getElementById('line-numbers');
+    if (!codeBody || !lineNumbersDiv) return;
+
+    // Obtener texto limpio
+    const text = codeBody.innerText.trimEnd();
+    const lines = text.split(/\r?\n/);
+    const count = lines.length;
+    
+    let html = '';
+    for (let i = 1; i <= count; i++) {
+        html += i + '<br>';
+    }
+    lineNumbersDiv.innerHTML = html;
+}
+
+// Ejecutar cuando se muestra el modal o hay cambios de contenido
+document.addEventListener('htmx:afterOnLoad', function(evt) {
+    if (evt.detail.target.id === 'genericModalContent') {
+        // Si el modal se carga por htmx
+        setTimeout(updateLineNumbers, 50);
+    }
+});
+
+// Observar cambios para el modal de código específico
+const observer = new MutationObserver(updateLineNumbers);
+window.addEventListener('DOMContentLoaded', () => {
+    const codeBody = document.getElementById('code-body');
+    if (codeBody) {
+        observer.observe(codeBody, { childList: true, characterData: true, subtree: true });
+        updateLineNumbers();
+    }
+    
+    // Al abrir el modal, forzar actualización
+    const modalEl = document.getElementById('codeModal');
+    if (modalEl) {
+        modalEl.addEventListener('shown.bs.modal', updateLineNumbers);
+    }
+});
+
+function copyModalCode() {
+  const codeBody = document.getElementById('code-body');
+  const btn = document.getElementById('btn-copy-modal');
+  const textToCopy = codeBody.innerText;
+  
+  navigator.clipboard.writeText(textToCopy).then(() => {
+    const originalContent = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check text-success me-1"></i> Copiado';
+    btn.style.borderColor = '#198754';
+    
+    setTimeout(() => {
+      btn.innerHTML = originalContent;
+      btn.style.borderColor = '';
+    }, 2000);
+  });
+}
+
+// Función de seguridad para cerrar el modal manualmente
+function hideCodeModal() {
+    const modalEl = document.getElementById('codeModal');
+    if (modalEl && typeof bootstrap !== 'undefined') {
+        const instance = bootstrap.Modal.getInstance(modalEl);
+        if (instance) instance.hide();
+    }
+}
+</script>

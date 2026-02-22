@@ -1,0 +1,102 @@
+{# SECCIÓN: ARCHIVOS - Solo para Custom #}
+{% if service.mode == 'custom' %}
+<div class="col-12 mt-5">
+  <h5 class="fw-bold mb-3">
+    <i class="fas fa-file-archive text-primary" style="margin-right: 0.5rem;"></i>Gestión de Archivos
+  </h5>
+
+  {# Visualización de archivos actuales #}
+  <div class="row g-4 justify-content-center mb-4">
+    {% if not service.has_compose %}
+    <div class="col-md-5">
+      <div class="p-3 bg-light rounded text-center border h-100 d-flex flex-column justify-content-center">
+        <i class="fas fa-file-alt fa-2x mb-2 {% if service.dockerfile %}text-success{% else %}text-muted{% endif %}"></i>
+        <div class="small fw-bold">Dockerfile</div>
+        <div class="x-small text-muted">
+          {% if service.dockerfile %}✓ Presente{% else %}- Vacío -{% endif %}
+        </div>
+        {% if service.dockerfile %}
+        <div class="mt-2">
+          <button 
+            type="button" 
+            class="btn btn-sm btn-outline-info" 
+            onclick="showFileModal('dockerfile', '{{ service.id }}')"
+          >
+            <i class="fas fa-eye me-1"></i>Ver
+          </button>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if service.has_compose %}
+    <div class="col-md-5">
+      <div class="p-3 bg-light rounded text-center border h-100 d-flex flex-column justify-content-center">
+        <i class="fas fa-project-diagram fa-2x mb-2 {% if service.compose %}text-primary{% else %}text-muted{% endif %}"></i>
+        <div class="small fw-bold">Docker Compose</div>
+        <div class="x-small text-muted">
+          {% if service.compose %}✓ Presente{% else %}- Vacío -{% endif %}
+        </div>
+        {% if service.compose %}
+        <div class="mt-2">
+          <button 
+            type="button" 
+            class="btn btn-sm btn-outline-info" 
+            onclick="showFileModal('compose', '{{ service.id }}')"
+          >
+            <i class="fas fa-eye me-1"></i>Ver
+          </button>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="col-md-5">
+      <div class="p-3 bg-light rounded text-center border h-100 d-flex flex-column justify-content-center">
+        <i class="fas fa-file-archive fa-2x mb-2 {% if service.code %}text-warning{% else %}text-muted{% endif %}"></i>
+        <div class="small fw-bold">Código Fuente (.zip)</div>
+        <div class="x-small text-muted">
+          {% if service.code %}✓ Presente{% else %}- No subido -{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 justify-content-center">
+    {% if not service.has_compose %}
+    <div class="col-md-5">
+      <label class="form-label small fw-bold text-success text-center d-block">Reemplazar Dockerfile</label>
+      <input type="file" name="dockerfile" class="form-control" />
+    </div>
+    {% endif %}
+
+    {% if service.has_compose %}
+    <div class="col-md-5">
+      <label class="form-label small fw-bold text-primary text-center d-block">Reemplazar Compose (.yml)</label>
+      <input type="file" name="compose" class="form-control" accept=".yml,.yaml" />
+    </div>
+    {% endif %}
+
+    <div class="col-md-5">
+      <label class="form-label small fw-bold text-warning text-center d-block">Reemplazar Código (.zip)</label>
+      <input type="file" name="code" class="form-control" accept=".zip" />
+    </div>
+  </div>
+
+  {# Contenedor para previsualización de contenedores detectados dinámicamente #}
+  <div id="compose-preview-container" class="mt-4 d-none">
+    <hr class="my-4 opacity-10" />
+    <div class="alert alert-info border-0 shadow-sm mb-0">
+      <div class="d-flex align-items-center mb-3">
+        <i class="fas fa-search fa-lg me-2"></i>
+        <h6 class="fw-bold mb-0">Nuevo Stack Detectado</h6>
+      </div>
+      <div id="compose-preview-content">
+        {# Aquí se cargará el fragmento de tabla desde el servidor #}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}

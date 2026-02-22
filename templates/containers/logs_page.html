@@ -1,0 +1,726 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extrahead %}
+<style>
+    /* Forzamos que el fondo ocupe toda la pantalla eliminando márgenes de base.html */
+    #main-content {
+        padding: 0 !important;
+    }
+    
+    #content-wrapper {
+        background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%) !important; /* Azul grisáceo claro y elegante */
+        min-height: 100vh;
+    }
+
+    .footer {
+        display: none !important;
+    }
+
+    .logs-page {
+        background: transparent; /* El fondo lo hereda del wrapper */
+        min-height: calc(100vh - 60px);
+        padding: 40px 20px;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+    }
+    
+    .logs-card {
+        width: 100%;
+        max-width: 1400px; /* Ancho máximo para que no se estire demasiado en pantallas gigantes */
+        background: #1a1a1a;
+        border-radius: 16px;
+        overflow: hidden;
+        /* Sombra multicapa para efecto difuminado premium */
+        box-shadow: 
+            0 10px 15px -3px rgba(0, 0, 0, 0.1),
+            0 30px 60px -12px rgba(0, 0, 0, 0.25),
+            0 50px 100px -20px rgba(0, 0, 0, 0.2);
+        border: none;
+    }
+    
+    .logs-header {
+        background: linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%); /* Azul sólido y vibrante */
+        padding: 22px 30px;
+        color: white;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: none;
+    }
+    
+    .logs-header h3 {
+        margin: 0;
+        font-weight: 700;
+        letter-spacing: -0.5px;
+        color: #0f172a;
+    }
+    
+    .logs-toolbar {
+        background-color: rgba(45, 45, 45, 0.6);
+        backdrop-filter: blur(10px);
+        padding: 15px 25px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        border-bottom: 1px solid #333;
+    }
+
+    .toolbar-row {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 10px;
+        align-items: center;
+        width: 100%;
+    }
+
+    @media (max-width: 992px) {
+        .toolbar-row { flex-wrap: wrap; }
+    }
+
+    .logs-toolbar input,
+    .logs-toolbar select {
+        background-color: #0a0a0a;
+        border: 1px solid #444;
+        color: #fff;
+        padding: 10px 15px;
+        border-radius: 8px;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+    }
+
+    .logs-toolbar input:focus,
+    .logs-toolbar select:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+        outline: none;
+    }
+
+    .search-container {
+        display: flex;
+        gap: 10px;
+        flex-grow: 1;
+        min-width: 300px;
+    }
+
+    .search-input { 
+        flex-grow: 1;
+    }
+
+    .btn-clear-search-premium {
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: #fff;
+        border-radius: 8px;
+        padding: 0 15px;
+        cursor: pointer;
+        display: none;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+        white-space: nowrap;
+    }
+
+    .btn-clear-search-premium:hover {
+        background: #ef4444;
+        border-color: #ef4444;
+    }
+
+    /* Estilo Premium para botones */
+    .logs-toolbar button[class^="btn-"] {
+        border: none;
+        border-radius: 8px;
+        padding: 10px 20px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 0.85rem;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: white;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .btn-copy { background: linear-gradient(135deg, #10b981 0%, #059669 100%); box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2); }
+    .btn-download { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2); }
+    .btn-refresh { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); box-shadow: 0 4px 10px rgba(245, 158, 11, 0.2); }
+    .btn-live { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); box-shadow: 0 4px 10px rgba(139, 92, 246, 0.2); }
+    .btn-clear { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); box-shadow: 0 4px 10px rgba(239, 68, 68, 0.2); }
+
+    .logs-toolbar button:hover {
+        transform: translateY(-2px);
+        filter: brightness(1.1);
+    }
+
+    .btn-live.active {
+        background: #f59e0b !important;
+        animation: pulse-live 2s infinite;
+    }
+    
+    @keyframes pulse-live {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); }
+        50% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); }
+    }
+
+    button:disabled, select:disabled, input:disabled {
+        opacity: 0.5 !important;
+        cursor: not-allowed !important;
+        pointer-events: none !important;
+    }
+
+    .d-none { display: none !important; }
+    .d-flex { display: flex !important; }
+
+    /* Estilo Premium para botón Volver */
+    .btn-back-premium {
+        background: rgba(255, 255, 255, 0.15);
+        color: white !important;
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        padding: 8px 22px;
+        border-radius: 50px;
+        font-weight: 600;
+        text-decoration: none !important;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.9rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .btn-back-premium:hover {
+        background: rgba(255, 255, 255, 0.25);
+        transform: translateX(-5px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .btn-back-premium i {
+        font-size: 0.8rem;
+        transition: transform 0.3s;
+    }
+
+    .btn-back-premium:hover i {
+        transform: scale(1.2);
+    }
+    
+    .logs-container {
+        background-color: #050505;
+        background-image: radial-gradient(circle at 50% -20%, #1e293b 0%, #050505 80%);
+        padding: 30px;
+        min-height: 500px;
+        max-height: 70vh;
+        overflow-y: auto;
+        font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+        font-size: 14px;
+        line-height: 1.7;
+    }
+    
+    .logs-container pre,
+    .log-line {
+        margin: 0;
+        white-space: pre !important; /* Forzamos que se mantenga el formato original sin saltos automáticos */
+        font-family: inherit;
+        display: block;
+        min-width: fit-content;
+    }
+    
+    .logs-container {
+        background-color: #050505;
+        background-image: radial-gradient(circle at 50% -20%, #1e293b 0%, #050505 80%);
+        padding: 20px;
+        min-height: 500px;
+        max-height: 75vh;
+        overflow: auto; /* Permite scroll vertical y horizontal */
+        font-family: 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        border: 1px solid #333;
+    }
+    
+    /* Colorización simple (fallback) */
+    .log-error { color: #f87171 !important; }
+    .log-warn { color: #fbbf24 !important; }
+    .log-info { color: #4ade80 !important; }
+    .log-debug { color: #60a5fa !important; }
+    
+    .log-header {
+        color: #22d3ee;
+        font-weight: bold;
+        background-color: rgba(255,255,255,0.05);
+        padding: 5px 15px;
+        margin: 10px 0;
+        border-radius: 4px;
+        display: block;
+        white-space: normal !important;
+    }
+    
+    .log-default { color: #cbd5e1; }
+    
+    .cache-hit { background-color: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .cache-miss { background-color: rgba(245, 158, 11, 0.2); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+
+    /* Estilos para el feedback de botones en JS */
+    .btn-success-feedback {
+        background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+        transform: scale(1.05);
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh">
+  <script>
+    (function() {
+      document.documentElement.style.setProperty('--subject-primary', '{{ current_subject.color|default:"#1e3a8a" }}');
+      document.documentElement.style.setProperty('--subject-secondary', '{{ current_subject.color|default:"#3b82f6" }}');
+    })();
+  </script>
+
+  {# Breadcrumbs - Ruta encima del banner #}
+  <nav aria-label="breadcrumb" class="mb-3 px-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item">
+        <a href="{% url 'containers:student_panel' %}" class="text-decoration-none text-muted">
+          <i class="fas fa-home me-1"></i>Inicio
+        </a>
+      </li>
+      {% if current_subject %}
+        <li class="breadcrumb-item">
+          <a href="{% url 'containers:student_subjects' %}" class="text-decoration-none text-muted">Asignaturas</a>
+        </li>
+        <li class="breadcrumb-item">
+          <a href="{% url 'containers:student_panel' %}?subject={{ current_subject.id }}" class="text-decoration-none text-muted">{{ current_subject.name }}</a>
+        </li>
+      {% endif %}
+      <li class="breadcrumb-item active text-primary fw-bold" aria-current="page">Logs: {{ service.name }}</li>
+    </ol>
+  </nav>
+
+  {# Header con degradado Premium - Estilo Unificado Pro #}
+  <div class="rounded-4 p-3 mb-4 shadow mx-3" 
+       style="background: linear-gradient(135deg, var(--subject-primary) 0%, var(--subject-secondary) 100%); display: flex; align-items: center;">
+    <div class="d-flex justify-content-between align-items-center w-100">
+      <div class="d-flex align-items-center">
+        {# Botón de Volver #}
+        <a href="{{ return_url }}" 
+           class="btn btn-light rounded-circle shadow-sm d-flex align-items-center justify-content-center px-0" 
+           style="width: 45px; height: 45px; min-width: 45px; margin-right: 2rem; color: var(--subject-primary); transition: all 0.2s;"
+           title="Volver">
+          <i class="fas fa-arrow-left"></i>
+        </a>
+
+        {# Logo/Icono de Logs #}
+        <div class="bg-white rounded-3 shadow-sm d-flex align-items-center justify-content-center overflow-hidden border border-white border-2" 
+             style="width: 55px; height: 55px; min-width: 55px; margin-right: 1.5rem;">
+          {% if current_subject.logo %}
+            <img src="{{ current_subject.logo.url }}" alt="Logo" class="w-100 h-100 object-fit-cover">
+          {% else %}
+            <i class="fas fa-file-alt" style="color: var(--subject-primary);"></i>
+          {% endif %}
+        </div>
+
+        {# Textos #}
+        <div class="text-container text-white ms-3">
+          <h1 class="h4 mb-0 fw-bold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15);">
+            Visualizando Logs: {{ service.name }}
+          </h1>
+          <div class="d-flex align-items-center mt-1 gap-2">
+            <span class="badge fw-bold small rounded-pill px-3" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2);">
+              <i class="fas fa-microchip me-1 small"></i> Contenedor
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="d-none d-md-block">
+        <span class="badge rounded-pill px-3 py-2 border" 
+              style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(8px); border-color: rgba(255, 255, 255, 0.2) !important; color: white;">
+          <i class="fas fa-history me-1"></i> Auditoría en Tiempo Real
+        </span>
+      </div>
+    </div>
+  </div>
+
+<div class="logs-page" style="min-height: auto; padding: 0 1rem;">
+    <div class="logs-card">
+    
+    <div class="logs-toolbar" id="logs-filters" style="position: relative;">
+        <!-- Overlay para modo Live -->
+        <div id="live-overlay" class="d-none" style="position: absolute; top: 0; left: 0; width: 100%; height: 50%; background: rgba(0,0,0,0.6); z-index: 5; border-radius: 8px 8px 0 0; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+            <span class="text-warning fw-bold small"><i class="fas fa-exclamation-triangle me-2"></i>Filtros inhabilitados en modo Live</span>
+        </div>
+        
+        <!-- Fila 1: Filtros -->
+        <div class="toolbar-row">
+            <div class="search-container">
+                <input type="text" 
+                       name="search" 
+                       id="logs-search-input"
+                       class="search-input"
+                       placeholder="🔍 Buscar en logs..."
+                       value="{{ search_text }}"
+                       hx-get="{% url 'containers:logs_page' service.id %}"
+                       hx-trigger="keyup changed delay:500ms"
+                       hx-target="#logs-content"
+                       hx-include="#logs-filters"
+                       oninput="toggleClearBtn(this)">
+                
+                <button type="button" 
+                        id="btn-clear-search" 
+                        class="btn-clear-search-premium {% if search_text %}d-flex{% else %}d-none{% endif %}" 
+                        onclick="clearSearch()"
+                        title="Limpiar búsqueda">
+                    <i class="fas fa-broom"></i> Limpiar
+                </button>
+            </div>
+            
+            <select name="level"
+                    hx-get="{% url 'containers:logs_page' service.id %}"
+                    hx-trigger="change"
+                    hx-target="#logs-content"
+                    hx-include="#logs-filters"
+                    title="Filtrar por nivel de severidad">
+                <option value="ALL" {% if log_level == 'ALL' %}selected{% endif %}>Todos los niveles</option>
+                <option value="ERROR" {% if log_level == 'ERROR' %}selected{% endif %}>🔴 ERROR</option>
+                <option value="WARN" {% if log_level == 'WARN' %}selected{% endif %}>🟡 WARN</option>
+                <option value="INFO" {% if log_level == 'INFO' %}selected{% endif %}>🟢 INFO</option>
+                <option value="DEBUG" {% if log_level == 'DEBUG' %}selected{% endif %}>🔵 DEBUG</option>
+            </select>
+            
+            <select name="since"
+                    hx-get="{% url 'containers:logs_page' service.id %}"
+                    hx-trigger="change"
+                    hx-target="#logs-content"
+                    hx-include="#logs-filters"
+                    title="Filtrar por antigüedad (desde hace...)">
+                <option value="" {% if not since %}selected{% endif %}>Cualquier momento</option>
+                <option value="5m" {% if since == '5m' %}selected{% endif %}>Últimos 5 min</option>
+                <option value="15m" {% if since == '15m' %}selected{% endif %}>Últimos 15 min</option>
+                <option value="1h" {% if since == '1h' %}selected{% endif %}>Última hora</option>
+                <option value="4h" {% if since == '4h' %}selected{% endif %}>Últimas 4 horas</option>
+                <option value="24h" {% if since == '24h' %}selected{% endif %}>Últimas 24 horas</option>
+                <option value="7d" {% if since == '7d' %}selected{% endif %}>Últimos 7 días</option>
+            </select>
+
+            <select name="tail"
+                    hx-get="{% url 'containers:logs_page' service.id %}"
+                    hx-trigger="change"
+                    hx-target="#logs-content"
+                    hx-include="#logs-filters">
+                <option value="100" {% if tail == '100' %}selected{% endif %}>100 líneas</option>
+                <option value="500" {% if tail == '500' %}selected{% endif %}>500 líneas</option>
+                <option value="1000" {% if tail == '1000' %}selected{% endif %}>1000 líneas</option>
+                <option value="all" {% if tail == 'all' %}selected{% endif %}>Todas</option>
+            </select>
+            
+            {% if service.has_compose and containers %}
+            <select name="container"
+                    hx-get="{% url 'containers:logs_page' service.id %}"
+                    hx-trigger="change"
+                    hx-target="#logs-content"
+                    hx-include="#logs-filters">
+                <option value="all" {% if not selected_container or selected_container == 'all' %}selected{% endif %}>Todos los contenedores</option>
+                {% for container in containers %}
+                <option value="{{ container.id }}" {% if selected_container == container.id|stringformat:"s" %}selected{% endif %}>{{ container.name }}</option>
+                {% endfor %}
+            </select>
+            {% endif %}
+        </div>
+        
+        <!-- Fila 2: Acciones -->
+        <div class="toolbar-row">
+            <input type="hidden" name="rich" value="{{ use_rich|yesno:'true,false' }}">
+            
+            <button class="btn-copy" onclick="copyLogs(this)" title="Copiar logs al portapapeles">
+                <i class="fas fa-copy"></i> Copiar
+            </button>
+            
+            <button class="btn-download" onclick="downloadLogs(this)" title="Descargar logs como archivo">
+                <i class="fas fa-download"></i> Descargar
+            </button>
+            
+            <button class="btn-refresh" 
+                    hx-get="{% url 'containers:logs_page' service.id %}?refresh=true"
+                    hx-target="#logs-content"
+                    hx-include="#logs-filters"
+                    title="Obtener logs más recientes del contenedor (limpia la caché)">
+                <i class="fas fa-sync-alt"></i> Refrescar
+            </button>
+            
+            <button id="btn-live" class="btn-live" onclick="toggleLiveStream()" title="Seguir logs en vivo">
+                <i class="fas fa-satellite-dish"></i> Seguir en vivo
+            </button>
+            
+            <button class="btn-clear" onclick="scrollToTop()" title="Ir al inicio">
+                <i class="fas fa-arrow-up"></i> Inicio
+            </button>
+            <button class="btn-clear" style="background: linear-gradient(135deg, #64748b 0%, #475569 100%);" onclick="scrollToBottom()" title="Ir al final">
+                <i class="fas fa-arrow-down"></i> Final
+            </button>
+        </div>
+    </div>
+    
+    <div class="logs-info" id="logs-info-container" style="background: rgba(0,0,0,0.2); padding: 10px 25px; border-bottom: 1px solid #333; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem;">
+        <div id="logs-info-fragment" style="display: flex; justify-content: space-between; width: 100%; align-items: center;">
+            <span>
+                <i class="fas fa-chart-bar me-1" style="color: #3b82f6;"></i> 
+                Mostrando <strong>{{ total_lines }}</strong> líneas
+                {% if search_text %}
+                | <i class="fas fa-search me-1" style="color: #fbbf24;"></i> Filtrado por: "<strong>{{ search_text }}</strong>"
+                {% endif %}
+                {% if log_level != 'ALL' %}
+                | <i class="fas fa-tag me-1" style="color: #10b981;"></i> Nivel: <strong>{{ log_level }}</strong>
+                {% endif %}
+                {% if since %}
+                | <i class="fas fa-clock me-1" style="color: #60a5fa;"></i> Desde hace: <strong>{{ since }}</strong>
+                {% endif %}
+                <span class="ms-3 text-muted" style="font-size: 0.75rem;">
+                    <i class="fas fa-info-circle me-1"></i> Timestamps convertidos a hora local (España)
+                </span>
+            </span>
+            <span class="cache-indicator {% if from_cache %}cache-hit{% else %}cache-miss{% endif %}" style="padding: 2px 10px; border-radius: 4px; font-weight: 600;">
+                {% if from_cache %}
+                <i class="fas fa-bolt" style="color: #fbbf24;"></i> Desde caché
+                {% else %}
+                <i class="fas fa-sync-alt" style="color: #10b981;"></i> Actualizado
+                {% endif %}
+            </span>
+        </div>
+    </div>
+    
+    <div class="logs-container" id="logs-content">
+        {{ logs_html|safe }}
+    </div>
+    </div> <!-- Cierre de logs-card -->
+</div>
+{% endblock %}
+
+{% block extrascripts %}
+<script>
+// Mostrar/ocultar botón de limpiar
+function toggleClearBtn(input) {
+    const btn = document.getElementById('btn-clear-search');
+    if (input.value.length > 0) {
+        btn.classList.remove('d-none');
+        btn.classList.add('d-flex');
+    } else {
+        btn.classList.remove('d-flex');
+        btn.classList.add('d-none');
+    }
+}
+
+// Limpiar búsqueda
+function clearSearch() {
+    const input = document.getElementById('logs-search-input');
+    const btn = document.getElementById('btn-clear-search');
+    input.value = '';
+    btn.classList.remove('d-flex');
+    btn.classList.add('d-none');
+    
+    // Forzamos una recarga limpia pidiendo refresh=true para limpiar la caché
+    const level = document.querySelector('select[name="level"]').value;
+    const since = document.querySelector('select[name="since"]').value;
+    const tail = document.querySelector('select[name="tail"]').value;
+    const container = document.querySelector('select[name="container"]') ? document.querySelector('select[name="container"]').value : 'all';
+    
+    const url = `?search=&level=${level}&since=${since}&tail=${tail}&container=${container}&refresh=true&rich=true&force_refresh=true`;
+    
+    htmx.ajax('GET', url, {
+        target: '#logs-content',
+        swap: 'innerHTML'
+    });
+}
+
+// Copiar logs al portapapeles
+function copyLogs(btn) {
+    const logsContent = document.getElementById('logs-content');
+    const text = logsContent.innerText;
+    
+    navigator.clipboard.writeText(text).then(() => {
+        const originalHTML = btn.innerHTML;
+        
+        btn.classList.add('btn-success-feedback');
+        btn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+        
+        setTimeout(() => {
+            btn.classList.remove('btn-success-feedback');
+            btn.innerHTML = originalHTML;
+        }, 2000);
+    }).catch(err => {
+        alert('Error al copiar: ' + err);
+    });
+}
+
+// Descargar logs como archivo
+function downloadLogs(btn) {
+    const logsContent = document.getElementById('logs-content');
+    const text = logsContent.innerText;
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `logs-{{ service.name }}-${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.log`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    // Feedback
+    const originalText = btn.innerHTML;
+    const originalClass = btn.className;
+    
+    btn.innerHTML = '<i class="fas fa-check"></i> Descargado!';
+    btn.classList.add('btn-success-feedback');
+    
+    setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.classList.remove('btn-success-feedback');
+    }, 2000);
+}
+
+// Reconectar contenedor individual
+function reconnect_container(name) {
+    if (liveSocket && liveSocket.readyState === WebSocket.OPEN) {
+        liveSocket.send(JSON.stringify({
+            "command": "reconnect",
+            "container": name
+        }));
+    }
+}
+window.reconnect_container = reconnect_container;
+
+// Scroll al inicio
+function scrollToTop() {
+    const container = document.querySelector('.logs-container');
+    container.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+    });
+}
+
+// Scroll al final
+function scrollToBottom() {
+    const container = document.querySelector('.logs-container');
+    container.scrollTo({
+        top: container.scrollHeight,
+        behavior: 'smooth'
+    });
+}
+
+// Streaming en vivo
+let liveSocket = null;
+let isLiveStreaming = false;
+
+function toggleLiveStream() {
+    const btn = document.getElementById('btn-live');
+    const logsContainer = document.getElementById('logs-content');
+    
+    // Función para bloquear/desbloquear UI
+    const setUIState = (disabled) => {
+        const filtersContainer = document.getElementById('logs-filters');
+        const overlay = document.getElementById('live-overlay');
+        const elements = filtersContainer.querySelectorAll('select, input, .btn-refresh, .btn-copy, .btn-download');
+        
+        elements.forEach(el => {
+            el.disabled = disabled;
+            if (disabled) el.style.opacity = '0.5';
+            else el.style.opacity = '1';
+        });
+        
+        // Efecto visual en el contenedor y overlay
+        if (disabled) {
+            filtersContainer.style.background = 'rgba(45, 45, 45, 0.9)';
+            if (overlay) {
+                overlay.classList.remove('d-none');
+                overlay.classList.add('d-flex');
+            }
+        } else {
+            filtersContainer.style.background = 'rgba(45, 45, 45, 0.6)';
+            if (overlay) {
+                overlay.classList.remove('d-flex');
+                overlay.classList.add('d-none');
+            }
+        }
+    };
+    
+    if (isLiveStreaming) {
+        // Detener streaming
+        if (liveSocket && liveSocket.readyState === WebSocket.OPEN) {
+            liveSocket.send("stop");
+            liveSocket.close();
+        }
+        liveSocket = null;
+        
+        btn.classList.remove('active');
+        btn.innerHTML = '<i class="fas fa-satellite-dish"></i> Seguir en vivo';
+        isLiveStreaming = false;
+        
+        setUIState(false); // Rehabilitar controles
+        
+        // Volver a cargar logs estáticos pulsando REFRESCAR
+        document.querySelector('.btn-refresh').click();
+    } else {
+        // Iniciar streaming
+        const scheme = window.location.protocol === "https:" ? "wss" : "ws";
+        const containerSelect = document.querySelector('select[name="container"]');
+        const sinceSelect = document.querySelector('select[name="since"]');
+        const tailSelect = document.querySelector('select[name="tail"]');
+        
+        const containerVal = containerSelect ? containerSelect.value : 'all';
+        const sinceVal = sinceSelect ? sinceSelect.value : '';
+        const tailVal = tailSelect ? tailSelect.value : '100';
+        
+        const socketUrl = `${scheme}://${window.location.host}/ws/logs-stream/{{ service.id }}/?container=${containerVal}&since=${sinceVal}&tail=${tailVal}`;
+        
+        liveSocket = new WebSocket(socketUrl);
+        
+        liveSocket.onopen = () => {
+            btn.classList.add('active');
+            btn.innerHTML = '<i class="fas fa-stop"></i> Detener vivo';
+            isLiveStreaming = true;
+            
+            setUIState(true); // Bloquear otros controles
+            
+            // Limpiar logs actuales para el modo live
+            logsContainer.innerHTML = '<div style="color: #4ade80; padding: 10px; font-weight: bold; border-bottom: 1px solid #333; animation: pulse 2s infinite;">📡 MODO LIVE ACTIVO: ESCUCHANDO EVENTOS...</div>';
+        };
+        
+        liveSocket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.log) {
+                    const div = document.createElement('div');
+                    div.innerHTML = data.log; // El backend envía el HTML colorizado
+                    logsContainer.appendChild(div);
+                    
+                    // Auto-scroll al final
+                    logsContainer.scrollTop = logsContainer.scrollHeight;
+                }
+            } catch (err) {
+                console.warn("Mensaje live no es JSON:", event.data);
+            }
+        };
+        
+        liveSocket.onclose = () => {
+            if (isLiveStreaming) {
+                btn.classList.remove('active');
+                btn.innerHTML = '<i class="fas fa-satellite-dish"></i> Seguir en vivo';
+                isLiveStreaming = false;
+            }
+        };
+        
+        liveSocket.onerror = (err) => {
+            console.error("Error WS Live:", err);
+            logsContainer.innerHTML += '<div style="color: #ef4444; padding: 10px;">🔴 ERROR DE CONEXIÓN AL STREAM</div>';
+        };
+    }
+}
+</script>
+{% endblock %}

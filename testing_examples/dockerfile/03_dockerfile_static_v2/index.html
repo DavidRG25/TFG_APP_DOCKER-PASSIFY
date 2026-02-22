@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PaaSify Static App</title>
+    <style>
+        body { font-family: sans-serif; background: #f0f4f8; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 2rem; border-radius: 12px; shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
+        h1 { color: #2563eb; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>PaaSify Static Example</h1>
+        <p>This is a second static example using Nginx.</p>
+        <p id="date"></p>
+    </div>
+    <script>
+        document.getElementById('date').innerText = "Loaded at: " + new Date().toLocaleString();
+    </script>
+</body>
+</html>

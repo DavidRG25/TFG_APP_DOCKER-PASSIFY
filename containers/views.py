@@ -1,12 +1,16 @@
 # test comment
+
 # containers/views.py
 import json
 from django.db import models
+from django.conf import settings
 
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.core.exceptions import FieldError
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.template.loader import render_to_string
 from django.utils.html import escape
 
@@ -30,6 +34,7 @@ from paasify.roles import (
 from .docker_client import get_docker_client
 from .models import AllowedImage, Service, ServiceContainer
 from .serializers import AllowedImageSerializer, ServiceSerializer
+from .compose_parser import DockerComposeParser
 from .services import (
     remove_container, 
     run_container, 
@@ -39,6 +44,25 @@ from .services import (
     fetch_container_logs,
     sync_service_status
 )
+
+@login_required
+@require_POST
+def analyze_compose(request):
+    """
+    Analiza un archivo docker-compose.yml y retorna información estructurada.
+    """
+    if 'compose_file' not in request.FILES:
+        return JsonResponse({'success': False, 'error': 'No se proporcionó archivo'}, status=400)
+
+    compose_file = request.FILES['compose_file']
+    try:
+        content = compose_file.read().decode('utf-8')
+    except Exception:
+        return JsonResponse({'success': False, 'error': 'Archivo no válido'}, status=400)
+
+    parser = DockerComposeParser(content)
+    result = parser.parse()
+    return JsonResponse(result)
 
 
 # ----------------------------- helpers -----------------------------
@@ -94,9 +118,11 @@ class ServiceViewSet(viewsets.ModelViewSet):
     def _render_table_fragment(self, request) -> str:
         services = self.get_queryset()
         host = request.get_host().split(":")[0]
+        # Detectar si el usuario debe ver la vista de supervisor (propietario o profesor)
+        is_supervisor = user_is_teacher(request.user) or user_is_admin(request.user)
         return render_to_string(
             "containers/_service_rows.html",
-            {"services": services, "host": host},
+            {"services": services, "host": host, "is_supervisor": is_supervisor},
             request=request,
         )
 
@@ -159,9 +185,50 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if status:
             qs = qs.filter(status=status)
 
+        mode = self.request.query_params.get('mode')
+        if mode:
+            qs = qs.filter(mode=mode)
+
+        q = self.request.query_params.get('q')
+        if q:
+            from django.db.models import Q
+            qs = qs.filter(Q(name__icontains=q) | Q(image__icontains=q))
+
         for s in qs:
             sync_service_status(s)
         return qs.exclude(status="removed")
+
+    @action(detail=True, methods=["post"], url_path="remove")
+    def remove(self, request, pk=None):
+        service = self.get_object()
+        
+        # Restricción: Los profesores no pueden eliminar contenedores de alumnos
+        if not request.user.is_superuser and service.owner != request.user:
+            if user_is_teacher(request.user):
+                if self._is_htmx(request):
+                    return self._htmx_response(request, status=403, message="No puedes eliminar contenedores de alumnos.", level="text-bg-danger")
+                raise PermissionDenied("Los profesores no pueden eliminar contenedores de los alumnos.")
+        
+        try:
+            from .services import remove_container_async
+            remove_container_async(service)
+        except Exception as exc:
+            if self._is_htmx(request):
+                return self._htmx_response(
+                    request,
+                    status=500,
+                    message=str(exc),
+                    level="text-bg-danger",
+                )
+            return DRF_Response({"status": "error", "message": str(exc)}, status=500)
+
+        if self._is_htmx(request):
+            return self._htmx_response(
+                request,
+                message="El servicio está siendo eliminado...",
+                level="text-bg-success",
+            )
+        return DRF_Response({"status": "deleting", "message": "Servicio eliminando."})
 
     def create(self, request, *args, **kwargs):
         """
@@ -194,10 +261,18 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if project_id:
             project = get_object_or_404(UserProject, pk=project_id, user_profile__user=request.user)
 
+        # Capturar configuraciones personalizadas de contenedores (para compose)
+        container_configs = request.data.get("container_configs")
+        if isinstance(container_configs, str):
+            try:
+                container_configs = json.loads(container_configs)
+            except:
+                container_configs = None
+
         service = serializer.save(owner=request.user, status="creating", project=project)
 
         try:
-            run_container(service, custom_port=custom_port)
+            run_container(service, custom_port=custom_port, container_configs=container_configs)
         except Exception as exc:
             service.status = "error"
             service.logs = str(exc)
@@ -226,6 +301,29 @@ class ServiceViewSet(viewsets.ModelViewSet):
             status=201,
             headers=headers
         )
+
+    def perform_update(self, serializer):
+        service = self.get_object()
+        if service.mode == 'default':
+            raise PermissionDenied("Los servicios del catálogo oficial no se pueden editar.")
+        
+        # Guardar cambios
+        updated_service = serializer.save()
+        
+        # Procesar archivos si vienen por multipart
+        self._attach_uploaded_files(updated_service, self.request, updated_service.mode)
+        
+        # Reiniciar contenedor
+        try:
+            keep_vols = getattr(updated_service, '_keep_volumes', True)
+            remove_container(updated_service, keep_files=True, keep_volumes=keep_vols)
+            run_container(updated_service)
+        except Exception as exc:
+            # En API reportamos el error pero permitimos que el objeto se guarde
+            updated_service.status = "error"
+            updated_service.logs = f"Error al actualizar: {exc}"
+            updated_service.save()
+            raise ValidationError(f"Error al reiniciar contenedor: {exc}")
 
     def _validation_error_response(self, exc: ValidationError):
         """Devuelve un fragmento HTML con errores de validación para HTMX."""
@@ -317,30 +415,24 @@ class ServiceViewSet(viewsets.ModelViewSet):
             )
         return DRF_Response({"status": "stopping", "message": "Servicio deteniendo."})
 
-    @action(detail=True, methods=["post"], url_path="remove")
-    def remove(self, request, pk=None):
+    @action(detail=True, methods=["post"])
+    def restart(self, request, pk=None):
         service = self.get_object()
-        
         try:
-            from .services import remove_container_async
-            remove_container_async(service)
+            from .services import run_container
+            run_container(service)
         except Exception as exc:
             if self._is_htmx(request):
-                return self._htmx_response(
-                    request,
-                    status=500,
-                    message=str(exc),
-                    level="text-bg-danger",
-                )
+                return self._htmx_response(request, status=500, message=str(exc), level="text-bg-danger")
             return DRF_Response({"status": "error", "message": str(exc)}, status=500)
 
         if self._is_htmx(request):
             return self._htmx_response(
                 request,
-                message="El servicio está siendo eliminado...",
-                level="text-bg-success",
+                message="El servicio está siendo enviado a reiniciar...",
+                level="text-bg-warning",
             )
-        return DRF_Response({"status": "deleting", "message": "Servicio eliminando."})
+        return DRF_Response({"status": "restarting", "message": "Servicio reiniciando."})
 
     @action(detail=True, methods=["get"])
     def logs(self, request, pk=None):
@@ -352,29 +444,33 @@ class ServiceViewSet(viewsets.ModelViewSet):
         """
         service = self.get_object()
         container_id_param = request.query_params.get("container")
+        tail_param = request.query_params.get("tail", "200")
+        since_param = request.query_params.get("since")
         
-        # Determinar de dónde obtener los logs
+        # Validar tail
+        try:
+            tail_val = int(tail_param) if tail_param != 'all' else 'all'
+        except:
+            tail_val = 200
+
+        # Determinar de dónde obtener los logs usando la utilidad unificada
+        container_name = None
         if container_id_param:
-            # Modo compose: logs de contenedor específico
             try:
                 container_record = ServiceContainer.objects.get(pk=container_id_param, service=service)
-                log_content = fetch_container_logs(container_record)
-                title = f"Logs de {service.name} - {container_record.name}"
+                container_name = container_record.name
             except ServiceContainer.DoesNotExist:
-                log_content = "(contenedor no encontrado)"
-                title = f"Logs de {service.name}"
-        else:
-            # Modo simple: logs del servicio (comportamiento anterior)
-            log_content = service.logs or "(sin logs)"
-            if service.container_id:
-                docker_client = get_docker_client()
-                if docker_client:
-                    try:
-                        container = docker_client.containers.get(service.container_id)
-                        log_content = container.logs(tail=200).decode(errors="replace")
-                    except Exception as e:
-                        log_content = f"(error leyendo logs: {e})"
-            title = f"Logs de {service.name}"
+                pass
+        
+        # Obtener logs (la utilidad ya maneja tail, since y la conversión horaria)
+        logs_lines, _ = fetch_container_logs(
+            service, 
+            tail=tail_val, 
+            since=since_param, 
+            container_name=container_name
+        )
+        log_content = "\n".join(logs_lines) if logs_lines else "(sin logs en este periodo)"
+        title = f"Logs de {service.name}" + (f" - {container_name}" if container_name else "")
         
         if self._is_htmx(request):
             # Determinamos si hace falta polling (si está operando o si está corriendo para ver logs frescos)
@@ -907,10 +1003,10 @@ def student_services_in_subject(request, subject_id):
     )
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@login_required
 def service_table(request):
     user = request.user
+    # Permitir a admins, profesores y alumnos (cada uno verá lo que le corresponde)
     if not (user.is_superuser or user_is_admin(user) or user_is_teacher(user) or user_is_student(user)):
         return HttpResponse("No tienes permiso para consultar servicios.", status=403)
 
@@ -929,6 +1025,23 @@ def service_table(request):
         qs = qs.filter(subject_id=subject_id)
     if project_id:
         qs = qs.filter(project_id=project_id)
+        
+    status = request.GET.get("status")
+    if status:
+        qs = qs.filter(status=status)
+        
+    mode = request.GET.get("mode")
+    if mode:
+        qs = qs.filter(mode=mode)
+        
+    q = request.GET.get("q")
+    if q:
+        from django.db.models import Q
+        qs = qs.filter(Q(name__icontains=q) | Q(image__icontains=q) | Q(owner__username__icontains=q) | Q(owner__first_name__icontains=q) | Q(owner__last_name__icontains=q))
+        
+    ordering = request.GET.get("ordering")
+    if ordering:
+        qs = qs.order_by(ordering)
 
     # Sincronizar estados con Docker antes de renderizar
     for s in qs:
@@ -948,62 +1061,111 @@ def service_table(request):
             status__in=["created", "restarting", "removing"]
         ).exists()
 
+    current_sub_obj = None
+    if subject_id:
+        try:
+            current_sub_obj = Subject.objects.get(pk=subject_id)
+        except Exception:
+            pass
+
     html = render_to_string("containers/_service_rows.html", {
         "services": qs, 
         "host": host, 
         "is_supervisor": is_supervisor,
         "has_transient": has_transient,
         "subject_id": subject_id,
-        "project_id": project_id
+        "project_id": project_id,
+        "current_subject": current_sub_obj
     }, request=request)
     return HttpResponse(html)
 
 
 @login_required
-def terminal_view(request, pk):
+def terminal_v2_view(request, pk):
     """
-    Muestra la terminal web para el servicio si el usuario es el propietario
-    y el contenedor esta en ejecucion.
+    Terminal web mejorada con PyXtermJS.
+    
+    Características:
+    - Soporte para múltiples shells
+    - Mejor manejo de errores
+    - Soporte para servicios Compose (múltiples contenedores)
+    - Timeout configurable
     """
     user = request.user
-    if user_is_admin(user) or user_is_teacher(user):
-        service = get_object_or_404(Service, pk=pk)
-    else:
-        service = get_object_or_404(Service, pk=pk, owner=user)
+    
+    # 1. Intentar obtener el servicio sin filtrar por dueño primero
+    try:
+        service = Service.objects.get(pk=pk)
+    except Service.DoesNotExist:
+        raise Http404("El servicio solicitado no existe.")
 
-    if service.status != "running" or not service.container_id:
-        return HttpResponse("El servicio no esta en ejecucion.", status=400)
+    # 2. Validar Permisos
+    has_permission = False
+    if user_is_admin(user):
+        has_permission = True
+    elif user_is_teacher(user):
+        # El profesor solo puede entrar si es de su asignatura
+        if service.subject and service.subject.teacher_user == user:
+            has_permission = True
+    elif service.owner == user:
+        has_permission = True
+
+    if not has_permission:
+        # En lugar de 404, devolvemos una página de error estilizada
+        return render(request, "containers/errors/no_permission.html", {
+            "service_name": service.name,
+            "error_title": "Acceso Denegado",
+            "error_message": "No tienes los permisos necesarios para acceder a esta terminal interactiva."
+        }, status=403)
+    
+    # Obtener parámetro de contenedor (para servicios Compose)
+    container_id = request.GET.get('container')
+    container_name = service.name
+    
+    # Verificar estado del servicio
+    if container_id:
+        # Modo Compose: verificar contenedor específico
+        try:
+            container_record = ServiceContainer.objects.get(pk=container_id, service=service)
+            if container_record.status != "running":
+                return HttpResponse(
+                    f"El contenedor '{container_record.name}' no está en ejecución.",
+                    status=400
+                )
+            container_name = container_record.name
+        except ServiceContainer.DoesNotExist:
+            return HttpResponse("Contenedor no encontrado.", status=404)
+    else:
+        # Modo simple: verificar servicio principal
+        if service.status != "running" or not service.container_id:
+            return HttpResponse("El servicio no está en ejecución.", status=400)
+    
+    # Verificar Docker disponible
     docker_client = get_docker_client()
     if docker_client is None:
-        return HttpResponse("Docker no esta disponible actualmente.", status=400)
-    try:
-        container = docker_client.containers.get(service.container_id)
-        container.reload()
-        if (container.status or "").lower() != "running":
-            return HttpResponse("El contenedor no esta en ejecucion.", status=400)
-    except NotFound:
-        return HttpResponse("El contenedor no existe.", status=404)
-    except DockerException as exc:
-        return HttpResponse(f"No se pudo acceder al contenedor: {exc}", status=400)
-
-    ws_path = f"/ws/terminal/{service.id}/"
+        return HttpResponse("Docker no está disponible actualmente.", status=503)
     
-    # Capturar URL de retorno para volver al contexto correcto
+    # Construir WebSocket path
+    ws_path = f"/ws/terminal-v2/{service.id}/"
+    if container_id:
+        ws_path += f"?container={container_id}"
+    
+    # Capturar URL de retorno
     return_url = request.GET.get('return_url')
     if not return_url:
         referer = request.META.get('HTTP_REFERER', '')
         if 'subjects/' in referer:
-            # Si viene de una asignatura, volver ahí
             return_url = referer
         else:
-            # Por defecto, panel principal
             from django.urls import reverse
             return_url = reverse('containers:student_panel')
     
-    return render(request, "containers/terminal.html", {
+    return render(request, "containers/terminal_v2.html", {
         "service": service,
+        "container_name": container_name,
         "ws_path": ws_path,
         "return_url": return_url,
+        "current_subject": service.subject,
     })
 
 
@@ -1020,8 +1182,8 @@ def post_login(request):
         return redirect("/admin/")
     if user_is_teacher(u):
         return redirect("professor_dashboard")
-    # La vista estÃƒÂ¡ dentro del app 'containers' (namespaced)
-    return redirect("containers:student_subjects")
+    # La vista está dentro del app 'containers' (namespaced)
+    return redirect("containers:student_panel")
 
 
 @login_required
@@ -1033,6 +1195,28 @@ def professor_dashboard(request):
     if not (user_is_teacher(request.user) or request.user.is_superuser):
         return HttpResponse("No tienes permiso para acceder a esta pÃƒÂ¡gina.", status=403)
 
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "create_subject":
+            name = request.POST.get("name")
+            category = request.POST.get("category", "optativa")
+            genero = request.POST.get("genero", "2024")
+            color = request.POST.get("color", "#4e73df")
+            if name:
+                new_sub = Subject.objects.create(
+                    name=name, 
+                    category=category, 
+                    genero=genero, 
+                    color=color,
+                    teacher_user=request.user
+                )
+                if "logo" in request.FILES:
+                    new_sub.logo = request.FILES["logo"]
+                    new_sub.save()
+                from django.contrib import messages
+                messages.success(request, f"Asignatura '{name}' creada con éxito.")
+            return redirect("professor_dashboard")
+
     subjects = Subject.objects.filter(teacher_user=request.user)
     if request.user.is_superuser:
         subjects = Subject.objects.all()
@@ -1042,7 +1226,18 @@ def professor_dashboard(request):
         if not request.user.is_superuser
         else UserProject.objects.all()
     )
-    projects = projects_qs.select_related("subject", "user_profile")
+
+    # Filtrado dinámico
+    q = request.GET.get('q')
+    if q:
+        from django.db.models import Q
+        projects_qs = projects_qs.filter(Q(place__icontains=q) | Q(user_profile__nombre__icontains=q) | Q(user_profile__user__username__icontains=q))
+
+    sub_id = request.GET.get('subject')
+    if sub_id:
+        projects_qs = projects_qs.filter(subject_id=sub_id)
+
+    projects = projects_qs.select_related("subject", "user_profile").order_by("-id")
 
     # Estadísticas para el profesor
     total_students = subjects.values('students').distinct().count()
@@ -1061,6 +1256,9 @@ def professor_dashboard(request):
         }
     }
 
+    if request.headers.get('HX-Request'):
+        return render(request, "professor/_project_table.html", context)
+
     return render(request, "professor/dashboard.html", context)
 
 
@@ -1071,6 +1269,99 @@ def professor_subject_detail(request, subject_id):
 
     base_qs = Subject.objects.all() if request.user.is_superuser else Subject.objects.filter(teacher_user=request.user)
     subject = get_object_or_404(base_qs.select_related("teacher_user"), pk=subject_id)
+
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "stop_all":
+            active_services = Service.objects.filter(subject=subject).exclude(status__in=["removed", "stopped"])
+            for svc in active_services:
+                try:
+                    stop_container(svc)
+                except Exception:
+                    pass
+            from django.contrib import messages
+            messages.success(request, "Se ha ordenado la parada de todos los contenedores de la asignatura.")
+        elif action == "create_student":
+            username = request.POST.get("username")
+            email = request.POST.get("email")
+            nombre = request.POST.get("nombre")
+            password = request.POST.get("password")
+            if username and email and nombre and password:
+                from django.contrib.auth import get_user_model
+                from paasify.models.StudentModel import UserProfile
+                from django.contrib.auth.models import Group
+                User = get_user_model()
+                try:
+                    if User.objects.filter(username=username).exists():
+                        from django.contrib import messages
+                        messages.error(request, "El nombre de usuario ya existe.")
+                    else:
+                        new_user = User.objects.create_user(username=username, email=email, password=password)
+                        student_group, _ = Group.objects.get_or_create(name='StudentGroup')
+                        new_user.groups.add(student_group)
+                        player = UserProfile.objects.create(user=new_user, nombre=nombre, year=email)
+                        subject.students.add(new_user)
+                        from django.contrib import messages
+                        messages.success(request, f"Alumno '{nombre}' creado y matriculado con éxito.")
+                except Exception as e:
+                    from django.contrib import messages
+                    messages.error(request, f"Error creando el alumno: {str(e)}")
+        elif action == "create_project":
+            place = request.POST.get("place")
+            student_id = request.POST.get("student_id")
+            if place and student_id:
+                from django.contrib.auth import get_user_model
+                from paasify.models.StudentModel import UserProfile
+                User = get_user_model()
+                try:
+                    student_user = User.objects.get(pk=student_id)
+                    user_profile = UserProfile.objects.get(user=student_user)
+                    UserProject.objects.create(place=place, subject=subject, user_profile=user_profile)
+                    from django.contrib import messages
+                    messages.success(request, "Proyecto asignado con éxito.")
+                except Exception as e:
+                    from django.contrib import messages
+                    messages.error(request, f"Error creando el proyecto: {str(e)}")
+        elif action == "edit_student":
+            student_id = request.POST.get("student_id")
+            email = request.POST.get("email")
+            password = request.POST.get("password")
+            if student_id:
+                try:
+                    from django.contrib.auth import get_user_model
+                    from paasify.models.StudentModel import UserProfile
+                    User = get_user_model()
+                    st_user = User.objects.get(pk=student_id)
+                    if email:
+                        st_user.email = email
+                        st_user.user_profile.year = email
+                        st_user.user_profile.save()
+                    if password:
+                        st_user.set_password(password)
+                    st_user.save()
+                    from django.contrib import messages
+                    messages.success(request, f"Alumno modificado con éxito.")
+                except Exception as e:
+                    from django.contrib import messages
+                    messages.error(request, f"Error modificando al alumno: {str(e)}")
+        elif action == "edit_subject":
+            color = request.POST.get("color")
+            if color:
+                subject.color = color
+            
+            # Quitar logo si se solicita
+            if request.POST.get("remove_logo") == "true":
+                if subject.logo:
+                    subject.logo.delete(save=False)
+                    subject.logo = None
+            elif "logo" in request.FILES:
+                subject.logo = request.FILES["logo"]
+            
+            subject.save()
+            from django.contrib import messages
+            messages.success(request, "Diseño de la asignatura actualizado.")
+
+        return redirect("professor_subject_detail", subject_id=subject.id)
 
     students = subject.students.all().order_by("username")
     services = (
@@ -1106,11 +1397,24 @@ def professor_project_detail(request, project_id):
 
     project = get_object_or_404(base_qs, pk=project_id)
 
+    if request.method == "POST":
+        action = request.POST.get("action")
+        if action == "stop_all":
+            active_services = Service.objects.filter(project=project).exclude(status__in=["removed", "stopped"])
+            for svc in active_services:
+                try:
+                    stop_container(svc)
+                except Exception:
+                    pass
+            from django.contrib import messages
+            messages.success(request, "Se ha ordenado la parada de todos los contenedores activos de este proyecto.")
+        return redirect("professor_project_detail", project_id=project.id)
+
     student_user = getattr(project.user_profile, "user", None)
     related_services = Service.objects.none()
     if student_user is not None:
         related_services = (
-            Service.objects.filter(owner=student_user)
+            Service.objects.filter(project=project)
             .exclude(status="removed")
             .select_related("owner", "subject")
         )
@@ -1119,14 +1423,38 @@ def professor_project_detail(request, project_id):
     return render(
         request,
         "professor/project_detail.html",
-        {"project": project, "related_services": related_services, "host": host},
+        {"project": project, "related_services": related_services, "host": host, "is_supervisor": True},
     )
 
 
-# Editar servicio (env/volumenes) y reiniciar
+# Editar servicio (env/archivos) y reiniciar
 @login_required
 def edit_service(request, pk):
-    service = get_object_or_404(Service, pk=pk, owner=request.user)
+    if request.user.is_superuser:
+        service = get_object_or_404(Service, pk=pk)
+    elif user_is_teacher(request.user):
+        from paasify.models import Subject
+        from django.db.models import Q
+        teacher_subjects = Subject.objects.filter(teacher_user=request.user)
+        service = get_object_or_404(Service.objects.filter(Q(owner=request.user) | Q(subject__in=teacher_subjects)), pk=pk)
+    else:
+        service = get_object_or_404(Service, pk=pk, owner=request.user)
+
+    # Restricción: No se pueden editar servicios del catálogo (default)
+    # Restricción: Los profesores no pueden editar servicios de alumnos
+    if not request.user.is_superuser and service.owner != request.user:
+        if user_is_teacher(request.user):
+            return render(request, 'containers/edit_service_forbidden.html', {
+                'service': service,
+                'title': 'No Permitido - Editar Servicio de Alumno',
+                'reason': 'Los profesores no pueden modificar la configuración de los contenedores de los alumnos.'
+            })
+
+    if service.mode == 'default':
+        return render(request, 'containers/edit_service_forbidden.html', {
+            'service': service,
+            'title': 'No Permitido - Editar Servicio'
+        })
 
     if request.method == "POST":
         def _parse_optional_json(raw_value: str, field_label: str):
@@ -1142,25 +1470,163 @@ def edit_service(request, pk):
 
         try:
             env_vars = _parse_optional_json(request.POST.get("env_vars", ""), "Variables de entorno")
-            # SEGURIDAD CRÍTICA: Volúmenes deshabilitados completamente
-            # volumes = _parse_optional_json(request.POST.get("volumes", ""), "Volumenes")
+            container_configs = _parse_optional_json(request.POST.get("container_configs", ""), "Configuración de contenedores")
         except ValueError as exc:
             return HttpResponse(str(exc), status=400)
 
-        service.env_vars = env_vars or None
-        # SEGURIDAD: No permitir modificación de volúmenes
-        # service.volumes = volumes or None
-        service.save(update_fields=["env_vars", "updated_at"])
+        # Actualizar campos
+        service.env_vars = env_vars if env_vars is not None else None
+        service.container_configs = container_configs if container_configs is not None else None
+        
+        # Tipo y visibilidad (solo modo dockerhub o custom/dockerfile)
+        if service.mode == 'dockerhub' or (service.mode == 'custom' and service.dockerfile):
+            service.container_type = request.POST.get("container_type", service.container_type)
+            service.is_web = request.POST.get("is_web") == "on"
+            
+            i_port = request.POST.get("internal_port")
+            if i_port:
+                try:
+                    service.internal_port = int(i_port)
+                except ValueError:
+                    pass
+
+            if "image" in request.POST:
+                service.image = request.POST.get("image")
+        
+        # Guardaremos el puerto al que queremos cambiar, y NO en el modelo
+        # hasta que remove_container limpie el anterior.
+        c_port = request.POST.get("custom_port")
+        new_assigned_port = None
+        if c_port:
+            try:
+                new_assigned_port = int(c_port)
+            except ValueError:
+                pass
+
+        # Parsear keep_volumes (checkbox html, puede venir como "on" o no venir)
+        keep_vols = request.POST.get("keep_volumes") == "on"
+
+        # Actualizar archivos si se proporcionan (reemplazo total)
+        if request.FILES.get("dockerfile"):
+            service.dockerfile = request.FILES["dockerfile"]
+        if request.FILES.get("compose"):
+            try:
+                from .compose_parser import DockerComposeParser
+                file_content = request.FILES["compose"].read().decode('utf-8')
+                parser = DockerComposeParser(file_content)
+                result = parser.parse()
+                if not result.get("success"):
+                    return HttpResponse(f"Error en script docker-compose: {result.get('error')} - {result.get('message')}", status=400)
+                request.FILES["compose"].seek(0)
+            except Exception as e:
+                return HttpResponse(f"Error parseando docker-compose: {str(e)}", status=400)
+            service.compose = request.FILES["compose"]
+        if request.FILES.get("code"):
+            service.code = request.FILES["code"]
+
+        service.status = "updating"
+        service.save()
 
         try:
-            remove_container(service)
-            run_container(service)
+            # Purga y reconstrucción total (preservando o no volúmenes según indique el usuario)
+            remove_container(service, keep_files=True, keep_volumes=keep_vols)
+            # Usar configs del POST o caer al modelo
+            configs_to_use = container_configs if container_configs else service.container_configs
+            run_container(service, container_configs=configs_to_use, custom_port=new_assigned_port)
         except Exception as exc:
             return HttpResponse(f"Error al reiniciar: {exc}", status=500)
 
-        return redirect("containers:student_panel")
+        return_url = request.POST.get('return_url')
+        if not return_url:
+            return_url = reverse('containers:student_panel')
+        return redirect(return_url)
 
-    return render(request, "containers/edit_service.html", {"service": service})
+    # Capturar URL de retorno inicial
+    return_url = request.GET.get('return_url')
+    if not return_url:
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'subjects/' in referer or 'projects/' in referer:
+            return_url = referer
+        else:
+            return_url = reverse('containers:student_panel')
+
+    # Para Compose, necesitamos los contenedores actuales para la tabla si existen
+    containers_info = []
+    if service.has_compose:
+        for c in service.containers.all():
+            if c.name != "principal":
+                containers_info.append({
+                    'name': c.name,
+                    'image': c.image_name,
+                    'internal_ports': c.internal_ports,
+                    'assigned_ports': c.assigned_ports,
+                    'is_web': c.is_web,
+                    'container_type': c.container_type
+                })
+
+    return render(request, "containers/edit_service.html", {
+        "service": service,
+        "current_subject": service.subject,
+        "return_url": return_url,
+        "containers_info": containers_info,
+        "env_vars_json": json.dumps(service.env_vars or {}, indent=2)
+    })
+
+
+@login_required
+def view_service_file(request, pk):
+    """
+    Retorna el contenido de un archivo (Dockerfile o Compose) en formato JSON para el modal de vista.
+    """
+    service = get_object_or_404(Service, pk=pk)
+    
+    # Seguridad: solo dueño o admin
+    if service.owner != request.user and not request.user.is_superuser:
+        return JsonResponse({'success': False, 'error': 'No autorizado'}, status=403)
+    
+    file_type = request.GET.get('type')
+    file_obj = None
+    
+    if file_type == 'dockerfile':
+        file_obj = service.dockerfile
+    elif file_type == 'compose':
+        file_obj = service.compose
+    
+    if not file_obj:
+        return JsonResponse({'success': False, 'error': 'Archivo no asignado o inexistente'})
+    
+    try:
+        if not file_obj or not file_obj.name:
+            return JsonResponse({'success': False, 'error': 'El archivo no tiene una ruta válida en la base de datos.'})
+
+        # Importar settings localmente para mayor seguridad en la función
+        from django.conf import settings
+        from pathlib import Path
+        
+        # Construir ruta absoluta
+        media_root = Path(settings.MEDIA_ROOT)
+        
+        # 1. Buscar primero en el workspace real de despliegue
+        workspace_path = media_root / "services" / str(service.pk)
+        expected_filename = "docker-compose.yml" if file_type == 'compose' else "Dockerfile"
+        file_path = workspace_path / expected_filename
+        
+        # 2. Fallback a la ruta guardada en el modelo en caso de no haber desplegado
+        if not file_path.exists():
+            file_path = media_root / file_obj.name
+            
+        if not file_path.exists():
+            return JsonResponse({
+                'success': False, 
+                'error': f"Archivo físico no encontrado en: {file_obj.name} ni en el workspace."
+            })
+
+        with open(file_path, 'r', encoding='utf-8', errors='replace') as f:
+            content = f.read()
+            return JsonResponse({'success': True, 'content': content})
+            
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': f"Excepción al leer archivo: {str(e)}"})
 
 
 @login_required
@@ -1179,7 +1645,16 @@ def new_service_page(request):
     Proporciona mejor UX que el modal con más espacio y ayuda contextual.
     """
     # Obtener datos necesarios para el formulario
-    images = AllowedImage.objects.all().order_by('name')
+    images = AllowedImage.objects.all().order_by('image_type', 'name')
+    
+    # Agrupar imágenes por tipo para el selector categorizado
+    images_by_type = {}
+    for img in images:
+        type_label = dict(AllowedImage.IMAGE_TYPES).get(img.image_type, "Otros")
+        if type_label not in images_by_type:
+            images_by_type[type_label] = []
+        images_by_type[type_label].append(img)
+    
     subjects = Subject.objects.filter(students=request.user)
     user_projects = UserProject.objects.filter(
         user_profile__user=request.user
@@ -1192,6 +1667,7 @@ def new_service_page(request):
     # Prioridad: 1) Query param 'return_url', 2) HTTP_REFERER, 3) student_panel por defecto
     return_url = request.GET.get('return_url')
     selected_subject_id = None
+    current_subject = None
     
     if not return_url:
         referer = request.META.get('HTTP_REFERER', '')
@@ -1203,18 +1679,33 @@ def new_service_page(request):
             match = re.search(r'/subjects/(\d+)/', referer)
             if match:
                 selected_subject_id = int(match.group(1))
+                try:
+                    current_subject = Subject.objects.get(pk=selected_subject_id)
+                except Subject.DoesNotExist:
+                    pass
         else:
             # Por defecto, panel principal
             from django.urls import reverse
             return_url = reverse('containers:student_panel')
+    elif 'subjects/' in return_url:
+        import re
+        match = re.search(r'/subjects/(\d+)/', return_url)
+        if match:
+            selected_subject_id = int(match.group(1))
+            try:
+                current_subject = Subject.objects.get(pk=selected_subject_id)
+            except Subject.DoesNotExist:
+                pass
     
     context = {
         'images': images,
+        'images_by_type': images_by_type,
         'available_subjects': subjects,
         'user_projects': user_projects,
         'host': host,
         'return_url': return_url,  # Pasar URL de retorno al template
         'selected_subject_id': selected_subject_id,  # ID de asignatura pre-seleccionada
+        'current_subject': current_subject,
     }
     
     return render(request, 'containers/new_service.html', context)
@@ -1271,10 +1762,11 @@ def api_documentation_view(request, section_slug="introduccion"):
         {"slug": "autenticacion",   "title": "Autenticación",          "file": "02_authentication.md"},
         {"slug": "gets",            "title": "Consultas (GETs)",      "file": "03_gets.md"},
         {"slug": "crear",           "title": "Crear Servicio",        "file": "04_create.md"},
-        {"slug": "acciones",        "title": "Acciones del Servicio", "file": "05_actions.md"},
-        {"slug": "logs",            "title": "Logs del Servicio",     "file": "06_logs.md"},
-        {"slug": "ci-cd",           "title": "Integración CI/CD",     "file": "07_cicd.md"},
-        {"slug": "errores",         "title": "Códigos de Error",      "file": "08_errors.md"},
+        {"slug": "modificar",       "title": "Modificar Servicio",    "file": "05_modify.md"},
+        {"slug": "acciones",        "title": "Acciones del Servicio", "file": "06_actions.md"},
+        {"slug": "logs",            "title": "Logs del Servicio",     "file": "07_logs.md"},
+        {"slug": "ci-cd",           "title": "Integración CI/CD",     "file": "08_cicd.md"},
+        {"slug": "errores",         "title": "Códigos de Error",      "file": "09_errors.md"},
     ]
 
     # Buscar la seccion actual
@@ -1363,9 +1855,26 @@ def api_command_generator_view(request):
     
     # URL de retorno
     return_url = request.GET.get('return_url')
+    current_subject = None
+    selected_subject_id = None
+    
     if not return_url:
-        from django.urls import reverse
-        return_url = reverse('containers:student_panel')
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'subjects/' in referer:
+            return_url = referer
+        else:
+            from django.urls import reverse
+            return_url = reverse('containers:student_panel')
+    
+    if return_url and 'subjects/' in return_url:
+        import re
+        match = re.search(r'/subjects/(\d+)/', return_url)
+        if match:
+            selected_subject_id = int(match.group(1))
+            try:
+                current_subject = Subject.objects.get(pk=selected_subject_id)
+            except Subject.DoesNotExist:
+                pass
         
     context = {
         'token': token.key,
@@ -1373,6 +1882,143 @@ def api_command_generator_view(request):
         'available_subjects': subjects,
         'user_projects': user_projects,
         'return_url': return_url,
+        'current_subject': current_subject,
+        'selected_subject_id': selected_subject_id,
     }
     
     return render(request, 'containers/api_command_generator.html', context)
+
+
+# ============================================================================
+# LOGS PAGE - Página dedicada para visualización de logs
+# ============================================================================
+
+@login_required
+def logs_page(request, pk):
+    """
+    Página dedicada para visualización de logs con funcionalidades avanzadas.
+    
+    Características:
+    - Filtros por nivel (ERROR, WARN, INFO, DEBUG)
+    - Búsqueda de texto
+    - Selector de cantidad de líneas
+    - Selector de contenedor (para Compose)
+    - Colorización con Rich
+    - Caché de logs
+    - Soporte para servicios Compose
+    """
+    user = request.user
+    if user_is_admin(user) or user_is_teacher(user):
+        service = get_object_or_404(Service, pk=pk)
+    else:
+        service = get_object_or_404(Service, pk=pk, owner=user)
+    
+    # Parámetros de filtro
+    search_text = request.GET.get('search', '').strip()
+    log_level = request.GET.get('level', 'ALL')
+    tail = request.GET.get('tail', '1000')
+    since = request.GET.get('since', '')
+    use_rich = request.GET.get('rich', 'true').lower() == 'true'
+    selected_container = request.GET.get('container', 'all')
+    force_refresh = request.GET.get('refresh', 'false').lower() == 'true'
+    
+    # Inicializar contenedores (necesario para el context de retorno)
+    containers = []
+    if service.has_compose:
+        containers = list(service.containers.all())
+
+    # Obtener utilidades
+    from .utils import (
+        fetch_container_logs,
+        group_logs_by_container,
+        colorize_logs_rich,
+        colorize_logs_simple,
+        filter_logs,
+        filter_by_level,
+        invalidate_logs_cache
+    )
+    
+    # Si se pide refrescar, invalidar caché antes de obtener logs
+    if force_refresh:
+        invalidate_logs_cache(service)
+
+    # Convertir tail a int (o None para 'all')
+    try:
+        tail_int = int(tail) if tail != 'all' else 'all'
+    except ValueError:
+        tail_int = 1000
+
+    since_val = since if since else None
+
+    if service.has_compose and selected_container != 'all':
+        try:
+            container_id = int(selected_container)
+            specific_container = service.containers.get(id=container_id)
+            logs_lines, from_cache = fetch_container_logs(service, tail=tail_int, since=since_val, container_name=specific_container.name, force_refresh=force_refresh)
+        except (ValueError, ServiceContainer.DoesNotExist):
+            logs_lines, from_cache = fetch_container_logs(service, tail=tail_int, since=since_val, force_refresh=force_refresh)
+    else:
+        logs_lines, from_cache = fetch_container_logs(service, tail=tail_int, since=since_val, force_refresh=force_refresh)
+    
+    # Aplicar filtros sobre las líneas "raw" (con prefijo [name] si aplica)
+    if search_text:
+        logs_lines = filter_logs(logs_lines, search_text)
+    
+    if log_level != 'ALL':
+        logs_lines = filter_by_level(logs_lines, log_level)
+    
+    # Guardar conteo real antes de añadir cabeceras
+    total_logs_count = len(logs_lines)
+    
+    # Agrupar por contenedor y añadir cabeceras '==='
+    if service.has_compose or selected_container != 'all':
+        logs_lines = group_logs_by_container(logs_lines)
+    
+    # Colorizar logs final
+    try:
+        if use_rich:
+            logs_html = colorize_logs_rich(logs_lines)
+        else:
+            logs_html = colorize_logs_simple(logs_lines)
+    except Exception as e:
+        logger.error(f"Error colorizando logs: {e}")
+        logs_html = colorize_logs_simple(logs_lines)
+    
+    # Capturar URL de retorno
+    return_url = request.GET.get('return_url')
+    if not return_url:
+        referer = request.META.get('HTTP_REFERER', '')
+        if 'subjects/' in referer:
+            return_url = referer
+        else:
+            from django.urls import reverse
+            return_url = reverse('containers:student_panel')
+    
+    # Si es request HTMX, solo devolver el fragmento de logs
+    if request.headers.get('HX-Request'):
+        return render(request, "containers/_partials/logs/_logs_content.html", {
+            "logs_html": logs_html,
+            "total_logs_count": total_logs_count,
+            "total_lines": len(logs_lines),
+            "from_cache": from_cache,
+            "search_text": search_text,
+            "log_level": log_level,
+            "since": since,
+        })
+    
+    # Request normal: página completa
+    return render(request, "containers/logs_page.html", {
+        "service": service,
+        "current_subject": service.subject,
+        "logs_html": logs_html,
+        "search_text": search_text,
+        "log_level": log_level,
+        "tail": tail,
+        "since": since,
+        "use_rich": use_rich,
+        "total_lines": len(logs_lines),
+        "from_cache": from_cache,
+        "return_url": return_url,
+        "containers": containers,
+        "selected_container": selected_container,
+    })

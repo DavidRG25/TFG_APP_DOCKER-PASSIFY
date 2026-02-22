@@ -9,7 +9,7 @@ from django.urls import reverse
 from docker.errors import DockerException
 from rest_framework.test import APIClient
 
-from containers.consumers import TerminalConsumer
+from containers.consumers import DockerTerminalConsumer
 from containers.docker_client import get_docker_client
 from containers.models import AllowedImage, PortReservation, Service
 from containers.services import remove_container, run_container, stop_container
@@ -185,7 +185,7 @@ async def test_terminal_websocket(student_user):
         assert svc.status == "running"
 
         communicator = WebsocketCommunicator(
-            TerminalConsumer.as_asgi(), f"/ws/terminal/{svc.pk}/"
+            DockerTerminalConsumer.as_asgi(), f"/ws/terminal-v2/{svc.pk}/"
         )
         communicator.scope["user"] = student_user
         communicator.scope["url_route"] = {"kwargs": {"service_id": svc.pk}}

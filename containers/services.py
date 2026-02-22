@@ -89,96 +89,75 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> 
     2. El código fuente esté descomprimido en services/<id>/
     
     Retorna el Path del workspace.
+    NOTA: Esta función copia los contenidos desde el storage de Django al sistema de archivos local
+    con nombres estándar (Dockerfile, source.zip), sin alterar los archivos originales de Django.
     """
+    import shutil
+    import os
+    
     workspace = ensure_service_workspace(service)
     
-    # Mapeo de campos FileField a nombres de archivo esperados
-    mapping = {
-        "dockerfile": "Dockerfile",
-        "compose": "docker-compose.yml",
-    }
-    updated_fields = []
-    from django.core.files.storage import default_storage
-    from django.core.files.base import ContentFile
-    
-    for field, filename in mapping.items():
-        ff = getattr(service, field, None)
-        if not ff:
-            continue
-        
-        # Ruta física deseada
-        dest = workspace / filename
-        desired_rel = f"services/{service.id}/{filename}"
-        
-        # Caso A: El archivo ya está en el sitio correcto y existe físicamente
-        if ff.name == desired_rel and dest.exists():
-            continue
-            
-        # Caso B: El archivo necesita ser movido o copiado
+    # Actualizar objeto desde DB para asegurar rutas de archivos frescas
+    service.refresh_from_db()
+
+    # 1. Copiar Dockerfile
+    if service.dockerfile:
+        dest = workspace / "Dockerfile"
         try:
-            # Si el archivo está en 'tmp/', lo leemos y movemos
-            content = ff.read()
-            
-            # 1. Si el nombre en DB está mal (ej. apunta a 'tmp/'), actualizarlo
-            if ff.name != desired_rel:
-                old_path = ff.name
-                ff.save(desired_rel, ContentFile(content), save=False)
-                updated_fields.append(field)
-                
-                # Intentar borrar el rastro viejo (especialmente útil para limpiar services/tmp/)
-                if old_path and old_path != desired_rel:
-                    try: 
-                        if default_storage.exists(old_path):
-                            default_storage.delete(old_path)
-                    except: pass
-            
-            # 2. Asegurar que el archivo existe físicamente en el workspace
-            if not dest.exists():
+            with open(service.dockerfile.path, "rb") as f_in:
+                content = f_in.read()
                 with open(dest, "wb") as f_out:
                     f_out.write(content)
-                    
         except Exception as e:
-            print(f"[warning] Error preparando {field}: {e}")
-            continue
+            print(f"[ERROR] No se pudo copiar Dockerfile para servicio {service.id}: {e}")
 
-    if updated_fields:
-        service.save(update_fields=updated_fields)
-    
-    # Descomprimir código si existe
-    if unpack_code and service.code:
-        code_ext = os.path.splitext(service.code.name or "")[1] or ".zip"
-        code_rel = f"services/{service.id}/source{code_ext}"
-        code_dest_phys = workspace / f"source{code_ext}"
-        
-        # Si el código no está en su sitio o es un temporal, moverlo
-        if service.code.name != code_rel or not code_dest_phys.exists():
-            old_code_path = service.code.name
-            with service.code.open("rb") as f_in:
+    # 2. Copiar docker-compose.yml
+    if service.has_compose and service.compose:
+        dest = workspace / "docker-compose.yml"
+        try:
+            with open(service.compose.path, "rb") as f_in:
                 content = f_in.read()
-                service.code.save(code_rel, ContentFile(content), save=False)
-            service.save(update_fields=["code"])
+                with open(dest, "wb") as f_out:
+                    f_out.write(content)
+        except Exception as e:
+            print(f"[ERROR] No se pudo copiar docker-compose para servicio {service.id}: {e}")
+
+    # 3. Copiar y descomprimir Código
+    if unpack_code and service.code:
+        try:
+            service.refresh_from_db() # Doble seguridad
+            # Determinar extensión original
+            ext = os.path.splitext(service.code.name)[1].lower() or ".zip"
+            archive_name = f"source{ext}"
+            dest_archive = workspace / archive_name
             
-            if old_code_path and old_code_path != code_rel:
-                try: 
-                    if default_storage.exists(old_code_path):
-                        default_storage.delete(old_code_path)
-                except: pass
+            # Copiar archivo zip/rar al workspace con nombre estándar
+            with open(service.code.path, "rb") as f_in:
+                content = f_in.read()
+                with open(dest_archive, "wb") as f_out:
+                    f_out.write(content)
             
-            # Asegurar copia física para descompresión
-            with open(code_dest_phys, "wb") as f_out:
-                f_out.write(content)
-        
-        # Limpiar archivos previos pero mantener los estructurales
-        for item in workspace.iterdir():
-            if item.name not in ["Dockerfile", "docker-compose.yml", "source.zip", "source.rar"]:
-                if item.is_file():
-                    item.unlink()
-                elif item.is_dir() and item.name not in [".vs"]:
-                    shutil.rmtree(item)
-        
-        # Descomprimir usando la ruta física para evitar errores de reapertura
-        _unpack_code_archive_to(str(workspace), archive_path=str(code_dest_phys))
-    
+            # Limpiar workspace ANTES de descomprimir 
+            # (borrar todo menos los archivos fuente que acabamos de poner)
+            for item in workspace.iterdir():
+                # Lista de intocables (archivos base)
+                if item.name.lower() in [archive_name.lower(), "dockerfile", "docker-compose.yml", ".vs"]:
+                    continue
+                
+                try:
+                    if item.is_file():
+                        item.unlink()
+                    elif item.is_dir():
+                        shutil.rmtree(item)
+                except Exception:
+                    pass
+
+            # Descomprimir
+            _unpack_code_archive_to(str(workspace), archive_path=str(dest_archive))
+            
+        except Exception as e:
+            print(f"[ERROR] Fallo procesando código ZIP: {e}")
+
     return workspace
 
 
@@ -247,6 +226,8 @@ def _extract_container_port_info(container):
     assigned_ports = []
     ports_settings = container.attrs.get("NetworkSettings", {}).get("Ports") or {}
     
+    seen_assigned = set()
+    
     for binding_key, bindings in ports_settings.items():
         try:
             container_port, protocol = binding_key.split("/")
@@ -268,11 +249,16 @@ def _extract_container_port_info(container):
                     host_port_int = int(host_port)
                 except ValueError:
                     continue
-                assigned_ports.append({
-                    "internal": container_port_int,
-                    "external": host_port_int,
-                    "protocol": protocol
-                })
+                
+                # Deduplicar: mismo puerto interno, externo y protocolo
+                entry_key = (container_port_int, host_port_int, protocol.lower())
+                if entry_key not in seen_assigned:
+                    assigned_ports.append({
+                        "internal": container_port_int,
+                        "external": host_port_int,
+                        "protocol": protocol
+                    })
+                    seen_assigned.add(entry_key)
     
     return internal_ports, assigned_ports
 
@@ -419,10 +405,14 @@ def _ensure_compose_ports(data: dict, previous_map: dict[str, dict[tuple[int, st
 def sync_service_status(service: Service):
     """
     Sincroniza el estado del servicio con Docker de forma proactiva.
-    
-    Rescata servicios estancados en estados transitorios (pending, starting, etc.)
-    si Docker ya informa de un estado estable.
+    Implementa un cooldown de 5 segundos para evitar bloqueos de base de datos.
     """
+    from django.core.cache import cache as django_cache
+    cache_key = f"sync_cooldown_{service.id}"
+    if django_cache.get(cache_key):
+        return
+    django_cache.set(cache_key, True, 5)
+
     # Ignorar servicios eliminados - no deben ser "resucitados"
     if service.status == "removed":
         return
@@ -452,21 +442,23 @@ def sync_service_status(service: Service):
 
                 return
 
+            # 1. Recopilar datos de Docker fuera de la transacción (Evita bloqueos de red dentro de lock de DB)
+            container_states = []
             all_running = True
             any_running = False
+            
             for ctr in containers:
-                ctr.reload()
+                try:
+                    ctr.reload()
+                except Exception:
+                    continue
+                    
                 status = (ctr.status or "").lower()
-                
-                # Un contenedor está "listo" si está corriendo O si ha terminado con éxito (exit code 0)
                 exit_code = ctr.attrs.get('State', {}).get('ExitCode', 0)
                 is_ready = (status == "running") or (status == "exited" and exit_code == 0)
                 
-
-                
                 if status == "running":
                     any_running = True
-                
                 if not is_ready:
                     all_running = False
                 
@@ -475,17 +467,45 @@ def sync_service_status(service: Service):
                 
                 internal_ports, assigned_ports = _extract_container_port_info(ctr)
                 
-                # Sincronizar ServiceContainer records
-                ServiceContainer.objects.update_or_create(
-                    service=service,
-                    name=svc_name,
-                    defaults={
+                container_states.append({
+                    "name": svc_name,
+                    "defaults": {
                         "container_id": ctr.id,
                         "status": status,
                         "internal_ports": internal_ports,
                         "assigned_ports": assigned_ports,
                     }
-                )
+                })
+
+            # 2. Aplicar cambios en una transacción rápida
+            with transaction.atomic():
+                for state in container_states:
+                    svc_name = state["name"]
+                    defaults = state["defaults"]
+                    
+                    # Cargar registro actual
+                    container_record = ServiceContainer.objects.filter(service=service, name=svc_name).first()
+                    
+                    if container_record:
+                        # Solo actualizar si hay cambios reales para ahorrar I/O
+                        changed = False
+                        # Solo actualizamos puertos si el contenedor corre o si detectamos puertos nuevos (evitar borrado en stop)
+                        actual_defaults = {
+                            "container_id": defaults["container_id"],
+                            "status": defaults["status"],
+                        }
+                        if defaults["status"] == "running" or defaults["assigned_ports"]:
+                            actual_defaults["internal_ports"] = defaults["internal_ports"]
+                            actual_defaults["assigned_ports"] = defaults["assigned_ports"]
+
+                        for key, value in actual_defaults.items():
+                            if getattr(container_record, key) != value:
+                                setattr(container_record, key, value)
+                                changed = True
+                        if changed:
+                            container_record.save()
+                    else:
+                        ServiceContainer.objects.create(service=service, name=svc_name, **defaults)
 
 
 
@@ -551,12 +571,28 @@ def sync_service_status(service: Service):
 
 # ==================== PORT MANAGEMENT ====================
 
+def _is_port_available_on_host(port: int) -> bool:
+    """Verifica si el puerto puede ser bindeado en el host (0.0.0.0)."""
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("0.0.0.0", port))
+        s.close()
+        return True
+    except socket.error:
+        return False
+
+
 def _release_port(port: int | None):
     if port:
         PortReservation.objects.filter(port=port).delete()
 
 
 def _reserve_specific_port(port: int) -> None:
+    # Primero verificar host si estamos en un entorno restrictivo (como Windows)
+    if not _is_port_available_on_host(port):
+        raise RuntimeError(f"El puerto {port} está reservado por el sistema o en uso.")
+    
     try:
         with transaction.atomic():
             PortReservation.objects.create(port=port)
@@ -572,12 +608,20 @@ def _reserve_random_port() -> int:
     """Reserva un puerto aleatorio dentro del rango definido."""
     for _ in range(50):
         candidate = generate_random_port()
+        
+        # 1. Verificar disponibilidad en el host
+        if not _is_port_available_on_host(candidate):
+            continue
+            
+        # 2. Intentar reservar en DB
         try:
             with transaction.atomic():
                 PortReservation.objects.create(port=candidate)
             return candidate
         except IntegrityError:
             continue
+    
+    # Fallback al método secuencial mejorado
     return PortReservation.reserve_free_port()
 
 
@@ -735,10 +779,15 @@ def _validate_upload(ff, *, allowed_extensions=None, max_size=MAX_UPLOAD_SIZE):
     if ff is None:
         return
 
-    if max_size and getattr(ff, "size", None) and ff.size > max_size:
-        raise ValueError(
-            f"El archivo '{getattr(ff, 'name', 'desconocido')}' supera el tamaño máximo permitido ({max_size // (1024 * 1024)} MiB)."
-        )
+    try:
+        if max_size and getattr(ff, "size", None) and ff.size > max_size:
+            raise ValueError(
+                f"El archivo '{getattr(ff, 'name', 'desconocido')}' supera el tamaño máximo permitido ({max_size // (1024 * 1024)} MiB)."
+            )
+    except (FileNotFoundError, OSError):
+        # Si el archivo no se encuentra en disco en este preciso momento (race cond), 
+        # saltamos validacion de tamaño para evitar crash.
+        pass
 
     if allowed_extensions is not None:
         name = getattr(ff, "name", "") or ""
@@ -831,6 +880,7 @@ def _run_container_internal(
     force_restart: bool = False,
     custom_port: int | None = None,
     command: list[str] | None = None,
+    container_configs: dict | None = None,
 ):
     """
     Arranca (o rearma) el contenedor asociado a un Service.
@@ -869,13 +919,13 @@ def _run_container_internal(
     # ========== DECISIÓN: ¿Es compose o simple? ==========
     if service.has_compose:
         # ===== MODO COMPOSE =====
-        _run_compose_service(service, docker_client, force_restart)
+        _run_compose_service(service, docker_client, force_restart, container_configs)
     else:
         # ===== MODO SIMPLE (mantiene funcionalidad anterior 100%) =====
         _run_simple_service(service, docker_client, force_restart, custom_port, command)
 
 
-def _run_compose_service(service: Service, docker_client, force_restart: bool):
+def _run_compose_service(service: Service, docker_client, force_restart: bool, container_configs: dict | None = None):
     """
     Ejecuta un servicio docker-compose.
     Crea ServiceContainer records para cada contenedor.
@@ -945,6 +995,9 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool):
     service.save(update_fields=["logs"])
     
     # Crear/actualizar ServiceContainer por cada uno
+    if container_configs is None:
+        container_configs = service.container_configs
+
     for ctr in containers:
         svc_name = ctr.labels.get("com.docker.compose.service") or ctr.name
         
@@ -954,12 +1007,35 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool):
         
         internal_ports, assigned_ports = _extract_container_port_info(ctr)
         
+        # Imagen del contenedor
+        img_name = ctr.attrs.get('Config', {}).get('Image', 'No especificada')
+
+        # Aplicar configuración personalizada si existe
+        c_config = (container_configs or {}).get(svc_name, {})
+        c_web = c_config.get('is_web', False)
+        c_type = c_config.get('container_type')
+        
+        # Si no hay tipo manual, intentar detectar por nombre de servicio
+        if not c_type:
+            name_low = svc_name.lower()
+            if any(x in name_low for x in ['db', 'sql', 'mysql', 'postgres', 'mongo', 'mariadb']):
+                c_type = 'database'
+            elif any(x in name_low for x in ['web', 'front', 'nginx', 'apache', 'pwa']):
+                c_type = 'web'
+            elif any(x in name_low for x in ['api', 'back', 'srv', 'app']):
+                c_type = 'api'
+            else:
+                c_type = 'misc'
+
         ServiceContainer.objects.update_or_create(
             service=service,
             name=svc_name,
             defaults={
                 "container_id": ctr.id,
+                "image_name": img_name,
                 "status": ctr.status,
+                "container_type": c_type,
+                "is_web": c_web,
                 "internal_ports": internal_ports,
                 "assigned_ports": assigned_ports,
             }
@@ -1076,11 +1152,21 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
         except DockerException:
             image_cmd = None
 
-        # --------- Variables (volúmenes DESHABILITADOS por seguridad) ---------
-        # SEGURIDAD CRÍTICA: Los volúmenes están completamente deshabilitados en contenedores simples
-        # para prevenir escalada de privilegios mediante bind mounts.
-        # Solo se permiten volúmenes nombrados en Docker Compose con validación estricta.
-        volumes = None  # NO crear volúmenes automáticamente
+        # --------- Variables y Volúmenes Automáticos ---------
+        # Se crean EXCLUSIVAMENTE volúmenes nombrados (NO bind mounts) basados en lo que 
+        # solicita la imagen original (ej. /var/lib/mysql en las bd). 
+        # Esto previene escalada de privilegios y permite que "keep_volumes" funcione.
+        volumes = {}
+        image_vols = image_attrs.get("Config", {}).get("Volumes") or {}
+        if image_vols:
+            for i, vol_path in enumerate(image_vols.keys()):
+                vol_name = f"paasify_vol_{service.id}_{i}"
+                volumes[vol_name] = {'bind': vol_path, 'mode': 'rw'}
+            
+            # Guardar referencia del primer volumen por compatibilidad y limpieza básica
+            if not service.volume_name:
+                service.volume_name = f"paasify_vol_{service.id}_0"
+                service.save(update_fields=["volume_name"])
 
         env_vars_raw = service.env_vars or {}
         if not isinstance(env_vars_raw, dict):
@@ -1151,14 +1237,17 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
         raise
 
 
-def _run_container_worker(
-    service_id: int, force_restart: bool, custom_port: int | None, command: list[str] | None
-) -> None:
+def _run_container_worker(service_id: int, force_restart: bool, custom_port: int | None, command: list[str] | None, container_configs: dict | None = None) -> None:
+    """Worker que ejecuta la creación del contenedor en background."""
     service = None
     try:
         service = Service.objects.get(pk=service_id)
         _run_container_internal(
-            service, force_restart=force_restart, custom_port=custom_port, command=command
+            service,
+            force_restart=force_restart,
+            custom_port=custom_port,
+            command=command,
+            container_configs=container_configs,
         )
     except Service.DoesNotExist:
         return
@@ -1181,6 +1270,7 @@ def run_container(
     custom_port: int | None = None,
     command: list[str] | None = None,
     enqueue: bool = True,
+    container_configs: dict | None = None,
 ) -> None:
     """
     Encola la ejecucion del contenedor para no bloquear el hilo que atiende la peticion.
@@ -1201,7 +1291,7 @@ def run_container(
     service.status = "pending"
     _append_log(service, "Ejecucion encolada.")
     service.save(update_fields=["status", "logs", "updated_at"])
-    EXECUTOR.submit(_run_container_worker, service.pk, force_restart, custom_port, command)
+    EXECUTOR.submit(_run_container_worker, service.pk, force_restart, custom_port, command, container_configs)
 
 
 # ==================== STOP / REMOVE ====================
@@ -1337,7 +1427,7 @@ def stop_container_async(service: Service) -> None:
     EXECUTOR.submit(_stop_container_worker, service.pk)
 
 
-def remove_container(service: Service):
+def remove_container(service: Service, keep_files: bool = False, keep_volumes: bool = False):
     """
     Elimina el servicio completamente.
     
@@ -1365,8 +1455,9 @@ def remove_container(service: Service):
                     "-f", str(compose_path),
                     "down",
                     "--rmi", "local",  # Solo eliminar imágenes construidas localmente
-                    "--volumes"         # Eliminar volúmenes
                 ]
+                if not keep_volumes:
+                    cmd.append("--volumes") # Eliminar volúmenes solo si keep_volumes es False
                 
                 subprocess.run(
                     cmd,
@@ -1388,21 +1479,22 @@ def remove_container(service: Service):
             # Eliminar registros de ServiceContainer
             service.containers.all().delete()
             
-            # Limpiar volúmenes huérfanos (anónimos no eliminados por --volumes)
-            try:
-                prune_cmd = ["docker", "volume", "prune", "-f"]
-                subprocess.run(
-                    prune_cmd,
-                    check=False,  # No fallar si no hay volúmenes que limpiar
-                    capture_output=True,
-                    text=True,
-                    encoding='utf-8',
-                    errors='replace'
-                )
-                _append_log(service, "Volúmenes huérfanos limpiados")
-            except Exception as e:
-                # No es crítico si falla
-                _append_log(service, f"Advertencia al limpiar volúmenes: {str(e)}")
+            # Limpiar volúmenes huérfanos solo si NO se preservan (para compose default down --volumes suele limpiarlos de todos modos)
+            if not keep_volumes:
+                try:
+                    prune_cmd = ["docker", "volume", "prune", "-f"]
+                    subprocess.run(
+                        prune_cmd,
+                        check=False,  # No fallar si no hay volúmenes que limpiar
+                        capture_output=True,
+                        text=True,
+                        encoding='utf-8',
+                        errors='replace'
+                    )
+                    _append_log(service, "Volúmenes huérfanos limpiados")
+                except Exception as e:
+                    # No es crítico si falla
+                    _append_log(service, f"Advertencia al limpiar volúmenes: {str(e)}")
             
         except subprocess.CalledProcessError as e:
             error_msg = (e.stderr or e.stdout or str(e)).strip()
@@ -1414,7 +1506,8 @@ def remove_container(service: Service):
             service.save(update_fields=["logs"])
         
         # Limpiar workspace
-        cleanup_service_workspace(service)
+        if not keep_files:
+            cleanup_service_workspace(service)
         
     else:
         # ===== MODO SIMPLE: Limpieza manual =====
@@ -1432,16 +1525,18 @@ def remove_container(service: Service):
         # Liberar puerto
         _release_port(service.assigned_port)
 
-        # Eliminar volumen
-        if service.volume_name:
+        # Eliminar TODOS los volúmenes asociados al servicio (paasify_vol_{id}_*)
+        if not keep_volumes:
             try:
-                volume = docker_client.volumes.get(service.volume_name)
-                volume.remove(force=True)
-            except NotFound:
-                pass
-            except DockerException as exc:
-                _append_log(service, f"Error al eliminar el volumen: {exc}")
+                vols = docker_client.volumes.list(filters={"name": f"paasify_vol_{service.id}_"})
+                for v in vols:
+                    v.remove(force=True)
+            except Exception as exc:
+                _append_log(service, f"Error al eliminar volúmenes: {exc}")
                 service.save(update_fields=["logs"])
+        
+        # En cualquier caso desvinculamos el nombre de la bd local
+        service.volume_name = None
         
         # Eliminar imagen si fue construida con Dockerfile
         if service.dockerfile:
@@ -1456,7 +1551,14 @@ def remove_container(service: Service):
                 service.save(update_fields=["logs"])
         
         # Limpiar workspace
-        cleanup_service_workspace(service)
+        if not keep_files:
+            cleanup_service_workspace(service)
+
+    # LIMPIEZA ADICIONAL: Eliminar imágenes "huérfanas" (<none>:<none>) generadas por reconstrucciones
+    try:
+        docker_client.images.prune(filters={'dangling': True})
+    except Exception as e:
+        pass # No es crítico si falla
 
     service.container_id = None
     service.assigned_port = None
