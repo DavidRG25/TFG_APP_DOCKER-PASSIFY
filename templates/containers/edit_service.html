@@ -1,11 +1,72 @@
-{% extends 'base.html' %} {% load static %} {% block title %}Editar Servicio -
-PaaSify{% endblock %} {% block body %}
+{% extends 'base.html' %} {% load static %} 
+{% block title %}Editar Servicio - PaaSify{% endblock %} 
+{% block body %}
 <div class="container-fluid py-4">
   <div class="row justify-content-center">
     <div class="col-xl-11">
-      
-      {# 1. Cabecera #}
-      {% include 'containers/_partials/edit/_header.html' %}
+  <script>
+    (function() {
+      document.documentElement.style.setProperty('--subject-primary', '{{ current_subject.color|default:"#fd7e14" }}');
+      document.documentElement.style.setProperty('--subject-secondary', '{{ current_subject.color|default:"#d35400" }}');
+    })();
+  </script>
+
+  {# Breadcrumbs - Ruta encima del banner #}
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item">
+        <a href="{% url 'containers:student_panel' %}" class="text-decoration-none text-muted">
+          <i class="fas fa-home me-1"></i>Inicio
+        </a>
+      </li>
+      {% if current_subject %}
+        <li class="breadcrumb-item">
+          <a href="{% url 'containers:student_subjects' %}" class="text-decoration-none text-muted">Asignaturas</a>
+        </li>
+        <li class="breadcrumb-item">
+          <a href="{% url 'containers:student_panel' %}?subject={{ current_subject.id }}" class="text-decoration-none text-muted">{{ current_subject.name }}</a>
+        </li>
+      {% endif %}
+      <li class="breadcrumb-item active text-primary fw-bold" aria-current="page">Editar: {{ service.name }}</li>
+    </ol>
+  </nav>
+
+  {# Header con degradado Premium - Estilo Unificado #}
+  <div class="rounded-4 p-4 mb-4 shadow" 
+       style="background: linear-gradient(135deg, var(--subject-primary) 0%, var(--subject-secondary) 100%); min-height: 140px; display: flex; align-items: center;">
+    <div class="d-flex justify-content-between align-items-center w-100">
+      <div class="d-flex align-items-center">
+        {# Botón de Volver #}
+        <a href="{{ return_url }}" 
+           class="btn btn-light rounded-circle shadow-sm d-flex align-items-center justify-content-center px-0" 
+           style="width: 50px; height: 50px; min-width: 50px; margin-right: 2.5rem; color: var(--subject-primary); transition: all 0.2s;"
+           title="Volver">
+          <i class="fas fa-arrow-left fa-lg"></i>
+        </a>
+
+        {# Logo/Icono del Servicio #}
+        <div class="bg-white rounded-4 shadow-sm d-flex align-items-center justify-content-center overflow-hidden border border-white border-2" 
+             style="width: 75px; height: 75px; min-width: 75px; margin-right: 3rem;">
+          {% if current_subject.logo %}
+            <img src="{{ current_subject.logo.url }}" alt="Logo" class="w-100 h-100 object-fit-cover">
+          {% else %}
+            <i class="fas fa-edit fa-2x" style="color: var(--subject-primary);"></i>
+          {% endif %}
+        </div>
+
+        {# Textos #}
+        <div class="text-container text-white">
+          <h1 class="h2 mb-1 fw-bold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15); line-height: 1.2;">
+            Editar: {{ service.name }}
+          </h1>
+          <p class="text-white-50 mb-0 opacity-90 fw-medium">
+            Modo: <strong>{% if service.mode == 'custom' %}{% if service.has_compose %}Stack Compose{% else %}Dockerfile{% endif %}{% else %}{{ service.get_mode_display }}{% endif %}</strong> 
+            | Estado: <span class="badge px-3 py-1" style="background: rgba(255, 255, 255, 0.15); border: 1px solid rgba(255, 255, 255, 0.3); color: white;">{{ service.status }}</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
 
       <div class="row justify-content-center">
         <div class="col-lg-12">
@@ -560,9 +621,11 @@ PaaSify{% endblock %} {% block body %}
       }
 
       // 5. Build/Upload Analysis
+      let isComposeValid = true;
       const composeInput = document.querySelector('input[name="compose"]');
       if (composeInput) {
         composeInput.addEventListener("change", function() {
+          isComposeValid = true; // reset
           if (!this.files || !this.files[0]) return;
           const formData = new FormData();
           formData.append('compose_file', this.files[0]);
@@ -579,12 +642,18 @@ PaaSify{% endblock %} {% block body %}
             .then(r => r.json())
             .then(data => {
               if (data.success) {
+                isComposeValid = true;
                 displayComposeAnalysis(data);
               } else {
+                isComposeValid = false;
                 previewContent.innerHTML = `<div class="alert alert-danger x-small border-0">${data.message || data.error}</div>`;
+                const msg = (data.message || data.error) + "\n\nPor favor, revisa que el archivo esté correctamente escrito (especialmente la indentación).";
+                if (typeof swal === 'function') swal("Archivo Inválido", msg, "error");
+                else if (typeof Swal === 'object') Swal.fire("Archivo Inválido", msg, "error");
               }
             })
             .catch(err => { 
+                isComposeValid = false;
                 previewContent.innerHTML = '<div class="alert alert-danger x-small">Error en conexión</div>'; 
             });
           }
@@ -594,6 +663,13 @@ PaaSify{% endblock %} {% block body %}
       // 6. Submit
       if (form) {
         form.addEventListener("submit", (e) => {
+          // Validar compose file
+          if (!isComposeValid) {
+            e.preventDefault();
+            if (typeof swal === 'function') swal("Error", "El archivo docker-compose contiene errores de formato. Corrígelo antes de continuar.", "error");
+            return;
+          }
+
           // Validar JSON
           if (envVarsTextarea && envVarsTextarea.classList.contains("is-invalid")) {
             e.preventDefault();

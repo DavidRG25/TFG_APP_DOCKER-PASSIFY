@@ -68,19 +68,19 @@
     }
     
     .status-badge {
-        font-size: 0.75rem;
-        padding: 4px 10px;
+        font-size: 0.9rem;
+        padding: 6px 14px;
         border-radius: 20px;
         background: rgba(0,0,0,0.3);
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
         border: 1px solid rgba(255,255,255,0.1);
     }
     
     .status-dot {
-        width: 8px;
-        height: 8px;
+        width: 10px;
+        height: 10px;
         border-radius: 50%;
     }
     
@@ -185,30 +185,79 @@
 {% endblock %}
 
 {% block body %}
-<div class="terminal-page">
-    <div class="terminal-card">
-        <div class="terminal-header">
-            <div class="terminal-title-area">
-                <h3 class="mb-0 text-white">
-                    <i class="fas fa-terminal me-2" style="color: #4ade80;"></i>
-                    Terminal: {{ container_name }}
-                </h3>
-                <div id="status-badge" class="status-badge status-connecting">
-                    <span class="status-dot"></span>
-                    <span id="status-text">Conectando...</span>
-                </div>
-            </div>
-            
-            <div class="terminal-actions">
-                <button id="btn-reconnect" class="btn-terminal btn-reconnect" onclick="reconnect()" disabled>
-                    <i class="fas fa-sync-alt"></i> Reconectar
-                </button>
-                <a href="{{ return_url }}" class="btn-back-premium">
-                    <i class="fas fa-chevron-left"></i> Volver al panel
-                </a>
-            </div>
+<div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh">
+  <script>
+    (function() {
+      document.documentElement.style.setProperty('--subject-primary', '{{ current_subject.color|default:"#1e3a8a" }}');
+      document.documentElement.style.setProperty('--subject-secondary', '{{ current_subject.color|default:"#3b82f6" }}');
+    })();
+  </script>
+
+  {# Breadcrumbs - Ruta encima del banner #}
+  <nav aria-label="breadcrumb" class="mb-3 px-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item">
+        <a href="{% url 'containers:student_panel' %}" class="text-decoration-none text-muted">
+          <i class="fas fa-home me-1"></i>Inicio
+        </a>
+      </li>
+      {% if current_subject %}
+        <li class="breadcrumb-item">
+          <a href="{% url 'containers:student_subjects' %}" class="text-decoration-none text-muted">Asignaturas</a>
+        </li>
+        <li class="breadcrumb-item">
+          <a href="{% url 'containers:student_panel' %}?subject={{ current_subject.id }}" class="text-decoration-none text-muted">{{ current_subject.name }}</a>
+        </li>
+      {% endif %}
+      <li class="breadcrumb-item active text-primary fw-bold" aria-current="page">Terminal: {{ service.name }}</li>
+    </ol>
+  </nav>
+
+  {# Header con degradado Premium - Estilo Unificado Pro #}
+  <div class="rounded-4 p-3 mb-4 shadow mx-3" 
+       style="background: linear-gradient(135deg, var(--subject-primary) 0%, var(--subject-secondary) 100%); display: flex; align-items: center;">
+    <div class="d-flex justify-content-between align-items-center w-100">
+      <div class="d-flex align-items-center">
+        {# Botón de Volver #}
+        <a href="{{ return_url }}" 
+           class="btn btn-light rounded-circle shadow-sm d-flex align-items-center justify-content-center px-0" 
+           style="width: 45px; height: 45px; min-width: 45px; margin-right: 2rem; color: var(--subject-primary); transition: all 0.2s;"
+           title="Volver">
+          <i class="fas fa-arrow-left"></i>
+        </a>
+
+        {# Logo/Icono de Terminal #}
+        <div class="bg-white rounded-3 shadow-sm d-flex align-items-center justify-content-center overflow-hidden border border-white border-2" 
+             style="width: 60px; height: 60px; min-width: 60px; margin-right: 2.5rem;">
+          {% if current_subject.logo %}
+            <img src="{{ current_subject.logo.url }}" alt="Logo" class="w-100 h-100 object-fit-cover">
+          {% else %}
+            <i class="fas fa-terminal fa-lg" style="color: var(--subject-primary);"></i>
+          {% endif %}
         </div>
-        
+
+        {# Textos #}
+        <div class="text-container text-white">
+          <h1 class="h4 mb-0 fw-bold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15);">
+            Consola Activa: {{ container_name }}
+          </h1>
+          <div id="status-badge" class="status-badge mt-1" style="background: rgba(0,0,0,0.2); border-color: rgba(255,255,255,0.1);">
+            <span class="status-dot"></span>
+            <span id="status-text" class="fw-bold">Conectando...</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="d-flex gap-2">
+        <button id="btn-reconnect" class="btn btn-sm btn-light rounded-pill px-3 fw-bold" onclick="reconnect()" disabled style="color: var(--subject-primary);">
+            <i class="fas fa-sync-alt me-1"></i> Reconectar
+        </button>
+      </div>
+    </div>
+  </div>
+
+<div class="terminal-page" style="min-height: auto; padding: 0 1rem;">
+    <div class="terminal-card">
         <div class="terminal-container">
             <div id="terminal"></div>
         </div>
@@ -266,11 +315,17 @@ document.addEventListener("DOMContentLoaded", () => {
     term.open(document.getElementById('terminal'));
     fitAddon.fit();
     
-    // Auto-resize
-    window.addEventListener('resize', () => {
-        fitAddon.fit();
-    });
-    
+    // Sincronizar tamaño con el backend
+    function sendResize() {
+        if (currentSocket && currentSocket.readyState === WebSocket.OPEN) {
+            currentSocket.send(JSON.stringify({
+                type: 'resize',
+                cols: term.cols,
+                rows: term.rows
+            }));
+        }
+    }
+
     // WebSocket connection
     let currentSocket = null;
     let retryCount = 0;
@@ -305,6 +360,12 @@ document.addEventListener("DOMContentLoaded", () => {
             retryCount = 0;
             updateStatus('connected', 'Conectado');
             term.write('\r\n\x1b[1;32m✓ Conexión establecida\x1b[0m\r\n');
+            
+            // Sincronizar tamaño inicial tras conectar (con pequeño delay para asegurar que el PTY está listo)
+            setTimeout(() => {
+                fitAddon.fit();
+                sendResize();
+            }, 500);
         };
         
         socket.onmessage = (event) => {
@@ -356,6 +417,16 @@ document.addEventListener("DOMContentLoaded", () => {
         };
     }
     
+    // Auto-resize
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            fitAddon.fit();
+            sendResize();
+        }, 200);
+    });
+
     // Enviar input al contenedor
     term.onData((data) => {
         if (currentSocket && currentSocket.readyState === WebSocket.OPEN) {

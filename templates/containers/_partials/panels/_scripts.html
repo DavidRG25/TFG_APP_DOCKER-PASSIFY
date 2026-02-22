@@ -260,9 +260,10 @@
       const composeBlock = document.getElementById("block-compose");
       const codeBlock = document.getElementById("block-code");
       const analysisBlock = document.getElementById("block-analysis");
+      const envVarsBlock = document.getElementById("block-env-vars");
 
       // Limpieza de estados visuales
-      [imageContainer, dockerhubBlock, customSubtypeBlock, dockerfileBlock, composeBlock, codeBlock, analysisBlock].forEach(el => {
+      [imageContainer, dockerhubBlock, customSubtypeBlock, dockerfileBlock, composeBlock, codeBlock, analysisBlock, envVarsBlock].forEach(el => {
         if (el) el.style.display = "none";
       });
 
@@ -319,6 +320,7 @@
               }
               simpleAccessBlock.style.display = "block";
           }
+          if (envVarsBlock) envVarsBlock.style.display = "block";
           if (analysisBlock) analysisBlock.style.display = "none";
           if (portConfigBlock) portConfigBlock.style.display = "block";
       } else if (mode === "custom" && submode === "compose") {
@@ -534,7 +536,22 @@
         displayComposeAnalysis(data);
       } else {
         analysisBlock.style.display = "none";
-        showToast(data.message || data.error, "text-bg-danger", "Error de Análisis");
+        // Limpiar el input para que pueda volver a elegirlo tras corregir
+        document.querySelector('input[name="compose"]').value = "";
+        
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                title: 'Error en Docker Compose',
+                html: `
+                  <div class="text-danger small mb-2">${data.message || data.error || 'Syntax error'}</div>
+                  <p class="mb-0 small text-muted">Por favor, revisa que el archivo esté correctamente escrito, prestando especial atención a la <b>indentación</b>.</p>
+                `,
+                icon: 'error',
+                confirmButtonColor: '#4e73df'
+            });
+        } else {
+            showToast((data.message || data.error) + " - Por favor, revisa la indentación.", "text-bg-danger", "Error de Análisis");
+        }
       }
     } catch (error) {
       console.error(error);

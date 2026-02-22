@@ -3,48 +3,116 @@
 {% load static %}
 {% block extrahead %}
 <link rel="stylesheet" href="{% static 'assets/css/dashboard.css' %}">
-
-<script>
-  document.addEventListener("DOMContentLoaded", function() {
-      const header = document.querySelector('.dynamic-subject-header');
-      if (header) {
-          const logo = header.getAttribute('data-logo');
-          const color = header.getAttribute('data-color');
-          if (logo && logo.trim() !== '') {
-              header.style.background = `url('${logo}') center/cover no-repeat`;
-              header.style.position = 'relative';
-              const overlay = header.querySelector('.subject-header-overlay');
-              if (overlay) overlay.style.display = 'block';
-          } else if (color) {
-              header.style.background = `linear-gradient(135deg, ${color} 0%, #224abe 100%)`;
-          }
-      }
-  });
-</script>
-
 {% endblock %}
 
 {% block body %}
-<div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh;">
-  {# Header con degradado Premium #}
-  <div class="rounded-3 p-4 mb-4 shadow-sm text-white dynamic-subject-header" 
-       data-logo="{% if subject.logo %}{{ subject.logo.url|default:'' }}{% endif %}"
-       data-color="{{ subject.color|default:'#4e73df' }}">
-    <div class="subject-header-overlay" style="display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.6); border-radius: inherit;"></div>
-    <div class="d-flex justify-content-between align-items-center" style="position: relative; z-index: 1;">
-      <div>
-        <h1 class="h3 mb-1 text-white fw-bold"><i class="fas fa-university me-2"></i>{{ subject.name }}</h1>
-        <p class="text-white-50 mb-0">
-          {% if subject.teacher_user %}Profesor: {{ subject.teacher_user.get_full_name|default:subject.teacher_user.username }} · {% endif %}
-          Curso {{ subject.genero }} · {{ subject.get_category_display|default:subject.category }}
-        </p>
+<div id="subject-theme-container" class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh;">
+  <script>
+    (function() {
+      const container = document.getElementById('subject-theme-container');
+      container.style.setProperty('--subject-primary', '{{ subject.color|default:"#4e73df" }}');
+      container.style.setProperty('--subject-secondary', '{{ subject.color|default:"#224abe" }}');
+    })();
+  </script>
+
+  {# Breadcrumbs - Ruta encima del banner #}
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item">
+        <a href="{% url 'professor_dashboard' %}" class="text-decoration-none text-muted">
+          <i class="fas fa-home me-1"></i>Inicio
+        </a>
+      </li>
+      <li class="breadcrumb-item">
+        <a href="{% url 'professor_dashboard' %}" class="text-decoration-none text-muted">Panel Profesor</a>
+      </li>
+      <li class="breadcrumb-item active text-primary fw-bold" aria-current="page">{{ subject.name }}</li>
+    </ol>
+  </nav>
+
+  {# Header con degradado Premium - Estilo Unificado #}
+  <div class="rounded-4 p-4 mb-4 shadow" 
+       style="background: linear-gradient(135deg, var(--subject-primary) 0%, var(--subject-secondary) 100%); min-height: 160px; display: flex; align-items: center;">
+    <div class="d-flex justify-content-between align-items-center w-100">
+      <div class="d-flex align-items-center">
+        {# Botón de Volver #}
+        <a href="{% url 'professor_dashboard' %}" 
+           class="btn btn-light rounded-circle shadow-sm d-flex align-items-center justify-content-center" 
+           style="width: 50px; height: 50px; min-width: 50px; margin-right: 2.5rem; color: var(--subject-primary); transition: all 0.2s;"
+           title="Volver al panel principal">
+          <i class="fas fa-arrow-left fa-lg"></i>
+        </a>
+
+        {# Logo de la Asignatura #}
+        <div class="bg-white rounded-4 shadow-sm d-flex align-items-center justify-content-center overflow-hidden border border-white border-2" 
+             style="width: 75px; height: 75px; min-width: 75px; margin-right: 3rem;">
+          {% if subject.logo %}
+            <img src="{{ subject.logo.url }}" alt="Logo" class="w-100 h-100 object-fit-cover">
+          {% else %}
+            <i class="fas fa-book fa-2x" style="color: var(--subject-primary);"></i>
+          {% endif %}
+        </div>
+
+        {# Textos #}
+        <div class="text-container text-white">
+          <h1 class="h1 mb-1 fw-bold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15); line-height: 1.2; font-size: 2.5rem;">{{ subject.name }}</h1>
+          <p class="text-white-50 mb-0 opacity-90 fw-semibold fs-5">
+            <i class="fas fa-info-circle me-2"></i>Curso {{ subject.genero }} · {{ subject.get_category_display|default:subject.category }}
+          </p>
+        </div>
       </div>
-      <div class="d-flex gap-2">
-        <button class="btn btn-outline-light shadow-sm" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#editSubjectModal" data-target="#editSubjectModal">
-          <i class="fas fa-palette me-2"></i>Personalizar
+
+      <style>
+        .prof-action-group {
+            background: rgba(0, 0, 0, 0.15);
+            padding: 4px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .prof-action-group .btn {
+            border: none;
+            padding: 0.7rem 1.5rem;
+            font-weight: 700;
+            font-size: 0.82rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: 0.3px;
+        }
+        .btn-customize {
+            background: transparent !important;
+            color: rgba(255, 255, 255, 0.9) !important;
+            border-radius: 12px !important;
+            margin-right: 2px;
+        }
+        .btn-customize:hover {
+            background: rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+        }
+        .btn-panel {
+            background: #ffffff !important;
+            color: var(--subject-primary, #4e73df) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .btn-panel:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+            background: #f8fafc !important;
+        }
+        .prof-action-group .btn i {
+            margin-right: 10px;
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+      </style>
+
+      <div class="d-flex prof-action-group align-items-center">
+        <button class="btn btn-customize d-flex align-items-center" 
+                data-bs-toggle="modal" data-toggle="modal" 
+                data-bs-target="#editSubjectModal" data-target="#editSubjectModal">
+          <i class="fas fa-palette"></i> Personalizar
         </button>
-        <a href="{% url 'professor_dashboard' %}" class="btn btn-light shadow-sm">
-          <i class="fas fa-arrow-left me-2"></i>Volver al Panel
+        <a href="{% url 'professor_dashboard' %}" class="btn btn-panel d-flex align-items-center">
+          <i class="fas fa-th-large"></i> Volver al Panel
         </a>
       </div>
     </div>
@@ -219,16 +287,59 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <div class="mb-3">
+          <div class="mb-4">
             <label class="form-label text-muted small fw-semibold">Color de Fondo (Hex)</label>
-            <input type="color" name="color" class="form-control form-control-color w-100 rounded-3" value="{{ subject.color|default:'#4e73df' }}">
+            <input type="color" name="color" class="form-control form-control-color w-100 rounded-3 shadow-sm" value="{{ subject.color|default:'#4e73df' }}" style="height: 45px;">
           </div>
           <div class="mb-3">
             <label class="form-label text-muted small fw-semibold">Icono/Logo de la Asignatura</label>
-            <input type="file" name="logo" class="form-control rounded-3" accept="image/*">
+            
+            <div id="logo-preview-container" class="mb-3 p-3 border rounded-4 bg-light text-center">
+              <div class="position-relative ms-auto me-auto" style="width: 100px; height: 100px;">
+                <div id="logo-display" class="w-100 h-100 rounded-3 border bg-white d-flex align-items-center justify-content-center overflow-hidden shadow-sm">
+                  {% if subject.logo %}
+                    <img src="{{ subject.logo.url }}" class="w-100 h-100 object-fit-cover" id="current-logo-img">
+                  {% else %}
+                    <i class="fas fa-book fa-3x text-muted opacity-50"></i>
+                  {% endif %}
+                </div>
+                {% if subject.logo %}
+                <button type="button" id="btn-remove-logo" class="btn btn-danger btn-sm rounded-circle position-absolute top-0 start-100 translate-middle shadow-sm" title="Quitar logo">
+                  <i class="fas fa-times"></i>
+                </button>
+                {% endif %}
+              </div>
+              <input type="hidden" name="remove_logo" id="remove-logo-input" value="false">
+            </div>
+
+            <input type="file" name="logo" id="logo-input" class="form-control rounded-3" accept="image/*">
             <small class="text-muted">Se recomienda una imagen cuadrada con fondo transparente.</small>
           </div>
         </div>
+        <script>
+          document.getElementById('logo-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+              const reader = new FileReader();
+              reader.onload = function(event) {
+                const display = document.getElementById('logo-display');
+                display.innerHTML = `<img src="${event.target.result}" class="w-100 h-100 object-fit-cover">`;
+                document.getElementById('remove-logo-input').value = 'false';
+              };
+              reader.readAsDataURL(file);
+            }
+          });
+
+          const btnRemove = document.getElementById('btn-remove-logo');
+          if (btnRemove) {
+            btnRemove.addEventListener('click', function() {
+              document.getElementById('logo-display').innerHTML = '<i class="fas fa-book fa-3x text-muted opacity-50"></i>';
+              document.getElementById('remove-logo-input').value = 'true';
+              document.getElementById('logo-input').value = '';
+              this.style.display = 'none';
+            });
+          }
+        </script>
         <div class="modal-footer border-0 pt-0">
           <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
           <button type="submit" class="btn btn-primary rounded-pill px-4">Guardar Cambios</button>

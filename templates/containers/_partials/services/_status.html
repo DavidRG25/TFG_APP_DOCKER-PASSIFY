@@ -6,6 +6,7 @@
     {% elif service.status == 'building' or service.status == 'pulling' or service.status == 'starting' %} bg-info text-white
     {% elif service.status == 'stopping' %} bg-warning text-dark
     {% elif service.status == 'deleting' %} bg-danger text-white
+    {% elif service.status == 'updating' %} bg-primary text-white
     {% else %} bg-warning text-dark
     {% endif %}">
     {% if service.status == 'building' %} <i class="fas fa-hammer fa-spin me-1"></i> Construyendo
@@ -13,6 +14,7 @@
     {% elif service.status == 'starting' %} <i class="fas fa-play fa-spin me-1"></i> Iniciando
     {% elif service.status == 'stopping' %} <i class="fas fa-pause fa-spin me-1"></i> Deteniendo
     {% elif service.status == 'deleting' %} <i class="fas fa-trash fa-spin me-1"></i> Eliminando
+    {% elif service.status == 'updating' %} <i class="fas fa-sync fa-spin me-1"></i> Actualizando
     {% else %} {{ service.status|default:'unknown'|title }}
     {% endif %}
     {% if service.has_compose %}

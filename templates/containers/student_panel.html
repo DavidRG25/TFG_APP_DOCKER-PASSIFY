@@ -2,24 +2,133 @@
 {% load static %}
 
 {% block body %}
-<div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh;">
-  {# Header con degradado #}
-  <div class="rounded-3 p-4 mb-4 shadow-sm" style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+<div id="subject-theme-container" class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh;">
+  <script>
+    (function() {
+      const container = document.getElementById('subject-theme-container');
+      container.style.setProperty('--subject-primary', '{{ current_subject.color|default:"#4e73df" }}');
+      container.style.setProperty('--subject-secondary', '{{ current_subject.color|default:"#224abe" }}');
+    })();
+  </script>
+  {# Breadcrumbs - Ruta encima del banner #}
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item">
+        <a href="{% url 'containers:student_panel' %}" class="text-decoration-none text-muted">
+          <i class="fas fa-home me-1"></i>Inicio
+        </a>
+      </li>
+      {% if current_subject %}
+        <li class="breadcrumb-item">
+          <a href="{% url 'containers:student_subjects' %}" class="text-decoration-none text-muted">Asignaturas</a>
+        </li>
+        <li class="breadcrumb-item active text-primary fw-bold" aria-current="page">{{ current_subject.name }}</li>
+      {% else %}
+        <li class="breadcrumb-item active text-primary fw-bold" aria-current="page">Mis Servicios</li>
+      {% endif %}
+    </ol>
+  </nav>
+
+  {# Header con degradado Premium #}
+  <div class="rounded-3 p-4 mb-4 shadow-sm" 
+       style="background: linear-gradient(135deg, var(--subject-primary) 0%, var(--subject-secondary) 100%);">
     <div class="d-flex justify-content-between align-items-center">
       <div>
-        <h1 class="h3 mb-1 text-white fw-bold">Mis servicios</h1>
-        <p class="text-white-50 mb-0">Gestiona tus contenedores y despliegues activos.</p>
+        {% if current_subject %}
+        <div class="d-flex align-items-center">
+          {# Botón de Volver #}
+          <a href="{% url 'containers:student_subjects' %}" 
+             class="btn btn-light rounded-circle shadow-sm d-flex align-items-center justify-content-center" 
+             style="width: 50px; height: 50px; min-width: 50px; margin-right: 2.5rem; color: var(--subject-primary); transition: all 0.2s;"
+             title="Volver a mis asignaturas">
+            <i class="fas fa-arrow-left fa-lg"></i>
+          </a>
+
+          {# Logo de la Asignatura #}
+          <div class="bg-white rounded-4 shadow-sm d-flex align-items-center justify-content-center overflow-hidden border border-white border-2" 
+               style="width: 75px; height: 75px; min-width: 75px; margin-right: 2rem;">
+            {% if current_subject.logo %}
+              <img src="{{ current_subject.logo.url }}" alt="Logo" class="w-100 h-100 object-fit-cover">
+            {% else %}
+              <i class="fas fa-book fa-2x" style="color: var(--subject-primary);"></i>
+            {% endif %}
+          </div>
+
+          {# Textos #}
+          <div class="text-container text-white ms-3">
+            <h1 class="h1 mb-1 text-white fw-bold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15); line-height: 1.2; font-size: 2.5rem;">{{ current_subject.name }}</h1>
+            <p class="text-white-50 mb-0 opacity-90 fw-semibold fs-5">
+              <i class="fas fa-user-tie me-2"></i>Prof. {{ current_subject.teacher_user.get_full_name|default:current_subject.teacher_user.username }}
+            </p>
+          </div>
+        </div>
+        {% else %}
+        <div class="d-flex align-items-center position-relative" style="z-index: 2;">
+          <div class="d-flex align-items-center justify-content-center me-5 shadow-sm" 
+               style="width: 70px; height: 70px; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(12px); border-radius: 20px; border: 1px solid rgba(255,255,255,0.2);">
+            <i class="fas fa-cubes fa-2x text-white"></i>
+          </div>
+          <div>
+            <h1 class="h2 mb-1 text-white fw-bold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15);">Mis servicios</h1>
+            <p class="text-white-50 mb-0 opacity-90 fw-medium fs-6">Gestión integral de tus contenedores y proyectos activos</p>
+          </div>
+        </div>
+        <i class="fas fa-cloud position-absolute" style="font-size: 14rem; right: 5%; bottom: -5rem; color: rgba(255,255,255,0.04); transform: rotate(5deg); pointer-events: none;"></i>
+        {% endif %}
       </div>
-      <div class="d-flex gap-2">
-        <a href="{% url 'containers:api_generator' %}" class="btn btn-outline-light d-flex align-items-center"
-           data-bs-toggle="tooltip" data-bs-placement="top" 
-           title="Genera comandos para desplegar servicios mediante la API o terminal.">
-          <i class="fas fa-terminal me-2"></i>Despliegue API/Terminal
+      
+      <style>
+        .deploy-group {
+            background: rgba(0, 0, 0, 0.15);
+            padding: 4px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .deploy-group .btn {
+            border: none;
+            padding: 0.7rem 1.5rem;
+            font-weight: 700;
+            font-size: 0.82rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: 0.3px;
+        }
+        .btn-api {
+            background: transparent !important;
+            color: rgba(255, 255, 255, 0.9) !important;
+            border-radius: 12px !important;
+            margin-right: 2px;
+        }
+        .btn-api:hover {
+            background: rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+        }
+        .btn-web {
+            background: #ffffff !important;
+            color: var(--subject-primary, #4e73df) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .btn-web:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+            background: #f8fafc !important;
+        }
+        /* Separación de icono y texto */
+        .deploy-group .btn i {
+            margin-right: 10px;
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+      </style>
+
+      <div class="d-flex deploy-group align-items-center">
+        <a href="{% url 'containers:api_generator' %}" class="btn btn-api d-flex align-items-center"
+           data-bs-toggle="tooltip" title="Despliegue profesional mediante API/CLI">
+          <i class="fas fa-terminal"></i> API / CLI
         </a>
-        <a href="{% url 'containers:new_service' %}" class="btn btn-light shadow-sm"
-           data-bs-toggle="tooltip" data-bs-placement="top" 
-           title="Despliega servicios de forma asistida a través del formulario web.">
-          <i class="fas fa-plus me-2"></i>Despliegue Web
+        <a href="{% url 'containers:new_service' %}" class="btn btn-web d-flex align-items-center"
+           data-bs-toggle="tooltip" title="Asistente de despliegue rápido">
+          <i class="fas fa-rocket"></i> Nuevo Servicio
         </a>
       </div>
     </div>
@@ -27,13 +136,11 @@
 
   {# Contenedor actualizable con estadísticas y tabla #}
   <div id="services-container">
-    {# 1. Estadísticas - Solo en vista general #}
     {% if not current_subject %}
+    {# 1. Estadísticas #}
     {% include "containers/_partials/panels/_stats.html" %}
-    {% endif %}
 
-    {# 2. Filtros - Solo en vista general #}
-    {% if not current_subject %}
+    {# 2. Filtros #}
     {% include "containers/_partials/panels/_filters.html" %}
     {% endif %}
 
@@ -41,19 +148,23 @@
     <div class="card border-0 shadow-sm">
       <div class="card-body p-0">
         <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
-            <thead style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
-              <tr class="text-white small text-uppercase">
-                <th class="py-3 ps-4">Proyecto</th>
-                <th class="py-3">Nombre</th>
-                <th class="py-3">Imagen</th>
-                <th class="py-3">Puerto</th>
-                <th class="py-3">Estado</th>
-                <th class="py-3 pe-4 text-end">Acciones</th>
+          <table class="table table-hover align-middle mb-0 overflow-hidden" style="border-radius: 12px 12px 0 0;">
+            <thead style="background: var(--subject-primary, #4e73df); border-radius: 12px 12px 0 0;">
+              <tr class="text-white small text-uppercase fw-bold" style="letter-spacing: 0.8px; font-size: 0.75rem;">
+                {% if not current_subject %}
+                <th class="py-3 ps-4 border-0">Asignatura</th>
+                {% endif %}
+                <th class="py-3 {% if current_subject %}ps-4{% endif %} border-0">Proyecto</th>
+                <th class="py-3 border-0">Nombre</th>
+                <th class="py-3 border-0">Imagen</th>
+                <th class="py-3 border-0">Puerto</th>
+                <th class="py-3 border-0 text-center">Estado</th>
+                <th class="py-3 pe-4 text-end border-0">Acciones</th>
               </tr>
             </thead>
             <tbody id="service-table" class="bg-white" 
                    hx-get="{% url 'containers:service_table' %}{% if current_subject %}?subject={{ current_subject.id }}{% endif %}"
+                   hx-include="{% if not current_subject %}#service-filters-form{% endif %}"
                    hx-trigger="load, every 3s, service:table-refresh from:body">
               {% include "containers/_service_rows.html" %}
             </tbody>

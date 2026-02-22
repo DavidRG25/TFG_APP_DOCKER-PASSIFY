@@ -171,19 +171,44 @@
 {% endblock %}
 
 {% block body %}
-<div class="container py-5 profile-container">
-  <!-- Header con Avatar -->
-  <div class="d-flex align-items-center mb-5">
-    <div class="avatar-circle">
-      {{ user.username|first|upper }}
+<div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh">
+  {# Breadcrumbs #}
+  <nav aria-label="breadcrumb" class="mb-3 px-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item">
+        <a href="{% url 'containers:student_panel' %}" class="text-decoration-none text-muted">
+          <i class="fas fa-home me-1"></i>Inicio
+        </a>
+      </li>
+      <li class="breadcrumb-item active text-primary fw-bold" aria-current="page">Mi Perfil</li>
+    </ol>
+  </nav>
+
+  {# Header con degradado Premium Unificado #}
+  <div class="rounded-4 p-4 mb-5 shadow mx-3 position-relative overflow-hidden" 
+       style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+    <div class="d-flex align-items-center position-relative" style="z-index: 2;">
+      {# Avatar #}
+      <div class="bg-white rounded-circle shadow-sm d-flex align-items-center justify-content-center border border-white border-2 me-4" 
+           style="width: 80px; height: 80px; min-width: 80px; color: #4e73df; font-size: 2.2rem; font-weight: 800;">
+        {{ user.username|first|upper }}
+      </div>
+      
+      {# Textos #}
+      <div class="text-white">
+        <h1 class="h2 mb-1 fw-extrabold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15);">Mi Perfil</h1>
+        <p class="text-white-50 mb-0 opacity-90 fw-medium">
+          <i class="fas fa-user-shield me-2"></i>{{ user.get_full_name|default:user.username }} 
+          <span class="mx-2">|</span> 
+          <i class="fas fa-envelope me-1 text-white-50"></i> {{ user.email }}
+        </p>
+      </div>
     </div>
-    <div>
-      <h1 class="h2 fw-bold mb-1 text-gray-800">Mi Perfil</h1>
-      <p class="text-muted mb-0">Gestiona tus datos personales y credenciales de acceso</p>
-    </div>
+    <i class="fas fa-cloud position-absolute" style="font-size: 15rem; right: 5%; bottom: -5rem; color: rgba(255,255,255,0.05); transform: rotate(-10deg); pointer-events: none;"></i>
   </div>
 
-  <div class="row g-4">
+  <div class="container">
+    <div class="row g-4">
     <!-- Columna izquierda: Datos personales y contraseña -->
     <div class="col-lg-6">
       

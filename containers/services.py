@@ -104,7 +104,7 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> 
     if service.dockerfile:
         dest = workspace / "Dockerfile"
         try:
-            with service.dockerfile.open("rb") as f_in:
+            with open(service.dockerfile.path, "rb") as f_in:
                 content = f_in.read()
                 with open(dest, "wb") as f_out:
                     f_out.write(content)
@@ -112,10 +112,10 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> 
             print(f"[ERROR] No se pudo copiar Dockerfile para servicio {service.id}: {e}")
 
     # 2. Copiar docker-compose.yml
-    if service.compose:
+    if service.has_compose and service.compose:
         dest = workspace / "docker-compose.yml"
         try:
-            with service.compose.open("rb") as f_in:
+            with open(service.compose.path, "rb") as f_in:
                 content = f_in.read()
                 with open(dest, "wb") as f_out:
                     f_out.write(content)
@@ -132,7 +132,7 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> 
             dest_archive = workspace / archive_name
             
             # Copiar archivo zip/rar al workspace con nombre estándar
-            with service.code.open("rb") as f_in:
+            with open(service.code.path, "rb") as f_in:
                 content = f_in.read()
                 with open(dest_archive, "wb") as f_out:
                     f_out.write(content)
@@ -1152,11 +1152,21 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
         except DockerException:
             image_cmd = None
 
-        # --------- Variables (volúmenes DESHABILITADOS por seguridad) ---------
-        # SEGURIDAD CRÍTICA: Los volúmenes están completamente deshabilitados en contenedores simples
-        # para prevenir escalada de privilegios mediante bind mounts.
-        # Solo se permiten volúmenes nombrados en Docker Compose con validación estricta.
-        volumes = None  # NO crear volúmenes automáticamente
+        # --------- Variables y Volúmenes Automáticos ---------
+        # Se crean EXCLUSIVAMENTE volúmenes nombrados (NO bind mounts) basados en lo que 
+        # solicita la imagen original (ej. /var/lib/mysql en las bd). 
+        # Esto previene escalada de privilegios y permite que "keep_volumes" funcione.
+        volumes = {}
+        image_vols = image_attrs.get("Config", {}).get("Volumes") or {}
+        if image_vols:
+            for i, vol_path in enumerate(image_vols.keys()):
+                vol_name = f"paasify_vol_{service.id}_{i}"
+                volumes[vol_name] = {'bind': vol_path, 'mode': 'rw'}
+            
+            # Guardar referencia del primer volumen por compatibilidad y limpieza básica
+            if not service.volume_name:
+                service.volume_name = f"paasify_vol_{service.id}_0"
+                service.save(update_fields=["volume_name"])
 
         env_vars_raw = service.env_vars or {}
         if not isinstance(env_vars_raw, dict):
@@ -1515,16 +1525,18 @@ def remove_container(service: Service, keep_files: bool = False, keep_volumes: b
         # Liberar puerto
         _release_port(service.assigned_port)
 
-        # Eliminar volumen
-        if service.volume_name and not keep_volumes:
+        # Eliminar TODOS los volúmenes asociados al servicio (paasify_vol_{id}_*)
+        if not keep_volumes:
             try:
-                volume = docker_client.volumes.get(service.volume_name)
-                volume.remove(force=True)
-            except NotFound:
-                pass
-            except DockerException as exc:
-                _append_log(service, f"Error al eliminar el volumen: {exc}")
+                vols = docker_client.volumes.list(filters={"name": f"paasify_vol_{service.id}_"})
+                for v in vols:
+                    v.remove(force=True)
+            except Exception as exc:
+                _append_log(service, f"Error al eliminar volúmenes: {exc}")
                 service.save(update_fields=["logs"])
+        
+        # En cualquier caso desvinculamos el nombre de la bd local
+        service.volume_name = None
         
         # Eliminar imagen si fue construida con Dockerfile
         if service.dockerfile:
@@ -1541,6 +1553,12 @@ def remove_container(service: Service, keep_files: bool = False, keep_volumes: b
         # Limpiar workspace
         if not keep_files:
             cleanup_service_workspace(service)
+
+    # LIMPIEZA ADICIONAL: Eliminar imágenes "huérfanas" (<none>:<none>) generadas por reconstrucciones
+    try:
+        docker_client.images.prune(filters={'dangling': True})
+    except Exception as e:
+        pass # No es crítico si falla
 
     service.container_id = None
     service.assigned_port = None

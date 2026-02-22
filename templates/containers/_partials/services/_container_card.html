@@ -70,10 +70,16 @@
                     {% with p_ext=first_port_obj.external p_int=first_port_obj.internal|default:80 %}
                         {# Solo mostrar si no es un puerto tipico de DB/Worker y no tiene nombre de DB/Worker #}
                         {% if p_int != 6379 and p_int != 5432 and p_int != 3306 and p_int != 27017 and 'redis' not in container.name|lower and 'worker' not in container.name|lower and 'db' not in container.name|lower %}
+                            {% if container.status == 'running' and container.container_id %}
                             <a href="http://{{ host }}:{{ p_ext }}" class="btn btn-primary" target="_blank"
                                 rel="noopener" title="Acceder a {{ container.name }}">
                                 <i class="fas fa-external-link-alt"></i>
                             </a>
+                            {% else %}
+                            <button class="btn btn-primary" disabled title="Acceso Web disponible solo cuando el contenedor esta en ejecucion">
+                                <i class="fas fa-external-link-alt"></i>
+                            </button>
+                            {% endif %}
                         {% endif %}
                     {% endwith %}
                 {% endwith %}
