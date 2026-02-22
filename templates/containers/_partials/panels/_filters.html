@@ -1,16 +1,145 @@
-{# Partial: Filtros de asignatura #}
-<div class="mb-4">
-  <h5 class="text-dark mb-3"><i class="fas fa-filter me-2"></i>Mis asignaturas</h5>
-  <div class="d-flex gap-2 flex-wrap">
-    <a href="{% url 'containers:student_panel' %}" 
-       class="btn btn-sm {% if not current_subject %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
-       Todas
-    </a>
-    {% for sub in available_subjects %}
-    <a href="{% url 'containers:student_services_in_subject' sub.id %}" 
-       class="btn btn-sm {% if current_subject.id == sub.id %}btn-primary{% else %}btn-outline-secondary{% endif %} rounded-pill px-3">
-       {{ sub.name }}
-    </a>
-    {% endfor %}
+{# Partial: Filtros interactivos #}
+<style>
+  .custom-select {
+    display: block;
+    width: 100%;
+    height: 3rem;
+    padding: 0.5rem 2.5rem 0.5rem 1.25rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.5;
+    color: #1e293b !important;
+    background-color: #ffffff;
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%234e73df' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    background-size: 14px 10px;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    appearance: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+  }
+  .custom-select:hover {
+    border-color: #4e73df;
+    background-color: #f8fafc;
+  }
+  .custom-select:focus {
+    border-color: #4e73df;
+    box-shadow: 0 0 0 4px rgba(78, 115, 223, 0.1);
+    outline: none;
+    color: #000000 !important;
+  }
+  .filter-card {
+    background: white;
+    border-radius: 1.25rem;
+    padding: 1.75rem;
+    margin-bottom: 2rem;
+    border: 1px solid rgba(0,0,0,0.03);
+    position: relative;
+    overflow: hidden;
+  }
+  .filter-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 4px; height: 100%;
+    background: #4e73df;
+  }
+  .filter-label {
+    font-weight: 700;
+    font-size: 0.75rem;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+</style>
+
+<div class="filter-card shadow-sm animate__animated animate__fadeIn">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+      <h5 class="text-dark fw-bold mb-0 d-flex align-items-center">
+        <i class="fas fa-filter text-primary me-2"></i>
+        Filtrar recursos
+      </h5>
+      <button type="button" class="btn btn-link text-muted text-decoration-none btn-sm fw-semibold" onclick="resetFilters()">
+          <i class="fas fa-sync-alt me-1"></i> Limpiar filtros
+      </button>
   </div>
+  
+  <form id="service-filters-form" class="row g-4 align-items-end" 
+        hx-get="{% url 'containers:service_table' %}" 
+        hx-target="#service-table" 
+        hx-trigger="change">
+    
+    <div class="col-md-5">
+      <label class="filter-label mb-2">
+        <i class="fas fa-book-bookmark text-primary opacity-75"></i> Asignatura
+      </label>
+      <select name="subject" id="filter-subject" class="custom-select shadow-none">
+        <option value="">Todas mis asignaturas</option>
+        {% for sub in available_subjects %}
+        <option value="{{ sub.id }}" {% if current_subject and current_subject.id == sub.id %}selected{% endif %}>{{ sub.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-5">
+      <label class="filter-label mb-2">
+        <i class="fas fa-folder-tree text-primary opacity-75"></i> Proyecto
+      </label>
+      <select name="project" id="filter-project" class="custom-select shadow-none">
+        <option value="" data-subject="all">Cualquier proyecto</option>
+        {% for proj in user_projects %}
+        <option value="{{ proj.id }}" data-subject="{{ proj.subject_id|default:'none' }}">
+          {{ proj.place }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    
+    <div class="col-md-2">
+        <div class="bg-light rounded-pill p-1 d-flex justify-content-center">
+            <span class="badge rounded-pill bg-white text-primary border shadow-sm px-3 py-2">
+                <i class="fas fa-info-circle me-1"></i> {{ services.count }} registros
+            </span>
+        </div>
+    </div>
+  </form>
 </div>
+
+<script>
+  function resetFilters() {
+      const form = document.getElementById('service-filters-form');
+      form.reset();
+      updateProjectFilter();
+      form.dispatchEvent(new Event('change'));
+  }
+
+  function updateProjectFilter() {
+      const subjectId = document.getElementById('filter-subject').value;
+      const projectSelect = document.getElementById('filter-project');
+      const options = projectSelect.querySelectorAll('option');
+      
+      let firstVisible = null;
+      options.forEach(opt => {
+          const optSubject = opt.dataset.subject;
+          if (optSubject === 'all' || !subjectId || optSubject === subjectId) {
+              opt.style.display = 'block';
+              if (!firstVisible && opt.value !== "") firstVisible = opt;
+          } else {
+              opt.style.display = 'none';
+              if (opt.selected) {
+                  projectSelect.value = "";
+              }
+          }
+      });
+  }
+
+  document.getElementById('filter-subject').addEventListener('change', updateProjectFilter);
+  
+  // Ejecutar al cargar
+  document.addEventListener('DOMContentLoaded', updateProjectFilter);
+</script>

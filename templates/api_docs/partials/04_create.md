@@ -17,6 +17,7 @@ Campos disponibles en **todos** los modos de despliegue:
 | **subject**        | int    | ✅ **Sí**   | ID de la asignatura.                                                                 |
 | **container_type** | string | ⭕ No       | Clasificación del servicio. Valores: `web` (default), `api`, `database`, `misc`.     |
 | **is_web**         | bool   | ⭕ No       | `true` (default) o `false`. Si es `true`, aparece el botón "Acceder" en la interfaz. |
+| **keep_volumes**   | bool   | ⭕ No       | `true` (default) o `false`. Conserva los datos en futuras recargas si hay volúmenes. |
 
 > 💡 **Nota sobre Tipos:**
 >
@@ -130,12 +131,15 @@ Sube tu código fuente (`.zip`) y define cómo construirlo. Requiere `multipart/
 
 Para servicios simples definidos en un `Dockerfile`.
 
-| Campo          | Tipo | Descripción                                                          |
-| :------------- | :--- | :------------------------------------------------------------------- |
-| **dockerfile** | File | Archivo `Dockerfile` (debe estar en la raíz o coincidir con el zip). |
-| **code**       | File | Archivo `.zip` con tu código fuente.                                 |
+| Campo          | Tipo   | Descripción                                                          |
+| :------------- | :----- | :------------------------------------------------------------------- |
+| **dockerfile** | File   | Archivo `Dockerfile` (debe estar en la raíz o coincidir con el zip). |
+| **code**       | File   | Archivo `.zip` con tu código fuente.                                 |
+| **env_vars**   | objeto | Variables de entorno (opcional, en formato JSON).                    |
 
-#### 📝 Ejemplo:
+#### 📝 Ejemplo 1: Básico (Sin variables)
+
+Para despliegues estándar que no requieren configuración externa:
 
 ```bash
 curl -X POST {{ PAASIFY_API_URL }}/containers/ \
@@ -147,6 +151,22 @@ curl -X POST {{ PAASIFY_API_URL }}/containers/ \
   -F "project=1" \
   -F "subject=1" \
   -F "container_type=web"
+```
+
+#### 📝 Ejemplo 2: Avanzado (Con variables de entorno)
+
+Usa el campo `env_vars` con un objeto JSON para configurar tu aplicación:
+
+```bash
+curl -X POST {{ PAASIFY_API_URL }}/containers/ \
+  -H "Authorization: Bearer <TOKEN>" \
+  -F "name=mi-app-configurada" \
+  -F "mode=custom" \
+  -F "code=@app.zip" \
+  -F "dockerfile=@Dockerfile" \
+  -F "project=1" \
+  -F "subject=1" \
+  -F 'env_vars={"DEBUG":"true", "PORT":"8080", "API_KEY":"xyz789"}'
 ```
 
 #### ✅ Ideal para:

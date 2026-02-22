@@ -47,6 +47,7 @@ En servicios desplegados desde DockerHub (`mode: "dockerhub"`):
 - `env_vars` - Variables de entorno (JSON)
 - `container_type` - Tipo (`web`, `api`, `database`, `misc`)
 - `is_web` - Visibilidad web (`true`/`false`)
+- `keep_volumes` - Conservar datos/volúmenes entre reinicios (`true`/`false`, por defecto `true`)
 
 #### ❌ Campos NO Modificables:
 
@@ -84,6 +85,7 @@ En servicios personalizados con Dockerfile (`mode: "custom"`, sin `compose`):
 - `env_vars` - Variables de entorno (JSON)
 - `container_type` - Tipo de servicio
 - `is_web` - Visibilidad web
+- `keep_volumes` - Conservar datos/volúmenes (`true`/`false`, por defecto `true`)
 - `dockerfile` - **Reemplazar Dockerfile** (archivo)
 - `code` - **Reemplazar código fuente** (.zip)
 
@@ -115,6 +117,7 @@ En servicios personalizados con Docker Compose (`mode: "custom"`, con `compose`)
 - `compose` - **Reemplazar docker-compose.yml** (archivo)
 - `code` - **Reemplazar código fuente** (.zip)
 - Configuración de contenedores individuales (tipo y visibilidad)
+- `keep_volumes` - Conservar datos de los volúmenes (`true`/`false`, por defecto `true`)
 
 #### ❌ Campos NO Modificables:
 
@@ -149,6 +152,7 @@ curl -X PATCH "{{ PAASIFY_API_URL }}/containers/123/" \
 | `env_vars`       | ✅        | ✅                  | ✅                |
 | `container_type` | ✅        | ✅                  | ✅ (por servicio) |
 | `is_web`         | ✅        | ✅                  | ✅ (por servicio) |
+| `keep_volumes`   | ✅        | ✅                  | ✅                |
 | `dockerfile`     | ❌        | ✅                  | ❌                |
 | `compose`        | ❌        | ❌                  | ✅                |
 | `code`           | ❌        | ✅                  | ✅                |

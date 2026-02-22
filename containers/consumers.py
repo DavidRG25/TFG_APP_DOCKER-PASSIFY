@@ -1,3 +1,4 @@
+import json
 import logging
 import threading
 import time
@@ -141,6 +142,9 @@ class DockerTerminalConsumer(WebsocketConsumer):
             
             logger.info(f"Terminal: Usuario {user} conectado a {container_name} ({shell})")
             
+            # Enviar configuración inicial (opcional, el cliente enviará el primer resize)
+            pass
+            
         except (DockerException, Exception) as exc:
             logger.error(f"Terminal: Error al iniciar shell: {exc}")
             self.send(text_data=f"\r\n\033[1;31m[ERROR]\033[0m {exc}\r\n")
@@ -201,15 +205,51 @@ class DockerTerminalConsumer(WebsocketConsumer):
             if not sock:
                 return
             
-            data = bytes_data if bytes_data is not None else (text_data or "")
-            if isinstance(data, str):
-                data = data.encode("utf-8", errors="ignore")
+            # Intentar parsear como JSON para comandos especiales (resize)
+            data_to_send = None
+            if text_data:
+                try:
+                    payload = json.loads(text_data)
+                    if isinstance(payload, dict):
+                        msg_type = payload.get("type")
+                        if msg_type == "resize":
+                            cols = payload.get("cols")
+                            rows = payload.get("rows")
+                            if cols and rows:
+                                self._exec_resize(cols, rows)
+                            return
+                        elif msg_type == "stdin":
+                            data_to_send = payload.get("data", "").encode("utf-8")
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+            if data_to_send is None:
+                data = bytes_data if bytes_data is not None else (text_data or "")
+                if isinstance(data, str):
+                    data = data.encode("utf-8", errors="ignore")
+                data_to_send = data
             
             send_fn = getattr(sock, "sendall", None) or getattr(sock, "send", None)
             if send_fn:
-                send_fn(data)
+                send_fn(data_to_send)
         except Exception as exc:
             logger.error(f"Terminal: Error enviando datos: {exc}")
+
+    def _exec_resize(self, cols, rows):
+        """Redimensionar la terminal en el contenedor"""
+        if not self.exec_id:
+            return
+        
+        docker_client = get_docker_client()
+        if not docker_client:
+            return
+            
+        try:
+            # Docker API espera width y height
+            docker_client.api.exec_resize(self.exec_id, height=rows, width=cols)
+            # logger.debug(f"Terminal: Resized to {cols}x{rows}")
+        except Exception as e:
+            logger.error(f"Terminal: Error redimensionando exec: {e}")
     
     def _timeout_monitor(self):
         """Hilo dedicado a vigilar la inactividad"""

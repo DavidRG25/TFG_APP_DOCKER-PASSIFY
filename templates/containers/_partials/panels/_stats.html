@@ -1,42 +1,57 @@
 {# Partial: Estadísticas del panel #}
-<div class="row g-3 mb-4 row-cols-2 row-cols-md-5">
+<div class="row g-3 mb-4 row-cols-2 row-cols-md-5 mx-1">
   <div class="col">
-    <div class="card border-0 shadow-sm border-start border-4 border-dark h-100">
-      <div class="card-body bg-white">
-        <h6 class="text-uppercase text-muted small fw-bold mb-2"><i class="fas fa-folder me-1"></i> Proyectos</h6>
-        <h3 class="mb-0 text-dark fw-bold">{{ stats.projects|default:0 }}</h3>
+    <div class="card border-0 shadow-sm h-100 transition-transform hover-up" style="border-radius: 16px; background: rgba(255,255,255,0.7); backdrop-filter: blur(10px);">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h6 class="text-uppercase text-muted small fw-extrabold mb-0" style="letter-spacing: 0.5px;">Proyectos</h6>
+          <i class="fas fa-folder text-dark opacity-25"></i>
+        </div>
+        <h2 class="mb-0 text-dark fw-extrabold">{{ stats.projects|default:0 }}</h2>
       </div>
     </div>
   </div>
   <div class="col">
-    <div class="card border-0 shadow-sm border-start border-4 border-primary h-100">
-      <div class="card-body bg-white">
-        <h6 class="text-uppercase text-muted small fw-bold mb-2"><i class="fas fa-cube me-1"></i> Totales</h6>
-        <h3 class="mb-0 text-primary fw-bold" id="stat-total">{{ stats.total|default:0 }}</h3>
+    <div class="card border-0 shadow-sm h-100 transition-transform hover-up" style="border-radius: 16px; background: rgba(255,255,255,0.7); backdrop-filter: blur(10px);">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h6 class="text-uppercase text-muted small fw-extrabold mb-0" style="letter-spacing: 0.5px;">Totales</h6>
+          <i class="fas fa-cube text-primary opacity-25"></i>
+        </div>
+        <h2 class="mb-0 text-primary fw-extrabold" id="stat-total">{{ stats.total|default:0 }}</h2>
       </div>
     </div>
   </div>
   <div class="col">
-    <div class="card border-0 shadow-sm border-start border-4 border-success h-100">
-      <div class="card-body bg-white">
-        <h6 class="text-uppercase text-muted small fw-bold mb-2"><i class="fas fa-play-circle me-1"></i> Ejecutando</h6>
-        <h3 class="mb-0 text-success fw-bold" id="stat-running">{{ stats.running|default:0 }}</h3>
+    <div class="card border-0 shadow-sm h-100 transition-transform hover-up" style="border-radius: 16px; background: rgba(255,255,255,0.7); backdrop-filter: blur(10px);">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h6 class="text-uppercase text-muted small fw-extrabold mb-0" style="letter-spacing: 0.5px;">Ejecutando</h6>
+          <i class="fas fa-play-circle text-success opacity-25"></i>
+        </div>
+        <h2 class="mb-0 text-success fw-extrabold" id="stat-running">{{ stats.running|default:0 }}</h2>
       </div>
     </div>
   </div>
   <div class="col">
-    <div class="card border-0 shadow-sm border-start border-4 border-secondary h-100">
-      <div class="card-body bg-white">
-        <h6 class="text-uppercase text-muted small fw-bold mb-2"><i class="fas fa-stop-circle me-1"></i> Detenidos</h6>
-        <h3 class="mb-0 text-secondary fw-bold" id="stat-stopped">{{ stats.stopped|default:0 }}</h3>
+    <div class="card border-0 shadow-sm h-100 transition-transform hover-up" style="border-radius: 16px; background: rgba(255,255,255,0.7); backdrop-filter: blur(10px);">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h6 class="text-uppercase text-muted small fw-extrabold mb-0" style="letter-spacing: 0.5px;">Detenidos</h6>
+          <i class="fas fa-stop-circle text-secondary opacity-25"></i>
+        </div>
+        <h2 class="mb-0 text-secondary fw-extrabold" id="stat-stopped">{{ stats.stopped|default:0 }}</h2>
       </div>
     </div>
   </div>
   <div class="col">
-    <div class="card border-0 shadow-sm border-start border-4 border-info h-100">
-      <div class="card-body bg-white">
-        <h6 class="text-uppercase text-muted small fw-bold mb-2"><i class="fas fa-book me-1"></i> Asignaturas</h6>
-        <h3 class="mb-0 text-info fw-bold">{{ stats.subjects|default:0 }}</h3>
+    <div class="card border-0 shadow-sm h-100 transition-transform hover-up" style="border-radius: 16px; background: rgba(255,255,255,0.7); backdrop-filter: blur(10px);">
+      <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <h6 class="text-uppercase text-muted small fw-extrabold mb-0" style="letter-spacing: 0.5px;">Asignaturas</h6>
+          <i class="fas fa-book text-info opacity-25"></i>
+        </div>
+        <h2 class="mb-0 text-info fw-extrabold">{{ stats.subjects|default:0 }}</h2>
       </div>
     </div>
   </div>

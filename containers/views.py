@@ -1003,10 +1003,10 @@ def student_services_in_subject(request, subject_id):
     )
 
 
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@login_required
 def service_table(request):
     user = request.user
+    # Permitir a admins, profesores y alumnos (cada uno verá lo que le corresponde)
     if not (user.is_superuser or user_is_admin(user) or user_is_teacher(user) or user_is_student(user)):
         return HttpResponse("No tienes permiso para consultar servicios.", status=403)
 
@@ -1061,13 +1061,21 @@ def service_table(request):
             status__in=["created", "restarting", "removing"]
         ).exists()
 
+    current_sub_obj = None
+    if subject_id:
+        try:
+            current_sub_obj = Subject.objects.get(pk=subject_id)
+        except Exception:
+            pass
+
     html = render_to_string("containers/_service_rows.html", {
         "services": qs, 
         "host": host, 
         "is_supervisor": is_supervisor,
         "has_transient": has_transient,
         "subject_id": subject_id,
-        "project_id": project_id
+        "project_id": project_id,
+        "current_subject": current_sub_obj
     }, request=request)
     return HttpResponse(html)
 
@@ -1157,6 +1165,7 @@ def terminal_v2_view(request, pk):
         "container_name": container_name,
         "ws_path": ws_path,
         "return_url": return_url,
+        "current_subject": service.subject,
     })
 
 
@@ -1173,8 +1182,8 @@ def post_login(request):
         return redirect("/admin/")
     if user_is_teacher(u):
         return redirect("professor_dashboard")
-    # La vista estÃƒÂ¡ dentro del app 'containers' (namespaced)
-    return redirect("containers:student_subjects")
+    # La vista está dentro del app 'containers' (namespaced)
+    return redirect("containers:student_panel")
 
 
 @login_required
@@ -1339,8 +1348,15 @@ def professor_subject_detail(request, subject_id):
             color = request.POST.get("color")
             if color:
                 subject.color = color
-            if "logo" in request.FILES:
+            
+            # Quitar logo si se solicita
+            if request.POST.get("remove_logo") == "true":
+                if subject.logo:
+                    subject.logo.delete(save=False)
+                    subject.logo = None
+            elif "logo" in request.FILES:
                 subject.logo = request.FILES["logo"]
+            
             subject.save()
             from django.contrib import messages
             messages.success(request, "Diseño de la asignatura actualizado.")
@@ -1473,34 +1489,50 @@ def edit_service(request, pk):
                     service.internal_port = int(i_port)
                 except ValueError:
                     pass
+
+            if "image" in request.POST:
+                service.image = request.POST.get("image")
         
-        # Puerto externo (assigned_port)
+        # Guardaremos el puerto al que queremos cambiar, y NO en el modelo
+        # hasta que remove_container limpie el anterior.
         c_port = request.POST.get("custom_port")
+        new_assigned_port = None
         if c_port:
             try:
-                service.assigned_port = int(c_port)
+                new_assigned_port = int(c_port)
             except ValueError:
                 pass
-        else:
-            # Si se deja vacío, se vuelve a automático (None)
-            service.assigned_port = None
+
+        # Parsear keep_volumes (checkbox html, puede venir como "on" o no venir)
+        keep_vols = request.POST.get("keep_volumes") == "on"
 
         # Actualizar archivos si se proporcionan (reemplazo total)
         if request.FILES.get("dockerfile"):
             service.dockerfile = request.FILES["dockerfile"]
         if request.FILES.get("compose"):
+            try:
+                from .compose_parser import DockerComposeParser
+                file_content = request.FILES["compose"].read().decode('utf-8')
+                parser = DockerComposeParser(file_content)
+                result = parser.parse()
+                if not result.get("success"):
+                    return HttpResponse(f"Error en script docker-compose: {result.get('error')} - {result.get('message')}", status=400)
+                request.FILES["compose"].seek(0)
+            except Exception as e:
+                return HttpResponse(f"Error parseando docker-compose: {str(e)}", status=400)
             service.compose = request.FILES["compose"]
         if request.FILES.get("code"):
             service.code = request.FILES["code"]
 
+        service.status = "updating"
         service.save()
 
         try:
-            # Purga y reconstrucción total
-            remove_container(service, keep_files=True)
+            # Purga y reconstrucción total (preservando o no volúmenes según indique el usuario)
+            remove_container(service, keep_files=True, keep_volumes=keep_vols)
             # Usar configs del POST o caer al modelo
             configs_to_use = container_configs if container_configs else service.container_configs
-            run_container(service, container_configs=configs_to_use)
+            run_container(service, container_configs=configs_to_use, custom_port=new_assigned_port)
         except Exception as exc:
             return HttpResponse(f"Error al reiniciar: {exc}", status=500)
 
@@ -1534,6 +1566,7 @@ def edit_service(request, pk):
 
     return render(request, "containers/edit_service.html", {
         "service": service,
+        "current_subject": service.subject,
         "return_url": return_url,
         "containers_info": containers_info,
         "env_vars_json": json.dumps(service.env_vars or {}, indent=2)
@@ -1634,6 +1667,7 @@ def new_service_page(request):
     # Prioridad: 1) Query param 'return_url', 2) HTTP_REFERER, 3) student_panel por defecto
     return_url = request.GET.get('return_url')
     selected_subject_id = None
+    current_subject = None
     
     if not return_url:
         referer = request.META.get('HTTP_REFERER', '')
@@ -1645,10 +1679,23 @@ def new_service_page(request):
             match = re.search(r'/subjects/(\d+)/', referer)
             if match:
                 selected_subject_id = int(match.group(1))
+                try:
+                    current_subject = Subject.objects.get(pk=selected_subject_id)
+                except Subject.DoesNotExist:
+                    pass
         else:
             # Por defecto, panel principal
             from django.urls import reverse
             return_url = reverse('containers:student_panel')
+    elif 'subjects/' in return_url:
+        import re
+        match = re.search(r'/subjects/(\d+)/', return_url)
+        if match:
+            selected_subject_id = int(match.group(1))
+            try:
+                current_subject = Subject.objects.get(pk=selected_subject_id)
+            except Subject.DoesNotExist:
+                pass
     
     context = {
         'images': images,
@@ -1658,6 +1705,7 @@ def new_service_page(request):
         'host': host,
         'return_url': return_url,  # Pasar URL de retorno al template
         'selected_subject_id': selected_subject_id,  # ID de asignatura pre-seleccionada
+        'current_subject': current_subject,
     }
     
     return render(request, 'containers/new_service.html', context)
@@ -1807,6 +1855,9 @@ def api_command_generator_view(request):
     
     # URL de retorno
     return_url = request.GET.get('return_url')
+    current_subject = None
+    selected_subject_id = None
+    
     if not return_url:
         referer = request.META.get('HTTP_REFERER', '')
         if 'subjects/' in referer:
@@ -1814,6 +1865,16 @@ def api_command_generator_view(request):
         else:
             from django.urls import reverse
             return_url = reverse('containers:student_panel')
+    
+    if return_url and 'subjects/' in return_url:
+        import re
+        match = re.search(r'/subjects/(\d+)/', return_url)
+        if match:
+            selected_subject_id = int(match.group(1))
+            try:
+                current_subject = Subject.objects.get(pk=selected_subject_id)
+            except Subject.DoesNotExist:
+                pass
         
     context = {
         'token': token.key,
@@ -1821,6 +1882,8 @@ def api_command_generator_view(request):
         'available_subjects': subjects,
         'user_projects': user_projects,
         'return_url': return_url,
+        'current_subject': current_subject,
+        'selected_subject_id': selected_subject_id,
     }
     
     return render(request, 'containers/api_command_generator.html', context)
@@ -1946,6 +2009,7 @@ def logs_page(request, pk):
     # Request normal: página completa
     return render(request, "containers/logs_page.html", {
         "service": service,
+        "current_subject": service.subject,
         "logs_html": logs_html,
         "search_text": search_text,
         "log_level": log_level,

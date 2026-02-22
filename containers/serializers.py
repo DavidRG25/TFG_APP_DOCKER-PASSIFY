@@ -493,6 +493,9 @@ class ServiceSerializer(serializers.ModelSerializer):
         # Guardar el modo en el objeto
         validated_data['mode'] = mode
         
+        # Eliminar kwargs que no pertenecen al modelo
+        validated_data.pop('keep_volumes', None)
+        
         if custom_port:
             validated_data['assigned_port'] = custom_port
         

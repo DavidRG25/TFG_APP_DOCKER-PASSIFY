@@ -275,24 +275,81 @@
 {% endblock %}
 
 {% block body %}
-<div class="logs-page">
-    <div class="logs-card">
-        <div class="logs-header">
-            <div>
-                <h3>
-                    <i class="fas fa-file-alt" style="color: #60a5fa; margin-right: 12px;"></i>
-                    <span style="color: #fff;">Logs: {{ container_name|default:service.name }}</span>
-                </h3>
-                <div style="margin-top: 5px; color: rgba(255,255,255,0.7); font-size: 0.85rem; font-weight: 400;">
-                    Servicio: <strong style="color: #fff;">{{ service.name }}</strong> | ID: #{{ service.id }}
-                </div>
-            </div>
-            <div class="logs-actions">
-                <a href="{{ return_url }}" class="btn-back-premium">
-                    <i class="fas fa-chevron-left"></i> Volver al panel
-                </a>
-            </div>
+<div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh">
+  <script>
+    (function() {
+      document.documentElement.style.setProperty('--subject-primary', '{{ current_subject.color|default:"#1e3a8a" }}');
+      document.documentElement.style.setProperty('--subject-secondary', '{{ current_subject.color|default:"#3b82f6" }}');
+    })();
+  </script>
+
+  {# Breadcrumbs - Ruta encima del banner #}
+  <nav aria-label="breadcrumb" class="mb-3 px-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item">
+        <a href="{% url 'containers:student_panel' %}" class="text-decoration-none text-muted">
+          <i class="fas fa-home me-1"></i>Inicio
+        </a>
+      </li>
+      {% if current_subject %}
+        <li class="breadcrumb-item">
+          <a href="{% url 'containers:student_subjects' %}" class="text-decoration-none text-muted">Asignaturas</a>
+        </li>
+        <li class="breadcrumb-item">
+          <a href="{% url 'containers:student_panel' %}?subject={{ current_subject.id }}" class="text-decoration-none text-muted">{{ current_subject.name }}</a>
+        </li>
+      {% endif %}
+      <li class="breadcrumb-item active text-primary fw-bold" aria-current="page">Logs: {{ service.name }}</li>
+    </ol>
+  </nav>
+
+  {# Header con degradado Premium - Estilo Unificado Pro #}
+  <div class="rounded-4 p-3 mb-4 shadow mx-3" 
+       style="background: linear-gradient(135deg, var(--subject-primary) 0%, var(--subject-secondary) 100%); display: flex; align-items: center;">
+    <div class="d-flex justify-content-between align-items-center w-100">
+      <div class="d-flex align-items-center">
+        {# Botón de Volver #}
+        <a href="{{ return_url }}" 
+           class="btn btn-light rounded-circle shadow-sm d-flex align-items-center justify-content-center px-0" 
+           style="width: 45px; height: 45px; min-width: 45px; margin-right: 2rem; color: var(--subject-primary); transition: all 0.2s;"
+           title="Volver">
+          <i class="fas fa-arrow-left"></i>
+        </a>
+
+        {# Logo/Icono de Logs #}
+        <div class="bg-white rounded-3 shadow-sm d-flex align-items-center justify-content-center overflow-hidden border border-white border-2" 
+             style="width: 55px; height: 55px; min-width: 55px; margin-right: 1.5rem;">
+          {% if current_subject.logo %}
+            <img src="{{ current_subject.logo.url }}" alt="Logo" class="w-100 h-100 object-fit-cover">
+          {% else %}
+            <i class="fas fa-file-alt" style="color: var(--subject-primary);"></i>
+          {% endif %}
         </div>
+
+        {# Textos #}
+        <div class="text-container text-white ms-3">
+          <h1 class="h4 mb-0 fw-bold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15);">
+            Visualizando Logs: {{ service.name }}
+          </h1>
+          <div class="d-flex align-items-center mt-1 gap-2">
+            <span class="badge fw-bold small rounded-pill px-3" style="background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2);">
+              <i class="fas fa-microchip me-1 small"></i> Contenedor
+            </span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="d-none d-md-block">
+        <span class="badge rounded-pill px-3 py-2 border" 
+              style="background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(8px); border-color: rgba(255, 255, 255, 0.2) !important; color: white;">
+          <i class="fas fa-history me-1"></i> Auditoría en Tiempo Real
+        </span>
+      </div>
+    </div>
+  </div>
+
+<div class="logs-page" style="min-height: auto; padding: 0 1rem;">
+    <div class="logs-card">
     
     <div class="logs-toolbar" id="logs-filters" style="position: relative;">
         <!-- Overlay para modo Live -->
