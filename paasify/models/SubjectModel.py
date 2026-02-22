@@ -52,6 +52,19 @@ class Subject(models.Model):
         verbose_name="Alumnos matriculados (usuarios)",
     )
 
+    logo = models.ImageField(
+        upload_to="logos/",
+        null=True,
+        blank=True,
+        verbose_name="Logo de la asignatura",
+    )
+
+    color = models.CharField(
+        max_length=7,
+        default="#4e73df",
+        verbose_name="Color de la asignatura",
+    )
+
     class Meta:
         managed = True
         verbose_name = "Asignatura"

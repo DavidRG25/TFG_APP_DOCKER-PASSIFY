@@ -1,6 +1,7 @@
 ﻿{# Template refactorizado: Filas de servicios #}
 {% for s in services %}
 <tr id="service-{{ s.id }}">
+  {% if not hide_redundant %}
   <td class="ps-4">
     <div class="fw-bold text-primary">{{ s.project.place|default:"General" }}</div>
     {% if s.subject %}
@@ -14,8 +15,9 @@
     <small class="text-muted">@{{ s.owner.username }}</small>
   </td>
   {% endif %}
+  {% endif %}
 
-  <td>
+  <td {% if hide_redundant %}class="ps-4"{% endif %}>
     <div class="fw-bold text-dark mb-1">{{ s.name }}</div>
     <small class="text-muted d-block mb-1" style="font-size: 0.7rem;">ID: #{{ s.id }}</small>
     <div>

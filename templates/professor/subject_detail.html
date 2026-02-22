@@ -3,13 +3,35 @@
 {% load static %}
 {% block extrahead %}
 <link rel="stylesheet" href="{% static 'assets/css/dashboard.css' %}">
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+      const header = document.querySelector('.dynamic-subject-header');
+      if (header) {
+          const logo = header.getAttribute('data-logo');
+          const color = header.getAttribute('data-color');
+          if (logo && logo.trim() !== '') {
+              header.style.background = `url('${logo}') center/cover no-repeat`;
+              header.style.position = 'relative';
+              const overlay = header.querySelector('.subject-header-overlay');
+              if (overlay) overlay.style.display = 'block';
+          } else if (color) {
+              header.style.background = `linear-gradient(135deg, ${color} 0%, #224abe 100%)`;
+          }
+      }
+  });
+</script>
+
 {% endblock %}
 
 {% block body %}
 <div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh;">
   {# Header con degradado Premium #}
-  <div class="rounded-3 p-4 mb-4 shadow-sm" style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
-    <div class="d-flex justify-content-between align-items-center">
+  <div class="rounded-3 p-4 mb-4 shadow-sm text-white dynamic-subject-header" 
+       data-logo="{% if subject.logo %}{{ subject.logo.url|default:'' }}{% endif %}"
+       data-color="{{ subject.color|default:'#4e73df' }}">
+    <div class="subject-header-overlay" style="display: none; position: absolute; inset: 0; background: rgba(0,0,0,0.6); border-radius: inherit;"></div>
+    <div class="d-flex justify-content-between align-items-center" style="position: relative; z-index: 1;">
       <div>
         <h1 class="h3 mb-1 text-white fw-bold"><i class="fas fa-university me-2"></i>{{ subject.name }}</h1>
         <p class="text-white-50 mb-0">
@@ -18,6 +40,9 @@
         </p>
       </div>
       <div class="d-flex gap-2">
+        <button class="btn btn-outline-light shadow-sm" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#editSubjectModal" data-target="#editSubjectModal">
+          <i class="fas fa-palette me-2"></i>Personalizar
+        </button>
         <a href="{% url 'professor_dashboard' %}" class="btn btn-light shadow-sm">
           <i class="fas fa-arrow-left me-2"></i>Volver al Panel
         </a>
@@ -31,19 +56,30 @@
       <div class="card border-0 shadow-sm h-100">
         <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
           <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-user-graduate text-primary me-2"></i>Alumnos Matriculados</h6>
-          <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill">{{ students.count }}</span>
+          <div>
+            <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill me-2">{{ students.count }}</span>
+            <button class="btn btn-sm btn-outline-primary rounded-pill" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createStudentModal" data-target="#createStudentModal">
+              <i class="fas fa-plus me-1"></i>Nuevo
+            </button>
+          </div>
         </div>
         <div class="card-body p-0 scroll-area" style="max-height: 300px; overflow-y: auto;">
           {% if students %}
             <div class="list-group list-group-flush">
               {% for student in students %}
-                <div class="list-group-item border-0 py-3 px-4 d-flex align-items-center hover-light">
-                  <div class="avatar-sm me-3 bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
-                    <i class="fas fa-user text-muted"></i>
+                <div class="list-group-item border-0 py-3 px-4 d-flex align-items-center justify-content-between hover-light">
+                  <div class="d-flex align-items-center">
+                    <div class="avatar-sm me-3 bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                      <i class="fas fa-user text-muted"></i>
+                    </div>
+                    <div>
+                      <div class="fw-semibold text-dark">{{ student.get_full_name|default:student.username }}</div>
+                    </div>
                   </div>
                   <div>
-                    <div class="fw-semibold text-dark">{{ student.get_full_name|default:student.username }}</div>
-                    <small class="text-muted">{{ student.email }}</small>
+                    <button class="btn btn-sm btn-light rounded-circle" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#editStudentModal{{ student.id }}" data-target="#editStudentModal{{ student.id }}" title="Editar Alumno">
+                      <i class="fas fa-edit text-secondary"></i>
+                    </button>
                   </div>
                 </div>
               {% endfor %}
@@ -62,7 +98,12 @@
       <div class="card border-0 shadow-sm h-100">
         <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
           <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-folder-open text-primary me-2"></i>Proyectos de la Asignatura</h6>
-          <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill">{{ projects.count }}</span>
+          <div>
+            <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill me-2">{{ projects.count }}</span>
+            <button class="btn btn-sm btn-outline-primary rounded-pill" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createProjectModal" data-target="#createProjectModal">
+              <i class="fas fa-plus me-1"></i>Nuevo
+            </button>
+          </div>
         </div>
         <div class="card-body p-0 scroll-area" style="max-height: 300px; overflow-y: auto;">
           {% if projects %}
@@ -73,7 +114,7 @@
                     <div class="me-3 text-info"><i class="fas fa-project-diagram fa-lg"></i></div>
                     <div>
                       <div class="fw-semibold text-dark">{{ project.place }}</div>
-                      <small class="text-muted">Por: {{ project.user_profile.nombre }}</small>
+                      <small class="text-muted">@{{ project.user_profile.user.username }}</small>
                     </div>
                   </div>
                   <a class="btn btn-sm btn-outline-primary rounded-pill" href="{% url 'professor_project_detail' project.id %}">
@@ -92,46 +133,147 @@
     </div>
   </div>
 
-  {# Tabla de Supervisión de Servicios #}
-  <div class="card border-0 shadow-sm overflow-hidden">
-    <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
-      <h5 class="mb-0 fw-bold"><i class="fas fa-microchip text-primary me-2"></i>Supervisión de Contenedores en Tiempo Real</h5>
-      <div class="d-flex gap-2">
-          <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" onclick="location.reload()">
-            <i class="fas fa-sync-alt me-1"></i>Actualizar Estado
-          </button>
-      </div>
-    </div>
-    <div class="card-body p-0">
-      {% if services %}
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
-            <thead style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
-              <tr class="text-white small text-uppercase">
-                <th class="py-3 ps-4">Proyecto</th>
-                <th class="py-3">Dueño</th>
-                <th class="py-3">Nombre</th>
-                <th class="py-3">Imagen</th>
-                <th class="py-3">Puerto</th>
-                <th class="py-3">Estado</th>
-                <th class="py-3 pe-4 text-end">Acciones</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white" id="service-table"
-                   hx-get="{% url 'containers:service_table' %}?subject={{ subject.id }}"
-                   hx-trigger="service:table-refresh from:body">
-              {% include "containers/_service_rows.html" %}
-            </tbody>
-          </table>
+</div>
+<!-- Modal Nuevo Alumno -->
+<div class="modal fade" id="createStudentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <form method="POST" action="{% url 'professor_subject_detail' subject.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_student">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold"><i class="fas fa-user-plus text-primary me-2"></i>Añadir Nuevo Alumno</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
-      {% else %}
-        <div class="p-5 text-center">
-          <i class="fas fa-microchip fa-3x text-light mb-3"></i>
-          <p class="text-muted">No hay contenedores desplegados por los alumnos en esta asignatura.</p>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Nombre de Usuario</label>
+            <input type="text" name="username" class="form-control rounded-3" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Nombre Completo</label>
+            <input type="text" name="nombre" class="form-control rounded-3" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Correo Electrónico</label>
+            <input type="email" name="email" class="form-control rounded-3" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Contraseña Inicial</label>
+            <input type="password" name="password" class="form-control rounded-3" required>
+          </div>
         </div>
-      {% endif %}
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary rounded-pill px-4">Crear y Matricular</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
+
+<!-- Modal Nuevo Proyecto -->
+<div class="modal fade" id="createProjectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <form method="POST" action="{% url 'professor_subject_detail' subject.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_project">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold"><i class="fas fa-folder-plus text-primary me-2"></i>Crear Nuevo Proyecto</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Nombre del Proyecto</label>
+            <input type="text" name="place" class="form-control rounded-3" placeholder="Ej: Práctica Final AWS" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Asignar a Alumno</label>
+            <select name="student_id" class="form-select rounded-3" required>
+              <option value="" disabled selected>Seleccione un alumno matriculado...</option>
+              {% for student in students %}
+                <option value="{{ student.id }}">{{ student.get_full_name|default:student.username }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary rounded-pill px-4">Crear Proyecto</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Personalizar Asignatura -->
+<div class="modal fade" id="editSubjectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <form method="POST" action="{% url 'professor_subject_detail' subject.id %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="edit_subject">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold"><i class="fas fa-palette text-primary me-2"></i>Personalizar Asignatura</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Color de Fondo (Hex)</label>
+            <input type="color" name="color" class="form-control form-control-color w-100 rounded-3" value="{{ subject.color|default:'#4e73df' }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Icono/Logo de la Asignatura</label>
+            <input type="file" name="logo" class="form-control rounded-3" accept="image/*">
+            <small class="text-muted">Se recomienda una imagen cuadrada con fondo transparente.</small>
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary rounded-pill px-4">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Modales Editar Alumno -->
+{% for student in students %}
+<div class="modal fade" id="editStudentModal{{ student.id }}" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <form method="POST" action="{% url 'professor_subject_detail' subject.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="edit_student">
+        <input type="hidden" name="student_id" value="{{ student.id }}">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold"><i class="fas fa-user-edit text-primary me-2"></i>Editar Alumno</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3 text-center">
+             <div class="fw-bold fs-5 text-dark">{{ student.get_full_name|default:student.username }}</div>
+             <div class="text-muted small">@{{ student.username }}</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Nuevo Correo Electrónico</label>
+            <input type="email" name="email" class="form-control rounded-3" value="{{ student.email }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Nueva Contraseña (dejar en blanco para no cambiar)</label>
+            <input type="password" name="password" class="form-control rounded-3" placeholder="••••••••">
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary rounded-pill px-4">Actualizar Datos</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
 {% include "containers/_partials/panels/_modals.html" %}
 {% endblock %}
