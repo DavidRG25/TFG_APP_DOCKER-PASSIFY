@@ -18,9 +18,61 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <script src="{% static 'assets/js/jquery.min.js' %}"></script>
     <script src="{% static 'assets/js/xlsx.min.js' %}"></script>
-    <script src="{% static 'assets/js/sweetalert.min.js' %}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+      // Función global para Toasts Premium
+      function showToast(message, variant = "text-bg-success", title = null) {
+        const variantMap = {
+          "text-bg-success": "success",
+          "text-bg-danger": "error",
+          "text-bg-warning": "warning",
+          "text-bg-info": "info",
+          "text-bg-primary": "info"
+        };
+        const icon = variantMap[variant] || "success";
+        const Toast = Swal.mixin({
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 4000,
+          timerProgressBar: true,
+          didOpen: (toast) => {
+            toast.addEventListener('mouseenter', Swal.stopTimer)
+            toast.addEventListener('mouseleave', Swal.resumeTimer)
+          }
+        });
+
+        Toast.fire({
+          icon: icon,
+          title: title ? `<strong>${title}</strong>` : null,
+          html: message,
+          background: '#fff',
+          color: '#2d3748',
+          padding: '1rem',
+          borderRadius: '1rem',
+          customClass: {
+            popup: 'shadow-lg border-0 premium-swal-toast' 
+          }
+        });
+      }
+    </script>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <style>
+        /* Asegurar que las notificaciones de SweetAlert queden por encima de todo (incluido el header) */
+        .swal2-container {
+            z-index: 100000 !important;
+        }
+        .premium-swal-toast {
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15) !important;
+        }
+
+        /* Estilos Toast Premium */
+        .premium-toast { backdrop-filter: blur(10px); }
+        .premium-toast-error { background-color: rgba(255, 245, 245, 0.95); border-left: 5px solid #dc3545 !important; }
+        .premium-toast-success { background-color: rgba(240, 255, 244, 0.95); border-left: 5px solid #198754 !important; }
+        .premium-toast-warning { background-color: rgba(255, 250, 235, 0.95); border-left: 5px solid #ffc107 !important; }
+        .premium-toast-info { background-color: rgba(240, 248, 255, 0.95); border-left: 5px solid #0d6efd !important; }
+
         /* Barra superior unificada - Modernizada */
         .top-navbar {
             position: fixed;
@@ -482,9 +534,53 @@
     <!-- Contenido principal -->
     <div id="content-wrapper">
         <div id="main-content">
-            <!-- Contenedor Maestro de Banners (Alineado bajo PaaSify) -->
+            <!-- Contenedor Maestro de Banners (Alineado a la derecha, estilo Toast Premium) -->
             <div id="global-alert-container" class="position-fixed p-0"
-                style="z-index: 10005; width: fit-content; max-width: 450px; top: 75px; left: 25px; pointer-events: none;">
+                style="z-index: 99999; min-width: 320px; max-width: 450px; top: 85px; right: 25px; pointer-events: none; display: flex; flex-direction: column; gap: 10px;">
+                {% if messages %}
+                  {% for message in messages %}
+                    <div class="alert premium-toast premium-toast-{% if message.tags == 'error' %}error{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %} alert-dismissible fade show shadow-lg border-0 rounded-4 d-flex align-items-center p-3 m-0" role="alert" style="pointer-events: auto;">
+                        <div class="me-3 fs-3 text-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}primary{% endif %}">
+                            <i class="fas fa-{% if message.tags == 'error' %}exclamation-circle{% elif message.tags == 'success' %}check-circle{% elif message.tags == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <h6 class="alert-heading fw-bold mb-1 text-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning text-dark{% else %}primary{% endif %}">
+                                {% if message.tags == 'error' %}Operación denegada{% elif message.tags == 'success' %}Operación exitosa{% elif message.tags == 'warning' %}Atención{% else %}Información{% endif %}
+                            </h6>
+                            <div class="small text-dark opacity-75 fw-semibold toast-message-text" style="line-height:1.3;">{{ message.message }}</div>
+                        </div>
+                        <button type="button" class="btn-close ms-2 align-self-start mt-1" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                  {% endfor %}
+                  <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const messageEls = document.querySelectorAll('.toast-message-text');
+                        messageEls.forEach(el => {
+                            let text = el.innerText;
+                            if (text.includes('|openModal=')) {
+                                const parts = text.split('|openModal=');
+                                el.innerText = parts[0]; // Set the text to just the message
+                                const modalId = parts[1].trim();
+                                if (modalId) {
+                                    const modalEl = document.getElementById(modalId);
+                                    if (modalEl) {
+                                        const myModal = new bootstrap.Modal(modalEl);
+                                        myModal.show();
+                                    }
+                                }
+                            }
+                        });
+                        
+                        setTimeout(function() {
+                            let alerts = document.querySelectorAll('#global-alert-container .alert');
+                            alerts.forEach(function(alert) {
+                                let bsAlert = new bootstrap.Alert(alert);
+                                bsAlert.close();
+                            });
+                        }, 6000);
+                    });
+                  </script>
+                {% endif %}
             </div>
 
             {% block body %}
@@ -524,6 +620,50 @@
             }
         </style>
     </div>
+
+    {% if user.is_authenticated and user.user_profile.must_change_password and request.resolver_match.url_name != 'logout' %}
+    <!-- Modal forzado de cambio de clave (Cubre toda la pantalla) -->
+    <div class="modal fade show" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" style="display: block; background: rgba(0,0,0,0.85); z-index: 105000;" aria-modal="true" role="dialog">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+          <div class="modal-header bg-warning text-dark border-0">
+            <h5 class="modal-title fw-bold"><i class="fas fa-shield-alt me-2"></i>Actualización de Seguridad</h5>
+          </div>
+          <div class="modal-body p-4 text-center">
+            <div class="mb-4">
+                <i class="fas fa-lock text-warning" style="font-size: 4rem;"></i>
+            </div>
+            <h4 class="fw-bold mb-3">Protege tu cuenta</h4>
+            <p class="text-muted mb-4 small">Por tu seguridad, tu profesor o administrador requiere que configures una contraseña personal y secreta antes de continuar.</p>
+            
+            <form method="POST" action="{% url 'change_password' %}" class="text-start">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-muted small">Tu nueva contraseña</label>
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-key"></i></span>
+                        <input type="password" name="new_password1" class="form-control border-start-0 py-2" placeholder="Mínimo 8 caracteres" required minlength="8">
+                    </div>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-bold text-muted small">Repite tu nueva contraseña</label>
+                    <div class="input-group shadow-sm">
+                        <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-check-double"></i></span>
+                        <input type="password" name="new_password2" class="form-control border-start-0 py-2" placeholder="Verifica tu contraseña" required minlength="8">
+                    </div>
+                </div>
+                <input type="hidden" name="force_change" value="true">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-warning py-2 fw-bold text-dark rounded-pill shadow-sm w-100">
+                        <i class="fas fa-save me-2"></i>Guardar y entrar
+                    </button>
+                </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
 
     <script src="{% static 'assets/bootstrap/js/bootstrap.min.js' %}"></script>
     <script src="{% static 'assets/js/chart.min.js' %}"></script>

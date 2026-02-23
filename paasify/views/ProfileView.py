@@ -3,7 +3,7 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
-from django.contrib.auth.forms import PasswordChangeForm
+from django.contrib.auth.forms import PasswordChangeForm, SetPasswordForm
 from django.http import JsonResponse
 from paasify.models.StudentModel import UserProfile
 from paasify.models.SubjectModel import Subject
@@ -68,15 +68,29 @@ def change_password_view(request):
     Procesa el cambio de contrasena del usuario.
     """
     if request.method == 'POST':
-        form = PasswordChangeForm(request.user, request.POST)
+        is_force_change = request.POST.get('force_change') == 'true'
+        user_must_change = hasattr(request.user, 'user_profile') and request.user.user_profile.must_change_password
+        
+        if is_force_change and user_must_change:
+            form = SetPasswordForm(request.user, request.POST)
+        else:
+            form = PasswordChangeForm(request.user, request.POST)
+            
         if form.is_valid():
             user = form.save()
             update_session_auth_hash(request, user)  # Mantener sesion activa
+            
+            # Limpiar el flag si estaba activo
+            if hasattr(user, 'user_profile'):
+                user.user_profile.must_change_password = False
+                user.user_profile.save()
+            
             messages.success(request, 'Tu contrasena ha sido cambiada exitosamente.')
             return redirect('profile')
         else:
-            for error in form.errors.values():
-                messages.error(request, error)
+            for error_list in form.errors.values():
+                for error in error_list:
+                    messages.error(request, error)
     
     return redirect('profile')
 

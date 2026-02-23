@@ -1,0 +1,24 @@
+/* custom_admin.css - Estilos Premium para el admin */
+
+/* Ajustes finos de colores en la tabla para alinear con Light Tech */
+.table-striped tbody tr:nth-of-type(odd) {
+    background-color: rgba(33, 150, 243, 0.03);
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+    color: #444;
+}
+
+/* Estilo para el logo en formato de texto puro */
+.brand-text {
+    font-weight: 600 !important;
+    font-size: 1.2rem !important;
+    color: #2196f3 !important;
+}
+
+/* Ocultar el logo por defecto ("A") de AdminLTE cuando no hay logo configurado */
+img.brand-image {
+    display: none !important;
+}

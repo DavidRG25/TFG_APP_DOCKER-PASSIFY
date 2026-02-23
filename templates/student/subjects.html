@@ -1,33 +1,104 @@
-{% extends "base.html" %}
-{% block body %}
-<div class="container">
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <h3 class="mb-0">Mis asignaturas</h3>
+{% extends "base.html" %} {% load static %} {% block extrahead %}
+<link rel="stylesheet" href="{% static 'assets/css/dashboard.css' %}" />
+{% endblock %} {% block body %}
+<div
+  class="container-fluid py-4"
+  style="background-color: #f8f9fc; min-height: 100vh"
+>
+  {# Header con degradado Premium #}
+  <div
+    class="rounded-4 p-4 mb-4 shadow position-relative overflow-hidden"
+    style="background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)"
+  >
+    <div
+      class="position-relative z-index-1 d-flex flex-column flex-md-row justify-content-between align-items-md-center"
+    >
+      <div class="text-white">
+        <h1 class="h2 mb-1 fw-bold text-shadow">
+          <i class="fas fa-book-reader me-2"></i>Mis Asignaturas
+        </h1>
+        <p class="mb-0 text-white-50 fs-6">
+          Explora tus cursos, gestiona despliegues y accede a tus recursos.
+        </p>
+      </div>
+
+      <div class="mt-3 mt-md-0">
+        <a
+          class="btn btn-light rounded-pill px-4 shadow-sm text-primary fw-bold"
+          href="{% url 'post_login' %}"
+        >
+          <i class="fas fa-home me-2"></i>Volver al Inicio
+        </a>
+      </div>
+    </div>
   </div>
 
-  {% if subjects %}
-    <div class="list-group">
-      {% for s in subjects %}
-        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
-           href="{% url 'student_services_in_subject' s.id %}">
-          <span>
-            {{ s.name }}
-            {% if s.category %}<small class="text-muted"> · {{ s.category }}</small>{% endif %}
-          </span>
-          <i class="fas fa-chevron-right"></i>
-        </a>
-      {% endfor %}
-    </div>
-  {% else %}
-    <div class="alert alert-info">
-      No tienes asignaturas asignadas todavía. Pide a tu profesor o al administrador que te matriculen en una.
-    </div>
-  {% endif %}
+  {# Contenido Principal #}
+  <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+    {% if subjects %} {% for s in subjects %}
+    <div class="col">
+      <div
+        class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden"
+        style="transition: transform 0.2s; border-top: 4px solid {{ s.color|default:'#4e73df' }} !important;"
+      >
+        <div class="card-body p-4 d-flex flex-column text-center">
+          <div class="mb-3 d-flex justify-content-center">
+            {% if s.logo %}
+            <img
+              src="{{ s.logo.url }}"
+              alt="Logo {{ s.name }}"
+              class="rounded-circle shadow-sm"
+              style="width: 70px; height: 70px; object-fit: cover; border: 2px solid {{ s.color|default:'#4e73df' }};"
+            />
+            {% else %}
+            <div
+              class="rounded-circle d-flex align-items-center justify-content-center shadow-sm"
+              style="width: 70px; height: 70px; background-color: {{ s.color|default:'#4e73df' }}15; border: 2px solid {{ s.color|default:'#4e73df' }};"
+            >
+              <i
+                class="fas fa-university fa-2x"
+                style="color: {{ s.color|default:'#4e73df' }};"
+              ></i>
+            </div>
+            {% endif %}
+          </div>
 
-  <div class="mt-3">
-    <a class="btn btn-outline-secondary" href="{% url 'post_login' %}">
-      <i class="fas fa-arrow-left"></i> Volver
-    </a>
+          <h5 class="card-title fw-bold text-dark mb-1">{{ s.name }}</h5>
+          <p class="text-muted small text-uppercase fw-semibold mb-3">
+            {{ s.category|default:"Asignatura" }}
+          </p>
+
+          <div class="mt-auto">
+            <a
+              href="{% url 'student_services_in_subject' s.id %}"
+              class="btn btn-outline-primary w-100 rounded-pill"
+              style="border-color: {{ s.color|default:'#4e73df' }}; color: {{ s.color|default:'#4e73df' }};"
+            >
+              Acceder al Workspace <i class="fas fa-arrow-right ms-1"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %} {% else %}
+    <div class="col-12">
+      <div class="alert bg-white border-0 shadow-sm rounded-4 p-4 text-center">
+        <i class="fas fa-info-circle fa-2x text-muted mb-3 d-block"></i>
+        <h5 class="fw-bold text-dark">Aún no tienes asignaturas</h5>
+        <p class="text-muted mb-0">
+          No se han encontrado asignaturas asociadas a tu perfil. Pide a tu
+          profesor que te matricule en el sistema.
+        </p>
+      </div>
+    </div>
+    {% endif %}
   </div>
 </div>
+
+<style>
+  .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+  }
+</style>
 {% endblock %}

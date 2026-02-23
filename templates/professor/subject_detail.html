@@ -111,9 +111,6 @@
                 data-bs-target="#editSubjectModal" data-target="#editSubjectModal">
           <i class="fas fa-palette"></i> Personalizar
         </button>
-        <a href="{% url 'professor_dashboard' %}" class="btn btn-panel d-flex align-items-center">
-          <i class="fas fa-th-large"></i> Volver al Panel
-        </a>
       </div>
     </div>
   </div>
@@ -126,6 +123,9 @@
           <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-user-graduate text-primary me-2"></i>Alumnos Matriculados</h6>
           <div>
             <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill me-2">{{ students.count }}</span>
+            <button class="btn btn-sm btn-outline-success rounded-pill me-1" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#addExistingStudentModal" data-target="#addExistingStudentModal" title="Matricular Alumno Existente">
+              <i class="fas fa-link me-1"></i>Existente
+            </button>
             <button class="btn btn-sm btn-outline-primary rounded-pill" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createStudentModal" data-target="#createStudentModal">
               <i class="fas fa-plus me-1"></i>Nuevo
             </button>
@@ -145,8 +145,17 @@
                     </div>
                   </div>
                   <div>
-                    <button class="btn btn-sm btn-light rounded-circle" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#editStudentModal{{ student.id }}" data-target="#editStudentModal{{ student.id }}" title="Editar Alumno">
+                    <button class="btn btn-sm btn-light rounded-circle me-1" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#editStudentModal{{ student.id }}" 
+                            title="Editar Alumno">
                       <i class="fas fa-edit text-secondary"></i>
+                    </button>
+                    <!-- Eliminación radical de la asignatura -->
+                    <button class="btn btn-sm btn-danger rounded-circle text-white shadow-sm hover-elevate" 
+                            onclick="confirmRemoveStudent('{{ student.id }}', '{{ student.username }}')"
+                            title="Desmatricular y eliminar datos">
+                      <i class="fas fa-trash-alt"></i>
                     </button>
                   </div>
                 </div>
@@ -179,7 +188,9 @@
               {% for project in projects %}
                 <div class="list-group-item border-0 py-3 px-4 d-flex justify-content-between align-items-center hover-light">
                   <div class="d-flex align-items-center">
-                    <div class="me-3 text-info"><i class="fas fa-project-diagram fa-lg"></i></div>
+                    <div class="me-4 text-center d-flex align-items-center justify-content-center" style="width: 45px; height: 45px; min-width: 45px; border-radius: 12px; background: rgba(0,0,0,0.03); color: var(--subject-primary);">
+                      <i class="fas fa-layer-group fa-lg"></i>
+                    </div>
                     <div>
                       <div class="fw-semibold text-dark">{{ project.place }}</div>
                       <small class="text-muted">@{{ project.user_profile.user.username }}</small>
@@ -211,7 +222,9 @@
         <input type="hidden" name="action" value="create_student">
         <div class="modal-header border-0 pb-0">
           <h5 class="modal-title fw-bold"><i class="fas fa-user-plus text-primary me-2"></i>Añadir Nuevo Alumno</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
         </div>
         <div class="modal-body">
           <div class="mb-3">
@@ -232,7 +245,6 @@
           </div>
         </div>
         <div class="modal-footer border-0 pt-0">
-          <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
           <button type="submit" class="btn btn-primary rounded-pill px-4">Crear y Matricular</button>
         </div>
       </form>
@@ -249,7 +261,9 @@
         <input type="hidden" name="action" value="create_project">
         <div class="modal-header border-0 pb-0">
           <h5 class="modal-title fw-bold"><i class="fas fa-folder-plus text-primary me-2"></i>Crear Nuevo Proyecto</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
         </div>
         <div class="modal-body">
           <div class="mb-3">
@@ -258,16 +272,15 @@
           </div>
           <div class="mb-3">
             <label class="form-label text-muted small fw-semibold">Asignar a Alumno</label>
-            <select name="student_id" class="form-select rounded-3" required>
+            <select name="student_id" class="form-select form-select-lg rounded-3 border-0 shadow-sm bg-light" required style="font-size: 0.95rem; cursor: pointer;">
               <option value="" disabled selected>Seleccione un alumno matriculado...</option>
               {% for student in students %}
-                <option value="{{ student.id }}">{{ student.get_full_name|default:student.username }}</option>
+                <option value="{{ student.id }}">👤 {{ student.get_full_name|default:student.username }}  ( @{{ student.username }} )</option>
               {% endfor %}
             </select>
           </div>
         </div>
         <div class="modal-footer border-0 pt-0">
-          <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
           <button type="submit" class="btn btn-primary rounded-pill px-4">Crear Proyecto</button>
         </div>
       </form>
@@ -284,7 +297,9 @@
         <input type="hidden" name="action" value="edit_subject">
         <div class="modal-header border-0 pb-0">
           <h5 class="modal-title fw-bold"><i class="fas fa-palette text-primary me-2"></i>Personalizar Asignatura</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
         </div>
         <div class="modal-body">
           <div class="mb-4">
@@ -341,7 +356,6 @@
           }
         </script>
         <div class="modal-footer border-0 pt-0">
-          <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
           <button type="submit" class="btn btn-primary rounded-pill px-4">Guardar Cambios</button>
         </div>
       </form>
@@ -354,13 +368,13 @@
 <div class="modal fade" id="editStudentModal{{ student.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow-lg rounded-4">
-      <form method="POST" action="{% url 'professor_subject_detail' subject.id %}">
+      <form method="POST" action="{% url 'professor_subject_detail' subject.id %}" id="formEditStudent{{ student.id }}">
         {% csrf_token %}
         <input type="hidden" name="action" value="edit_student">
         <input type="hidden" name="student_id" value="{{ student.id }}">
         <div class="modal-header border-0 pb-0">
           <h5 class="modal-title fw-bold"><i class="fas fa-user-edit text-primary me-2"></i>Editar Alumno</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div class="mb-3 text-center">
@@ -373,18 +387,195 @@
           </div>
           <div class="mb-3">
             <label class="form-label text-muted small fw-semibold">Nueva Contraseña (dejar en blanco para no cambiar)</label>
-            <input type="password" name="password" class="form-control rounded-3" placeholder="••••••••">
+            <input type="password" name="password" id="editPassword{{ student.id }}" class="form-control rounded-3" placeholder="••••••••">
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Repetir Nueva Contraseña</label>
+            <input type="password" name="password_confirm" id="editPasswordConfirm{{ student.id }}" class="form-control rounded-3" placeholder="••••••••">
+          </div>
+          <div class="form-check mb-3 mt-3">
+            <input class="form-check-input" type="checkbox" name="must_change_password" value="1" id="mustChangePwd{{ student.id }}" {% if student.user_profile.must_change_password %}checked{% endif %}>
+            <label class="form-check-label text-muted small fw-semibold" for="mustChangePwd{{ student.id }}">
+              Requerir actualización de contraseña en el próximo inicio de sesión
+            </label>
           </div>
         </div>
         <div class="modal-footer border-0 pt-0">
-          <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-primary rounded-pill px-4">Actualizar Datos</button>
+          <button type="button" class="btn btn-primary rounded-pill px-4" onclick="confirmEditStudent('{{ student.id }}', '{{ student.username }}')">Actualizar Datos</button>
         </div>
       </form>
     </div>
   </div>
 </div>
 {% endfor %}
+
+<!-- Modal Matricular Alumno Existente -->
+<div class="modal fade" id="addExistingStudentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4">
+      <form method="POST" action="{% url 'professor_subject_detail' subject.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_existing_student">
+        <div class="modal-header border-0 pb-0">
+          <h5 class="modal-title fw-bold"><i class="fas fa-link text-success me-2"></i>Matricular Alumno Existente</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info border-0 bg-info bg-opacity-10 text-info fw-semibold small pb-2">
+            Selecciona un alumno que ya está registrado en la plataforma.
+          </div>
+          <div class="mb-3">
+            <label class="form-label text-muted small fw-semibold">Alumno</label>
+            <select name="student_id" class="form-select form-select-lg rounded-3 border-0 shadow-sm bg-light" required style="font-size: 0.95rem; cursor: pointer;">
+              <option value="" disabled selected>Seleccione un alumno disponible...</option>
+              {% for available in available_students %}
+                <option value="{{ available.id }}">👤 {{ available.get_full_name|default:available.username }}  ( @{{ available.username }} )</option>
+              {% endfor %}
+            </select>
+            {% if not available_students %}
+              <div class="text-danger small mt-2"><i class="fas fa-exclamation-triangle"></i> No hay alumnos disponibles para matricular.</div>
+            {% endif %}
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="submit" class="btn btn-success rounded-pill px-4 text-white hover-elevate shadow-sm" {% if not available_students %}disabled{% endif %}>Matricular Alumno</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  function confirmEditStudent(studentId, username) {
+    const form = document.getElementById('formEditStudent' + studentId);
+    const pwdInput = document.getElementById('editPassword' + studentId).value.trim();
+    const pwdConfirm = document.getElementById('editPasswordConfirm' + studentId).value.trim();
+    
+    if (pwdInput !== "") {
+        // Validation check
+        if (pwdInput !== pwdConfirm) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Contraseñas no coinciden',
+                text: 'Las contraseñas no son iguales, por favor revisa.',
+                confirmButtonColor: '#4e73df',
+                customClass: { confirmButton: 'btn btn-primary rounded-pill' },
+                buttonsStyling: false
+            });
+            return;
+        }
+
+        // Show Sweet Alert asking for confirmation
+        Swal.fire({
+          title: '<h4 class="fw-bold mb-0">Confirmar cambio de clave</h4>',
+          html: `<p class="text-muted mt-2 mb-0">Estás a punto de cambiar la contraseña de <strong>@${username}</strong>. ¿Estás seguro?</p>`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: '<i class="fas fa-save me-2"></i>Sí, guardar',
+          cancelButtonText: 'Cancelar',
+          reverseButtons: true,
+          confirmButtonColor: '#f6c23e',
+          cancelButtonColor: '#858796',
+          customClass: {
+            confirmButton: 'btn btn-warning px-4 py-2 fw-bold text-dark shadow-sm me-2',
+            cancelButton: 'btn btn-light px-4 py-2 fw-bold shadow-sm'
+          },
+          buttonsStyling: false,
+          showLoaderOnConfirm: true,
+          preConfirm: () => {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve();
+                }, 600); // Simulate brief loading
+            });
+          }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            form.submit();
+          }
+        });
+    } else {
+        // Directly submit if no password change
+        form.submit();
+    }
+  }
+
+  function confirmRemoveStudent(studentId, username) {
+      Swal.fire({
+          title: '<h4 class="fw-bold mb-0 text-danger">Eliminación Radical</h4>',
+          html: `<div class="text-muted mt-2 mb-0 text-start">
+                  <p>Estás a punto de <strong>desmatricular</strong> al alumno <strong>@${username}</strong> de esta asignatura.</p>
+                  <p class="text-danger fw-bold"><i class="fas fa-exclamation-triangle me-1"></i> ¡ADVERTENCIA!</p>
+                  <ul class="small mb-0 pb-0">
+                    <li>Se apagarán y borrarán <strong>TODOS</strong> sus servicios.</li>
+                    <li>Se borrarán todas sus asignaciones de proyectos de esta asignatura.</li>
+                    <li>Este proceso <strong>NO</strong> se puede deshacer.</li>
+                  </ul>
+                 </div>`,
+          icon: 'error',
+          showCancelButton: true,
+          confirmButtonText: '<i class="fas fa-trash-alt me-2"></i>Eliminar Todo',
+          cancelButtonText: 'Cancelar',
+          reverseButtons: true,
+          confirmButtonColor: '#e74a3b',
+          cancelButtonColor: '#858796',
+          customClass: {
+            confirmButton: 'btn btn-danger px-4 py-2 fw-bold shadow-sm rounded-pill me-2',
+            cancelButton: 'btn btn-light px-4 py-2 fw-bold shadow-sm rounded-pill'
+          },
+          buttonsStyling: false,
+          showLoaderOnConfirm: true,
+          allowOutsideClick: () => !Swal.isLoading(),
+          preConfirm: () => {
+              return new Promise((resolve) => {
+                  setTimeout(() => {
+                      resolve();
+                  }, 1200); // Loading visual
+              });
+          }
+      }).then((result) => {
+          if (result.isConfirmed) {
+              const form = document.createElement("form");
+              form.method = "POST";
+              form.action = "{% url 'professor_subject_detail' subject.id %}";
+              
+              const csrfInput = document.createElement("input");
+              csrfInput.type = "hidden";
+              csrfInput.name = "csrfmiddlewaretoken";
+              csrfInput.value = "{{ csrf_token }}";
+              
+              const actionInput = document.createElement("input");
+              actionInput.type = "hidden";
+              actionInput.name = "action";
+              actionInput.value = "remove_student";
+              
+              const studentIdInput = document.createElement("input");
+              studentIdInput.type = "hidden";
+              studentIdInput.name = "student_id";
+              studentIdInput.value = studentId;
+
+              form.appendChild(csrfInput);
+              form.appendChild(actionInput);
+              form.appendChild(studentIdInput);
+              document.body.appendChild(form);
+              
+              // Cargar SweetAlert genérico de progreso final
+              Swal.fire({
+                  title: 'Procesando...',
+                  text: 'Eliminando datos y contenedores, por favor espera.',
+                  allowOutsideClick: false,
+                  showConfirmButton: false,
+                  didOpen: () => {
+                      Swal.showLoading();
+                  }
+              });
+              
+              form.submit();
+          }
+      });
+  }
+</script>
 
 {% include "containers/_partials/panels/_modals.html" %}
 {% endblock %}
