@@ -1,5 +1,13 @@
 from django.apps import AppConfig
+from django.template.defaultfilters import register
 
+@register.filter(is_safe=False)
+def length_is(value, arg):
+    """Return a boolean of whether the value's length is the argument."""
+    try:
+        return len(value) == int(arg)
+    except (ValueError, TypeError):
+        return ""
 
 class PaasifysConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'

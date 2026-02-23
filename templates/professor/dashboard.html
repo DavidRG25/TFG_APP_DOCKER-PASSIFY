@@ -7,24 +7,95 @@
 
 {% block body %}
 <div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh;">
-  {# Header con degradado Premium #}
-  <div class="rounded-3 p-4 mb-4 shadow-sm" style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
-    <div class="d-flex justify-content-between align-items-center">
-      <div>
-        <h1 class="h3 mb-1 text-white fw-bold"><i class="fas fa-chalkboard-teacher me-2"></i>Panel de Control Docente</h1>
-        <p class="text-white-50 mb-0">Supervisión de asignaturas, proyectos y actividad de contenedores.</p>
+  {# Breadcrumbs - Ruta encima del banner #}
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item">
+        <a href="{% url 'index' %}" class="text-decoration-none text-muted">
+          <i class="fas fa-home me-1"></i>Inicio
+        </a>
+      </li>
+      <li class="breadcrumb-item active text-primary fw-bold" aria-current="page">Panel Profesor</li>
+    </ol>
+  </nav>
+
+  {# Header con degradado Premium - Estilo Unificado #}
+  <div class="rounded-4 p-4 mb-4 shadow" 
+       style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%); min-height: 160px; display: flex; align-items: center;">
+    <div class="d-flex justify-content-between align-items-center w-100">
+      <div class="d-flex align-items-center">
+        {# Icono del Dashboard #}
+        <div class="bg-white rounded-4 shadow-sm d-flex align-items-center justify-content-center overflow-hidden border border-white border-2" 
+             style="width: 75px; height: 75px; min-width: 75px; margin-right: 3rem;">
+          <i class="fas fa-chalkboard-teacher fa-2x" style="color: #4e73df;"></i>
+        </div>
+
+        {# Textos #}
+        <div class="text-container text-white">
+          <h1 class="h1 mb-1 fw-bold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15); line-height: 1.2; font-size: 2.5rem;">
+            Panel de Control Docente
+          </h1>
+          <p class="text-white-50 mb-0 opacity-90 fw-semibold fs-5 mt-2">
+            Supervisión de asignaturas, proyectos y actividad de contenedores.
+          </p>
+        </div>
       </div>
-      <div class="d-flex gap-2">
-        <button class="btn btn-outline-light d-flex align-items-center" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createSubjectModal" data-target="#createSubjectModal">
-          <i class="fas fa-plus-circle me-2"></i>Nueva Asignatura
+
+      <style>
+        .prof-action-group {
+            background: rgba(0, 0, 0, 0.15);
+            padding: 4px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .btn-panel {
+            background: #ffffff !important;
+            color: #4e73df !important;
+            border-radius: 12px !important;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border: none;
+            padding: 0.7rem 1.5rem;
+            font-weight: 700;
+            font-size: 0.82rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: 0.3px;
+        }
+        .btn-panel:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+            background: #f8fafc !important;
+        }
+        .btn-customize {
+            background: transparent !important;
+            color: rgba(255, 255, 255, 0.9) !important;
+            border-radius: 12px !important;
+            margin-right: 2px;
+            border: none;
+            padding: 0.7rem 1.5rem;
+            font-weight: 700;
+            font-size: 0.82rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: 0.3px;
+        }
+        .btn-customize:hover {
+            background: rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+        }
+      </style>
+
+      <div class="d-flex prof-action-group align-items-center">
+        <button class="btn btn-customize d-flex align-items-center" 
+                data-bs-toggle="modal" data-toggle="modal" 
+                data-bs-target="#createSubjectModal" data-target="#createSubjectModal">
+          <i class="fas fa-plus-circle me-2"></i> Nueva Asignatura
         </button>
         {% if request.user.is_superuser or request.user.is_staff %}
-          <a class="btn btn-outline-light d-flex align-items-center" href="/admin/">
-            <i class="fas fa-user-shield me-2"></i>Admin Global
+          <a class="btn btn-customize d-flex align-items-center" href="/admin/">
+            <i class="fas fa-user-shield me-2"></i> Admin Global
           </a>
         {% endif %}
-        <a class="btn btn-light shadow-sm" href="{% url 'professor_dashboard' %}">
-          <i class="fas fa-sync-alt me-2"></i>Sincronizar
+        <a href="{% url 'professor_dashboard' %}" class="btn btn-panel d-flex align-items-center ms-1">
+          <i class="fas fa-sync-alt me-2"></i> Sincronizar
         </a>
       </div>
     </div>
@@ -93,7 +164,7 @@
                   <span><i class="fas fa-users me-1"></i>{{ s.students.count }} Estudiantes</span>
                   <span><i class="fas fa-calendar-alt me-1"></i>{{ s.genero|default:'2026' }}</span>
                 </div>
-                <a href="{% url 'professor_subject_detail' s.id %}" class="btn btn-primary btn-sm w-100 rounded-pill shadow-sm">
+                <a href="{% url 'professor_subject_detail' s.id %}" class="btn btn-sm w-100 rounded-pill shadow-sm text-white" style="background-color: {{ s.color|default:'#4e73df' }};">
                   Gestionar Asignatura <i class="fas fa-arrow-right ms-1"></i>
                 </a>
               </div>
@@ -191,7 +262,9 @@
         <input type="hidden" name="action" value="create_subject">
         <div class="modal-header border-0 pb-0">
           <h5 class="modal-title fw-bold"><i class="fas fa-university text-primary me-2"></i>Nueva Asignatura</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
         </div>
         <div class="modal-body">
           <div class="mb-3">
@@ -220,7 +293,7 @@
           </div>
         </div>
         <div class="modal-footer border-0 pt-0">
-          <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-light rounded-pill" data-dismiss="modal">Cancelar</button>
           <button type="submit" class="btn btn-primary rounded-pill px-4">Crear Asignatura</button>
         </div>
       </form>

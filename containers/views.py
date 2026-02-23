@@ -1289,29 +1289,80 @@ def professor_subject_detail(request, subject_id):
             if username and email and nombre and password:
                 from django.contrib.auth import get_user_model
                 from paasify.models.StudentModel import UserProfile
-                from django.contrib.auth.models import Group
+                from paasify.roles import ensure_user_group, STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP
                 User = get_user_model()
                 try:
                     if User.objects.filter(username=username).exists():
                         from django.contrib import messages
-                        messages.error(request, "El nombre de usuario ya existe.")
+                        messages.error(request, f"El nombre de usuario '{username}' ya existe.|openModal=createStudentModal")
                     else:
                         new_user = User.objects.create_user(username=username, email=email, password=password)
-                        student_group, _ = Group.objects.get_or_create(name='StudentGroup')
-                        new_user.groups.add(student_group)
-                        player = UserProfile.objects.create(user=new_user, nombre=nombre, year=email)
+                        ensure_user_group(new_user, STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP)
+                        
+                        # Recuperar perfil de alumno autocreado por las señales (o crearlo preventivamente si no existe)
+                        profile, _ = UserProfile.objects.get_or_create(user=new_user)
+                        profile.nombre = nombre
+                        profile.year = email
+                        profile.save()
+                        
                         subject.students.add(new_user)
                         from django.contrib import messages
                         messages.success(request, f"Alumno '{nombre}' creado y matriculado con éxito.")
                 except Exception as e:
                     from django.contrib import messages
-                    messages.error(request, f"Error creando el alumno: {str(e)}")
+                    messages.error(request, f"Error creando el alumno: {str(e)}|openModal=createStudentModal")
+        elif action == "add_existing_student":
+            student_id = request.POST.get("student_id")
+            if student_id:
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                try:
+                    student_user = User.objects.get(pk=student_id)
+                    subject.students.add(student_user)
+                    from django.contrib import messages
+                    messages.success(request, f"Alumno '{student_user.username}' matriculado con éxito.")
+                except Exception as e:
+                    from django.contrib import messages
+                    messages.error(request, f"Error matriculando al alumno: {str(e)}")
+        elif action == "remove_student":
+            student_id = request.POST.get("student_id")
+            if student_id:
+                from django.contrib.auth import get_user_model
+                from paasify.models.StudentModel import UserProfile
+                from containers.models import UserProject
+                User = get_user_model()
+                try:
+                    student_user = User.objects.get(pk=student_id)
+                    profile = UserProfile.objects.get(user=student_user)
+                    
+                    # 1. Borrar servicios del alumno en esta asignatura
+                    services_to_remove = Service.objects.filter(subject=subject, owner=student_user)
+                    for svc in services_to_remove:
+                        try:
+                            stop_container(svc)
+                            remove_container(svc)
+                        except Exception:
+                            pass
+                        svc.delete()
+                    
+                    # 2. Borrar asignaciones de proyectos
+                    UserProject.objects.filter(subject=subject, user_profile=profile).delete()
+                    
+                    # 3. Desmatricular
+                    subject.students.remove(student_user)
+                    
+                    from django.contrib import messages
+                    messages.success(request, f"El alumno '{student_user.username}' ha sido desmatriculado y sus datos locales borrados.")
+                except Exception as e:
+                    from django.contrib import messages
+                    messages.error(request, f"Error desmatriculando al alumno: {str(e)}")
         elif action == "create_project":
             place = request.POST.get("place")
             student_id = request.POST.get("student_id")
             if place and student_id:
                 from django.contrib.auth import get_user_model
                 from paasify.models.StudentModel import UserProfile
+                from containers.models import UserProject
                 User = get_user_model()
                 try:
                     student_user = User.objects.get(pk=student_id)
@@ -1364,6 +1415,16 @@ def professor_subject_detail(request, subject_id):
         return redirect("professor_subject_detail", subject_id=subject.id)
 
     students = subject.students.all().order_by("username")
+    
+    from django.contrib.auth import get_user_model
+    from paasify.roles import STUDENT_GROUP_NAMES
+    User = get_user_model()
+    # Alumnos disponibles: rol de alumno, no superusuarios y que no estén ya en la asignatura
+    available_students = User.objects.filter(
+        is_superuser=False, 
+        groups__name__in=STUDENT_GROUP_NAMES
+    ).exclude(id__in=subject.students.values_list("id", flat=True)).distinct().order_by("username")
+    
     services = (
         Service.objects.filter(subject=subject)
         .select_related("owner")
@@ -1379,6 +1440,7 @@ def professor_subject_detail(request, subject_id):
         {
             "subject": subject,
             "students": students,
+            "available_students": available_students,
             "services": services,
             "projects": projects,
             "host": host,

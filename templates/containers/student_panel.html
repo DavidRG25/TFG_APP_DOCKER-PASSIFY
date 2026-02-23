@@ -163,7 +163,7 @@
               </tr>
             </thead>
             <tbody id="service-table" class="bg-white" 
-                   hx-get="{% url 'containers:service_table' %}{% if current_subject %}?subject={{ current_subject.id }}{% endif %}"
+                   hx-get="{% url 'containers:service_table' %}{% if current_subject %}?subject={{ current_subject.id }}&hide_subject=1{% endif %}"
                    hx-include="{% if not current_subject %}#service-filters-form{% endif %}"
                    hx-trigger="load, every 3s, service:table-refresh from:body">
               {% include "containers/_service_rows.html" %}
