@@ -11,9 +11,11 @@
   </td>
   {% endif %}
   
+  {% if not hide_project_column %}
   <td class="{% if hide_redundant or hide_subject_column %}ps-4{% endif %}">
     <div class="fw-bold text-primary">{{ s.project.place|default:"General" }}</div>
   </td>
+  {% endif %}
   
   {% if not hide_redundant and is_supervisor %}
   <td>
@@ -22,7 +24,7 @@
   </td>
   {% endif %}
 
-  <td {% if hide_redundant %}class="ps-4"{% endif %}>
+  <td {% if hide_redundant or hide_project_column %}class="ps-4"{% endif %}>
     <div class="fw-bold text-dark mb-1">{{ s.name }}</div>
     <small class="text-muted d-block mb-1" style="font-size: 0.7rem;">ID: #{{ s.id }}</small>
     <div>
