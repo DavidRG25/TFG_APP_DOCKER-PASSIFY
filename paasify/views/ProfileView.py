@@ -49,14 +49,22 @@ def profile_view(request):
     if user.groups.filter(name__iexact='teacher').exists():
         subjects_as_teacher = Subject.objects.filter(teacher_user=user)
     
+    is_admin = user.is_superuser
+    is_teacher = user.groups.filter(name__iexact='teacher').exists()
+    is_student = user.groups.filter(name__iexact='student').exists()
+    
+    # Jerarquia de roles para no duplicar en el perfil si no es necesario: Admin > Teacher > Student
+    display_student = is_student and not is_teacher and not is_admin
+    display_teacher = is_teacher and not is_admin
+    
     context = {
         'user': user,
         'profile': profile,
         'api_token': api_token_data,
         'subjects_as_student': subjects_as_student,
         'subjects_as_teacher': subjects_as_teacher,
-        'is_student': user.groups.filter(name__iexact='student').exists(),
-        'is_teacher': user.groups.filter(name__iexact='teacher').exists(),
+        'is_student': display_student,
+        'is_teacher': display_teacher,
     }
     
     return render(request, 'profile.html', context)

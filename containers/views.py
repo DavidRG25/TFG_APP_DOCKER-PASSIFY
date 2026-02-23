@@ -13,6 +13,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.template.loader import render_to_string
 from django.utils.html import escape
+from django.contrib import messages
 
 from rest_framework import viewsets
 from rest_framework.decorators import action, api_view, permission_classes
@@ -23,12 +24,15 @@ from rest_framework.exceptions import ValidationError
 
 from docker.errors import DockerException, NotFound
 
+from django.contrib.auth import get_user_model
 from paasify.models.ProjectModel import UserProject
 from paasify.models.SubjectModel import Subject
+from paasify.models.StudentModel import UserProfile
 from paasify.roles import (
     user_is_admin as roles_user_is_admin,
     user_is_student as roles_user_is_student,
     user_is_teacher as roles_user_is_teacher,
+    ensure_user_group, STUDENT_GROUP_NAMES, TEACHER_GROUP_NAMES, DEFAULT_STUDENT_GROUP
 )
 
 from .docker_client import get_docker_client
@@ -1026,6 +1030,10 @@ def service_table(request):
     if project_id:
         qs = qs.filter(project_id=project_id)
         
+    hide_subject = request.GET.get("hide_subject") == "1"
+    hide_project = request.GET.get("hide_project") == "1"
+    hide_owner = request.GET.get("hide_owner") == "1"
+        
     status = request.GET.get("status")
     if status:
         qs = qs.filter(status=status)
@@ -1075,6 +1083,9 @@ def service_table(request):
         "has_transient": has_transient,
         "subject_id": subject_id,
         "project_id": project_id,
+        "hide_redundant": hide_owner or hide_subject or hide_project,
+        "hide_subject_column": hide_subject,
+        "hide_project_column": hide_project,
         "current_subject": current_sub_obj
     }, request=request)
     return HttpResponse(html)
@@ -1154,11 +1165,12 @@ def terminal_v2_view(request, pk):
     return_url = request.GET.get('return_url')
     if not return_url:
         referer = request.META.get('HTTP_REFERER', '')
-        if 'subjects/' in referer:
+        if 'professor/' in referer:
+            return_url = referer
+        elif 'subjects/' in referer:
             return_url = referer
         else:
-            from django.urls import reverse
-            return_url = reverse('containers:student_panel')
+            return_url = reverse('professor_dashboard' if user_is_teacher(user) else 'containers:student_panel')
     
     return render(request, "containers/terminal_v2.html", {
         "service": service,
@@ -1279,7 +1291,6 @@ def professor_subject_detail(request, subject_id):
                     stop_container(svc)
                 except Exception:
                     pass
-            from django.contrib import messages
             messages.success(request, "Se ha ordenado la parada de todos los contenedores de la asignatura.")
         elif action == "create_student":
             username = request.POST.get("username")
@@ -1287,52 +1298,50 @@ def professor_subject_detail(request, subject_id):
             nombre = request.POST.get("nombre")
             password = request.POST.get("password")
             if username and email and nombre and password:
-                from django.contrib.auth import get_user_model
-                from paasify.models.StudentModel import UserProfile
-                from paasify.roles import ensure_user_group, STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP
-                User = get_user_model()
+                User_cls = get_user_model()
                 try:
-                    if User.objects.filter(username=username).exists():
-                        from django.contrib import messages
+                    if User_cls.objects.filter(username=username).exists():
                         messages.error(request, f"El nombre de usuario '{username}' ya existe.|openModal=createStudentModal")
                     else:
-                        new_user = User.objects.create_user(username=username, email=email, password=password)
+                        new_user = User_cls.objects.create_user(username=username, email=email, password=password)
+                        
+                        # Populate first_name and last_name for full name display
+                        full_name_parts = nombre.strip().split(' ', 1)
+                        if len(full_name_parts) > 1:
+                            new_user.first_name = full_name_parts[0]
+                            new_user.last_name = full_name_parts[1]
+                        else:
+                            new_user.first_name = nombre
+                        new_user.save()
+
                         ensure_user_group(new_user, STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP)
                         
-                        # Recuperar perfil de alumno autocreado por las señales (o crearlo preventivamente si no existe)
                         profile, _ = UserProfile.objects.get_or_create(user=new_user)
                         profile.nombre = nombre
                         profile.year = email
+                        profile.must_change_password = request.POST.get("must_change_password") == "1"
                         profile.save()
                         
                         subject.students.add(new_user)
-                        from django.contrib import messages
                         messages.success(request, f"Alumno '{nombre}' creado y matriculado con éxito.")
                 except Exception as e:
-                    from django.contrib import messages
                     messages.error(request, f"Error creando el alumno: {str(e)}|openModal=createStudentModal")
         elif action == "add_existing_student":
             student_id = request.POST.get("student_id")
             if student_id:
-                from django.contrib.auth import get_user_model
-                User = get_user_model()
+                User_cls = get_user_model()
                 try:
-                    student_user = User.objects.get(pk=student_id)
+                    student_user = User_cls.objects.get(pk=student_id)
                     subject.students.add(student_user)
-                    from django.contrib import messages
                     messages.success(request, f"Alumno '{student_user.username}' matriculado con éxito.")
                 except Exception as e:
-                    from django.contrib import messages
                     messages.error(request, f"Error matriculando al alumno: {str(e)}")
         elif action == "remove_student":
             student_id = request.POST.get("student_id")
             if student_id:
-                from django.contrib.auth import get_user_model
-                from paasify.models.StudentModel import UserProfile
-                from containers.models import UserProject
-                User = get_user_model()
+                User_cls = get_user_model()
                 try:
-                    student_user = User.objects.get(pk=student_id)
+                    student_user = User_cls.objects.get(pk=student_id)
                     profile = UserProfile.objects.get(user=student_user)
                     
                     # 1. Borrar servicios del alumno en esta asignatura
@@ -1351,49 +1360,45 @@ def professor_subject_detail(request, subject_id):
                     # 3. Desmatricular
                     subject.students.remove(student_user)
                     
-                    from django.contrib import messages
                     messages.success(request, f"El alumno '{student_user.username}' ha sido desmatriculado y sus datos locales borrados.")
                 except Exception as e:
-                    from django.contrib import messages
                     messages.error(request, f"Error desmatriculando al alumno: {str(e)}")
         elif action == "create_project":
             place = request.POST.get("place")
             student_id = request.POST.get("student_id")
             if place and student_id:
-                from django.contrib.auth import get_user_model
-                from paasify.models.StudentModel import UserProfile
-                from containers.models import UserProject
-                User = get_user_model()
+                User_cls = get_user_model()
                 try:
-                    student_user = User.objects.get(pk=student_id)
+                    student_user = User_cls.objects.get(pk=student_id)
                     user_profile = UserProfile.objects.get(user=student_user)
                     UserProject.objects.create(place=place, subject=subject, user_profile=user_profile)
-                    from django.contrib import messages
                     messages.success(request, "Proyecto asignado con éxito.")
                 except Exception as e:
-                    from django.contrib import messages
                     messages.error(request, f"Error creando el proyecto: {str(e)}")
         elif action == "edit_student":
             student_id = request.POST.get("student_id")
             email = request.POST.get("email")
             password = request.POST.get("password")
+            must_change = request.POST.get("must_change_password") == "1"
+            
             if student_id:
+                User_cls = get_user_model()
                 try:
-                    from django.contrib.auth import get_user_model
-                    from paasify.models.StudentModel import UserProfile
-                    User = get_user_model()
-                    st_user = User.objects.get(pk=student_id)
+                    st_user = User_cls.objects.get(pk=student_id)
+                    
                     if email:
                         st_user.email = email
                         st_user.user_profile.year = email
-                        st_user.user_profile.save()
+                    
+                    st_user.user_profile.must_change_password = must_change
+                    st_user.user_profile.save()
+                    
                     if password:
                         st_user.set_password(password)
+                    
                     st_user.save()
-                    from django.contrib import messages
                     messages.success(request, f"Alumno modificado con éxito.")
                 except Exception as e:
-                    from django.contrib import messages
                     messages.error(request, f"Error modificando al alumno: {str(e)}")
         elif action == "edit_subject":
             color = request.POST.get("color")
@@ -1409,21 +1414,22 @@ def professor_subject_detail(request, subject_id):
                 subject.logo = request.FILES["logo"]
             
             subject.save()
-            from django.contrib import messages
             messages.success(request, "Diseño de la asignatura actualizado.")
 
         return redirect("professor_subject_detail", subject_id=subject.id)
 
     students = subject.students.all().order_by("username")
     
-    from django.contrib.auth import get_user_model
-    from paasify.roles import STUDENT_GROUP_NAMES
     User = get_user_model()
-    # Alumnos disponibles: rol de alumno, no superusuarios y que no estén ya en la asignatura
+    # Alumnos disponibles: rol de alumno, NO rol de profesor, no superusuarios y que no estén ya en la asignatura
     available_students = User.objects.filter(
         is_superuser=False, 
         groups__name__in=STUDENT_GROUP_NAMES
-    ).exclude(id__in=subject.students.values_list("id", flat=True)).distinct().order_by("username")
+    ).exclude(
+        groups__name__in=TEACHER_GROUP_NAMES
+    ).exclude(
+        id__in=subject.students.values_list("id", flat=True)
+    ).distinct().order_by("username")
     
     services = (
         Service.objects.filter(subject=subject)
@@ -1922,11 +1928,12 @@ def api_command_generator_view(request):
     
     if not return_url:
         referer = request.META.get('HTTP_REFERER', '')
-        if 'subjects/' in referer:
+        if 'professor/' in referer:
+            return_url = referer
+        elif 'subjects/' in referer:
             return_url = referer
         else:
-            from django.urls import reverse
-            return_url = reverse('containers:student_panel')
+            return_url = reverse('professor_dashboard' if user_is_teacher(user) else 'containers:student_panel')
     
     if return_url and 'subjects/' in return_url:
         import re
@@ -2050,11 +2057,12 @@ def logs_page(request, pk):
     return_url = request.GET.get('return_url')
     if not return_url:
         referer = request.META.get('HTTP_REFERER', '')
-        if 'subjects/' in referer:
+        if 'professor/' in referer:
+            return_url = referer
+        elif 'subjects/' in referer:
             return_url = referer
         else:
-            from django.urls import reverse
-            return_url = reverse('containers:student_panel')
+            return_url = reverse('professor_dashboard' if user_is_teacher(user) else 'containers:student_panel')
     
     # Si es request HTMX, solo devolver el fragmento de logs
     if request.headers.get('HX-Request'):

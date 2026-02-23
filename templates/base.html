@@ -445,6 +445,8 @@
                 </li>
 
                 {% if nav_is_admin or nav_is_student or user.is_superuser %}
+                {# Si es profesor y NO es admin/superuser, Ocultamos Proyectos y Mis Asignaturas #}
+                {% if not nav_is_teacher or user.is_superuser %}
                 <li class="nav-item">
                     <a class="nav-link" href="{% url 'containers:student_panel' %}">
                         <i class="fas fa-table"></i><span>Proyectos</span>
@@ -456,25 +458,7 @@
                         <i class="fas fa-book"></i><span>Mis asignaturas</span>
                     </a>
                 </li>
-
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'containers:api_docs' %}" data-bs-toggle="tooltip"
-                        data-bs-placement="bottom" title="Documentación técnica detallada de la API REST.">
-                        <i class="fas fa-code"></i><span>API Docs</span>
-                    </a>
-                </li>
-                {% elif user|has_group:'student' or user|has_group:'alumno' %}
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'containers:student_panel' %}">
-                        <i class="fas fa-table"></i><span>Proyectos</span>
-                    </a>
-                </li>
-
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'containers:student_subjects' %}">
-                        <i class="fas fa-book"></i><span>Mis asignaturas</span>
-                    </a>
-                </li>
+                {% endif %}
 
                 <li class="nav-item">
                     <a class="nav-link" href="{% url 'containers:api_docs' %}" data-bs-toggle="tooltip"
@@ -486,13 +470,7 @@
 
                 {% if nav_is_admin or nav_is_teacher or user.is_superuser %}
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'professor_dashboard' %}">
-                        <i class="fas fa-chalkboard-teacher"></i><span>Panel profesor</span>
-                    </a>
-                </li>
-                {% elif user|has_group:'teacher' or user|has_group:'profesor' %}
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'professor_dashboard' %}">
+                    <a class="nav-link {% if section == 'professor' %} active {% endif %}" href="{% url 'professor_dashboard' %}">
                         <i class="fas fa-chalkboard-teacher"></i><span>Panel profesor</span>
                     </a>
                 </li>
@@ -534,50 +512,54 @@
     <!-- Contenido principal -->
     <div id="content-wrapper">
         <div id="main-content">
-            <!-- Contenedor Maestro de Banners (Alineado a la derecha, estilo Toast Premium) -->
-            <div id="global-alert-container" class="position-fixed p-0"
-                style="z-index: 99999; min-width: 320px; max-width: 450px; top: 85px; right: 25px; pointer-events: none; display: flex; flex-direction: column; gap: 10px;">
+            <!-- Contenedor Maestro de Notificaciones (Gestionado por JS y SweetAlert2) -->
+            <div id="global-alert-container">
                 {% if messages %}
-                  {% for message in messages %}
-                    <div class="alert premium-toast premium-toast-{% if message.tags == 'error' %}error{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}info{% endif %} alert-dismissible fade show shadow-lg border-0 rounded-4 d-flex align-items-center p-3 m-0" role="alert" style="pointer-events: auto;">
-                        <div class="me-3 fs-3 text-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning{% else %}primary{% endif %}">
-                            <i class="fas fa-{% if message.tags == 'error' %}exclamation-circle{% elif message.tags == 'success' %}check-circle{% elif message.tags == 'warning' %}exclamation-triangle{% else %}info-circle{% endif %}"></i>
-                        </div>
-                        <div class="flex-grow-1">
-                            <h6 class="alert-heading fw-bold mb-1 text-{% if message.tags == 'error' %}danger{% elif message.tags == 'success' %}success{% elif message.tags == 'warning' %}warning text-dark{% else %}primary{% endif %}">
-                                {% if message.tags == 'error' %}Operación denegada{% elif message.tags == 'success' %}Operación exitosa{% elif message.tags == 'warning' %}Atención{% else %}Información{% endif %}
-                            </h6>
-                            <div class="small text-dark opacity-75 fw-semibold toast-message-text" style="line-height:1.3;">{{ message.message }}</div>
-                        </div>
-                        <button type="button" class="btn-close ms-2 align-self-start mt-1" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                  {% endfor %}
+                  <script id="django-messages-json" type="application/json">
+                    [
+                      {% for message in messages %}
+                      {
+                        "msg": "{{ message.message|escapejs }}",
+                        "tags": "{{ message.tags|escapejs }}"
+                      }{% if not forloop.last %},{% endif %}
+                      {% endfor %}
+                    ]
+                  </script>
                   <script>
                     document.addEventListener('DOMContentLoaded', function() {
-                        const messageEls = document.querySelectorAll('.toast-message-text');
-                        messageEls.forEach(el => {
-                            let text = el.innerText;
-                            if (text.includes('|openModal=')) {
-                                const parts = text.split('|openModal=');
-                                el.innerText = parts[0]; // Set the text to just the message
-                                const modalId = parts[1].trim();
-                                if (modalId) {
-                                    const modalEl = document.getElementById(modalId);
-                                    if (modalEl) {
-                                        const myModal = new bootstrap.Modal(modalEl);
-                                        myModal.show();
-                                    }
-                                }
+                      const msgContainer = document.getElementById('django-messages-json');
+                      if (!msgContainer) return;
+                      
+                      const djangoMessages = JSON.parse(msgContainer.textContent);
+
+                      djangoMessages.forEach(m => {
+                        let msg = m.msg;
+                        let tags = m.tags;
+                        let variant = "text-bg-info";
+                        let title = "Información";
+
+                        if (tags.includes('success')) { variant = "text-bg-success"; title = "Operación exitosa"; }
+                        else if (tags.includes('error') || tags.includes('danger')) { variant = "text-bg-danger"; title = "Operación denegada"; }
+                        else if (tags.includes('warning')) { variant = "text-bg-warning"; title = "Atención"; }
+
+                        // Soporte para abrir modales automáticamente desde el mensaje
+                        if (msg.includes('|openModal=')) {
+                          const parts = msg.split('|openModal=');
+                          msg = parts[0];
+                          const modalId = parts[1].trim();
+                          if (modalId) {
+                            const modalEl = document.getElementById(modalId);
+                            if (modalEl) {
+                              setTimeout(() => {
+                                const myModal = new bootstrap.Modal(modalEl);
+                                myModal.show();
+                              }, 300);
                             }
-                        });
+                          }
+                        }
                         
-                        setTimeout(function() {
-                            let alerts = document.querySelectorAll('#global-alert-container .alert');
-                            alerts.forEach(function(alert) {
-                                let bsAlert = new bootstrap.Alert(alert);
-                                bsAlert.close();
-                            });
-                        }, 6000);
+                        showToast(msg, variant, title);
+                      });
                     });
                   </script>
                 {% endif %}
