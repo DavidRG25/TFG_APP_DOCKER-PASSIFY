@@ -144,35 +144,49 @@
     {% include "containers/_partials/panels/_filters.html" %}
     {% endif %}
 
-    {# 3. Tabla de servicios #}
-    <div class="card border-0 shadow-sm">
-      <div class="card-body p-0">
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0 overflow-hidden" style="border-radius: 12px 12px 0 0;">
-            <thead style="background: var(--subject-primary, #4e73df); border-radius: 12px 12px 0 0;">
-              <tr class="text-white small text-uppercase fw-bold" style="letter-spacing: 0.8px; font-size: 0.75rem;">
-                {% if not current_subject %}
-                <th class="py-3 ps-4 border-0">Asignatura</th>
-                {% endif %}
-                <th class="py-3 {% if current_subject %}ps-4{% endif %} border-0">Proyecto</th>
-                <th class="py-3 border-0">Nombre</th>
-                <th class="py-3 border-0">Imagen</th>
-                <th class="py-3 border-0">Puerto</th>
-                <th class="py-3 border-0 text-center">Estado</th>
-                <th class="py-3 pe-4 text-end border-0">Acciones</th>
-              </tr>
-            </thead>
-            <tbody id="service-table" class="bg-white" 
-                   hx-get="{% url 'containers:service_table' %}{% if current_subject %}?subject={{ current_subject.id }}&hide_subject=1{% endif %}"
-                   hx-include="{% if not current_subject %}#service-filters-form{% endif %}"
-                   hx-trigger="load, every 3s, service:table-refresh from:body">
-              {% include "containers/_service_rows.html" %}
-            </tbody>
-          </table>
-        </div>
+  {# 3. Tabla de servicios #}
+  <input type="hidden" name="ordering" id="ordering-input" value="-id">
+  {% if current_subject %}
+    <input type="hidden" name="hide_subject" value="1" id="hide-subject-input">
+  {% endif %}
+  <div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 overflow-hidden" style="border-radius: 12px 12px 0 0; table-layout: fixed;">
+          <thead style="background: var(--subject-primary, #4e73df); border-radius: 12px 12px 0 0;">
+            <tr class="text-white small text-uppercase fw-bold" style="letter-spacing: 0.8px; font-size: 0.75rem;">
+              {% if not current_subject %}
+              <th class="py-3 ps-4 border-0" style="cursor: pointer; width: 15%;" onclick="toggleServiceOrdering('subject')">
+                Asignatura <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-subject"></i>
+              </th>
+              {% endif %}
+              <th class="py-3 {% if current_subject %}ps-4{% endif %} border-0" style="cursor: pointer; width: 15%;" onclick="toggleServiceOrdering('project')">
+                Proyecto <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-project"></i>
+              </th>
+              <th class="py-3 border-0" style="cursor: pointer; width: 20%;" onclick="toggleServiceOrdering('name')">
+                Nombre <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-name"></i>
+              </th>
+              <th class="py-3 border-0" style="cursor: pointer; width: 15%;" onclick="toggleServiceOrdering('image')">
+                Imagen <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-image"></i>
+              </th>
+              <th class="py-3 border-0" style="width: 10%;">Puerto</th>
+              <th class="py-3 border-0 text-center" style="cursor: pointer; width: 10%;" onclick="toggleServiceOrdering('status')">
+                Estado <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-status"></i>
+              </th>
+              <th class="py-3 pe-4 text-end border-0" style="width: 15%;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="service-table" class="bg-white" 
+                 hx-get="{% url 'containers:service_table' %}{% if current_subject %}?subject={{ current_subject.id }}{% endif %}"
+                 hx-include="{% if not current_subject %}#service-filters-form, #ordering-input{% else %}#ordering-input, #hide-subject-input{% endif %}"
+                 hx-trigger="load, every 3s, service:table-refresh from:body">
+            {% include "containers/_service_rows.html" %}
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
+</div>
 </div>
 
 {# 4. Modales #}
@@ -181,6 +195,38 @@
 {% endblock %}
 
 {% block extrascripts %}
+<script>
+  function toggleServiceOrdering(field) {
+    const input = document.getElementById('ordering-input');
+    const current = input.value;
+    let newValue = field;
+    
+    if (current === field) {
+      newValue = '-' + field;
+    } else if (current === '-' + field) {
+      newValue = field;
+    }
+    
+    input.value = newValue;
+    
+    // Update icons
+    ['subject', 'project', 'name', 'image', 'status'].forEach(f => {
+      const icon = document.getElementById('sort-icon-' + f);
+      if (icon) {
+        icon.className = 'fas fa-sort ms-1 opacity-50';
+      }
+    });
+    
+    const activeIcon = document.getElementById('sort-icon-' + field);
+    if (activeIcon) {
+      activeIcon.className = newValue.startsWith('-') ? 'fas fa-sort-down ms-1 text-white' : 'fas fa-sort-up ms-1 text-white';
+      activeIcon.classList.remove('opacity-50');
+    }
+    
+    // Trigger HTMX update on the table body
+    htmx.trigger('#service-table', 'service:table-refresh');
+  }
+</script>
 {# 5. Scripts #}
 {% include "containers/_partials/panels/_scripts.html" %}
 {% endblock %}

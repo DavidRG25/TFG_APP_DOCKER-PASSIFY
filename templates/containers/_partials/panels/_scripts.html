@@ -205,7 +205,7 @@
     const modalErrorContainer = document.getElementById("modal-form-errors");
     const pageErrorContainer = document.getElementById("form-errors");
     const errorHTML = `
-      <div class="alert alert-danger alert-dismissible fade show" role="alert">
+      <div class="alert alert-danger fade show p-3" role="alert">
         <div class="d-flex align-items-start">
           <i class="fas fa-exclamation-triangle fs-4 me-3 mt-1" style="color: #dc3545;"></i>
           <div class="flex-grow-1">
@@ -213,7 +213,6 @@
             <div class="small">${message}</div>
           </div>
         </div>
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
     `;
     if (modalErrorContainer) {

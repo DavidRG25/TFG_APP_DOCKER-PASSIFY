@@ -185,26 +185,108 @@
   </nav>
 
   {# Header con degradado Premium Unificado #}
-  <div class="rounded-4 p-4 mb-5 shadow mx-3 position-relative overflow-hidden" 
+  <div class="rounded-4 p-4 mb-3 shadow mx-3 position-relative overflow-hidden" 
        style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
-    <div class="d-flex align-items-center position-relative" style="z-index: 2;">
-      {# Avatar #}
-      <div class="bg-white rounded-circle shadow-sm d-flex align-items-center justify-content-center border border-white border-2 me-4" 
-           style="width: 80px; height: 80px; min-width: 80px; color: #4e73df; font-size: 2.2rem; font-weight: 800;">
-        {{ user.username|first|upper }}
+    <div class="row align-items-center position-relative" style="z-index: 2;">
+      <div class="col-md-auto mb-3 mb-md-0">
+          {# Avatar #}
+          <div class="bg-white rounded-circle shadow-sm d-flex align-items-center justify-content-center border border-white border-2 mx-auto" 
+               style="width: 100px; height: 100px; color: #4e73df; font-size: 2.8rem; font-weight: 800;">
+            {{ user.username|first|upper }}
+          </div>
       </div>
-      
-      {# Textos #}
-      <div class="text-white">
-        <h1 class="h2 mb-1 fw-extrabold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15);">Mi Perfil</h1>
-        <p class="text-white-50 mb-0 opacity-90 fw-medium">
-          <i class="fas fa-user-shield me-2"></i>{{ user.get_full_name|default:user.username }} 
-          <span class="mx-2">|</span> 
-          <i class="fas fa-envelope me-1 text-white-50"></i> {{ user.email }}
-        </p>
+      <div class="col-md text-center text-md-start text-white">
+          {# Textos #}
+          <h1 class="h1 mb-1 fw-extrabold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15);">{{ profile.nombre|default:user.get_full_name|default:user.username }}</h1>
+          <p class="text-white-50 mb-0 opacity-90 fw-medium">
+            <i class="fas fa-at me-1"></i>{{ user.username }} 
+            <span class="mx-2">·</span> 
+            <i class="fas fa-envelope me-1 text-white-50"></i> {{ user.email }}
+          </p>
+          <div class="mt-2 text-center text-md-start">
+              {% if is_student %}
+              <span class="badge rounded-pill px-3 py-1 small shadow-sm me-1" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); backdrop-filter: blur(4px);">
+                  <i class="fas fa-graduation-cap me-1"></i>Alumno
+              </span>
+              {% endif %}
+              {% if is_teacher %}
+              <span class="badge rounded-pill px-3 py-1 small shadow-sm me-1" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); backdrop-filter: blur(4px);">
+                  <i class="fas fa-chalkboard-teacher me-1"></i>Profesor
+              </span>
+              {% endif %}
+              {% if user.is_superuser or is_admin %}
+              <span class="badge rounded-pill px-3 py-1 small shadow-sm me-1" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); backdrop-filter: blur(4px);">
+                  <i class="fas fa-user-shield me-1"></i>Admin
+              </span>
+              {% endif %}
+          </div>
       </div>
     </div>
     <i class="fas fa-cloud position-absolute" style="font-size: 15rem; right: 5%; bottom: -5rem; color: rgba(255,255,255,0.05); transform: rotate(-10deg); pointer-events: none;"></i>
+  </div>
+
+  {# Barra de Estadísticas Premium #}
+  <div class="container mb-5">
+      <div class="row g-4 justify-content-center">
+          {# Asignaturas #}
+          <div class="col-md-4 col-sm-6">
+              <div class="bg-white rounded-4 p-4 shadow-sm border-0 d-flex align-items-center justify-content-center" style="gap: 1.5rem; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                  <div class="rounded-4 d-flex align-items-center justify-content-center shadow-sm" style="width: 60px; height: 60px; min-width: 60px; background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
+                      <i class="fas fa-graduation-cap text-white" style="font-size: 1.7rem;"></i>
+                  </div>
+                  <div>
+                      <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.65rem; letter-spacing: 1px; opacity: 0.8;">Asignaturas</div>
+                      <div class="h2 mb-0 fw-bold text-dark" style="line-height: 1;">{{ stats.subjects|default:0 }}</div>
+                  </div>
+              </div>
+          </div>
+
+          {# Segundo Slot: Alumnos para Profesores, Proyectos para Alumnos #}
+          <div class="col-md-4 col-sm-6">
+              <div class="bg-white rounded-4 p-4 shadow-sm border-0 d-flex align-items-center justify-content-center" style="gap: 1.5rem; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                  {% if is_teacher %}
+                  <div class="rounded-4 d-flex align-items-center justify-content-center shadow-sm" style="width: 60px; height: 60px; min-width: 60px; background: linear-gradient(135deg, #f6c23e 0%, #dda20a 100%);">
+                      <i class="fas fa-user-friends text-white" style="font-size: 1.7rem;"></i>
+                  </div>
+                  <div>
+                      <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.65rem; letter-spacing: 1px; opacity: 0.8;">Mis Alumnos</div>
+                      <div class="h2 mb-0 fw-bold text-dark" style="line-height: 1;">{{ stats.students|default:0 }}</div>
+                  </div>
+                  {% else %}
+                  <div class="rounded-4 d-flex align-items-center justify-content-center shadow-sm" style="width: 60px; height: 60px; min-width: 60px; background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%);">
+                      <i class="fas fa-project-diagram text-white" style="font-size: 1.7rem;"></i>
+                  </div>
+                  <div>
+                      <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.65rem; letter-spacing: 1px; opacity: 0.8;">Proyectos</div>
+                      <div class="h2 mb-0 fw-bold text-dark" style="line-height: 1;">{{ stats.projects|default:0 }}</div>
+                  </div>
+                  {% endif %}
+              </div>
+          </div>
+
+          {# Tercer Slot: Proyectos para Profesores, Servicios para Otros #}
+          <div class="col-md-4 col-sm-6">
+              <div class="bg-white rounded-4 p-4 shadow-sm border-0 d-flex align-items-center justify-content-center" style="gap: 1.5rem; transition: transform 0.2s;" onmouseover="this.style.transform='translateY(-5px)'" onmouseout="this.style.transform='translateY(0)'">
+                  {% if is_teacher %}
+                  <div class="rounded-4 d-flex align-items-center justify-content-center shadow-sm" style="width: 60px; height: 60px; min-width: 60px; background: linear-gradient(135deg, #1cc88a 0%, #13855c 100%);">
+                      <i class="fas fa-project-diagram text-white" style="font-size: 1.7rem;"></i>
+                  </div>
+                  <div>
+                      <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.65rem; letter-spacing: 1px; opacity: 0.8;">Proyectos</div>
+                      <div class="h2 mb-0 fw-bold text-dark" style="line-height: 1;">{{ stats.projects|default:0 }}</div>
+                  </div>
+                  {% else %}
+                  <div class="rounded-4 d-flex align-items-center justify-content-center shadow-sm" style="width: 60px; height: 60px; min-width: 60px; background: linear-gradient(135deg, #36b9cc 0%, #258391 100%);">
+                      <i class="fas fa-server text-white" style="font-size: 1.7rem;"></i>
+                  </div>
+                  <div>
+                      <div class="text-muted small fw-bold text-uppercase mb-1" style="font-size: 0.65rem; letter-spacing: 1px; opacity: 0.8;">Contenedores</div>
+                      <div class="h2 mb-0 fw-bold text-dark" style="line-height: 1;">{{ stats.services|default:0 }}</div>
+                  </div>
+                  {% endif %}
+              </div>
+          </div>
+      </div>
   </div>
 
   <div class="container">
@@ -212,45 +294,46 @@
     <!-- Columna izquierda: Datos personales y contraseña -->
     <div class="col-lg-6">
       
-      <!-- Datos personales -->
+      <!-- Datos personales (Editable) -->
       <div class="card premium-card mb-4">
-        <div class="card-header d-flex align-items-center">
-          <div class="card-icon-container bg-primary-soft" style="background: rgba(78, 115, 223, 0.1); color: var(--premium-blue);">
-              <i class="fas fa-id-card"></i>
+        <div class="card-header d-flex align-items-center justify-content-between">
+          <div class="d-flex align-items-center">
+              <div class="card-icon-container bg-primary-soft" style="background: rgba(78, 115, 223, 0.1); color: var(--premium-blue);">
+                  <i class="fas fa-id-card"></i>
+              </div>
+              <h5 class="mb-0 fw-bold">Configuración de Cuenta</h5>
           </div>
-          <h5 class="mb-0 fw-bold">Datos Personales</h5>
+          <button type="button" class="btn btn-sm btn-light rounded-pill px-3 border" onclick="toggleProfileEdit()" id="btn-edit-profile">
+              <i class="fas fa-edit me-1"></i>Editar
+          </button>
         </div>
         <div class="card-body p-4">
-          <div class="row">
-              <div class="col-md-6 mb-3">
-                  <label class="form-label fw-semibold text-muted small text-uppercase">Usuario</label>
-                  <div class="fw-bold">{{ user.username }}</div>
-              </div>
-              <div class="col-md-6 mb-3">
-                  <label class="form-label fw-semibold text-muted small text-uppercase">Email</label>
-                  <div class="fw-bold">{{ user.email }}</div>
-              </div>
-              {% if profile %}
-              <div class="col-12 mb-3">
-                  <label class="form-label fw-semibold text-muted small text-uppercase">Nombre completo</label>
-                  <div class="fw-bold text-primary">{{ profile.nombre }}</div>
-              </div>
-              {% endif %}
-              <div class="col-12 mt-2">
-                  <label class="form-label fw-semibold text-muted small text-uppercase d-block mb-2">Rol en la plataforma</label>
-                  <div>
-                    {% if is_student %}
-                    <span class="badge rounded-pill px-3 py-2 bg-info" style="font-size: 0.85rem;"><i class="fas fa-graduation-cap me-1"></i> Alumno</span>
-                    {% endif %} 
-                    {% if is_teacher %}
-                    <span class="badge rounded-pill px-3 py-2 bg-success" style="font-size: 0.85rem;"><i class="fas fa-chalkboard-teacher me-1"></i> Profesor</span>
-                    {% endif %} 
-                    {% if user.is_superuser %}
-                    <span class="badge rounded-pill px-3 py-2 bg-danger" style="font-size: 0.85rem;"><i class="fas fa-user-shield me-1"></i> Administrador</span>
-                    {% endif %}
-                  </div>
-              </div>
-          </div>
+          <form id="profile-form" action="{% url 'update_profile' %}" method="POST">
+            {% csrf_token %}
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label fw-semibold text-muted small text-uppercase" style="font-size: 0.7rem;">Nombre de Usuario</label>
+                    <div class="premium-form-control bg-light text-muted fw-bold" style="opacity: 0.8;">{{ user.username }}</div>
+                    <small class="text-muted" style="font-size: 0.65rem; font-style: italic;">Identificador único del sistema.</small>
+                </div>
+                <div class="col-md-6">
+                    <label for="email" class="form-label fw-semibold text-muted small text-uppercase" style="font-size: 0.7rem;">Correo Electrónico</label>
+                    <input type="email" name="email" id="email" class="form-control premium-form-control profile-input" value="{{ user.email }}" readonly required>
+                </div>
+                <div class="col-md-12">
+                    <label for="full_name" class="form-label fw-semibold text-muted small text-uppercase" style="font-size: 0.7rem;">Nombre completo y Apellidos</label>
+                    <input type="text" name="full_name" id="full_name" class="form-control premium-form-control profile-input" value="{{ profile.nombre|default:user.get_full_name }}" readonly required>
+                </div>
+                <div id="profile-actions" class="col-12 mt-4 d-none">
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1 fw-bold rounded-pill">
+                            <i class="fas fa-check-circle me-1"></i> Guardar Cambios
+                        </button>
+                        <button type="button" class="btn btn-light rounded-pill px-4" onclick="toggleProfileEdit()">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+          </form>
         </div>
       </div>
 
@@ -258,29 +341,33 @@
       <div class="card premium-card shadow-sm border-0">
         <div class="card-header d-flex align-items-center" style="border-top: 4px solid #f6c23e;">
           <div class="card-icon-container" style="background: rgba(246, 194, 62, 0.1); color: #f6c23e;">
-              <i class="fas fa-key"></i>
+              <i class="fas fa-shield-alt"></i>
           </div>
           <h5 class="mb-0 fw-bold">Seguridad</h5>
         </div>
         <div class="card-body p-4">
-          <form method="POST" action="{% url 'change_password' %}">
+          <form method="POST" action="{% url 'change_password' %}" id="password-form">
             {% csrf_token %}
             <div class="mb-3">
               <label for="old_password" class="form-label small fw-bold">Contraseña actual</label>
-              <input type="password" class="form-control premium-form-control" id="old_password" name="old_password" placeholder="••••••••" required />
+              <div class="input-group">
+                  <span class="input-group-text bg-light border-end-0"><i class="fas fa-lock text-muted opacity-50"></i></span>
+                  <input type="password" class="form-control premium-form-control border-start-0" id="old_password" name="old_password" placeholder="••••••••" required />
+              </div>
             </div>
             <div class="row g-3 mb-4">
                 <div class="col-md-6">
                     <label for="new_password1" class="form-label small fw-bold">Nueva contraseña</label>
-                    <input type="password" class="form-control premium-form-control" id="new_password1" name="new_password1" placeholder="Nueva" required />
+                    <input type="password" class="form-control premium-form-control" id="new_password1" name="new_password1" placeholder="Mín. 8 caracteres" required onkeyup="checkPasswords()" />
                 </div>
                 <div class="col-md-6">
                     <label for="new_password2" class="form-label small fw-bold">Confirmar</label>
-                    <input type="password" class="form-control premium-form-control" id="new_password2" name="new_password2" placeholder="Repite" required />
+                    <input type="password" class="form-control premium-form-control" id="new_password2" name="new_password2" placeholder="Repite password" required onkeyup="checkPasswords()" />
                 </div>
+                <div id="password-feedback" class="col-12 mt-1 display-none small text-center fw-bold"></div>
             </div>
-            <button type="submit" class="btn btn-warning w-100 fw-bold py-2 shadow-sm">
-              <i class="fas fa-save me-2"></i> Actualizar Contraseña
+            <button type="submit" class="btn btn-warning w-100 fw-bold py-2 shadow-sm rounded-pill" id="btn-update-password" disabled>
+              <i class="fas fa-key me-2"></i> Actualizar Contraseña
             </button>
           </form>
         </div>
@@ -504,31 +591,6 @@
       }
   });
 
-  function showToast(message, icon = "success") {
-    const Toast = Swal.mixin({
-      toast: true,
-      position: 'top-start',
-      showConfirmButton: false,
-      timer: 2500,
-      timerProgressBar: true,
-      didOpen: (toast) => {
-        toast.addEventListener('mouseenter', Swal.stopTimer)
-        toast.addEventListener('mouseleave', Swal.resumeTimer)
-      }
-    });
-
-    Toast.fire({
-      icon: icon,
-      title: message,
-      background: '#fff',
-      color: '#2d3748',
-      padding: '1rem',
-      borderRadius: '1rem',
-      customClass: {
-        popup: 'shadow-lg border-0'
-      }
-    });
-  }
 
   function generateToken() {
     fetch("{% url 'generate_token' %}", {
@@ -726,6 +788,67 @@
         }
     }
     // El evento 'hidden.bs.modal' se encargará de recargar si shouldReloadOnClose es true
+  }
+
+  // Lógica de edición de perfil
+  function toggleProfileEdit() {
+      const inputs = document.querySelectorAll('.profile-input');
+      const actions = document.getElementById('profile-actions');
+      const btnEdit = document.getElementById('btn-edit-profile');
+      const isEditing = !inputs[0].readOnly;
+
+      inputs.forEach(input => {
+          input.readOnly = isEditing;
+          if (!isEditing) {
+              input.classList.remove('bg-light');
+              input.style.borderColor = 'var(--premium-blue)';
+          } else {
+              input.classList.add('bg-light');
+              input.style.borderColor = '#f1f5f9';
+          }
+      });
+
+      if (!isEditing) {
+          actions.classList.remove('d-none');
+          btnEdit.classList.add('btn-primary');
+          btnEdit.classList.remove('btn-light');
+          btnEdit.innerHTML = '<i class="fas fa-times me-1"></i>Dejar de Editar';
+      } else {
+          actions.classList.add('d-none');
+          btnEdit.classList.remove('btn-primary');
+          btnEdit.classList.add('btn-light');
+          btnEdit.innerHTML = '<i class="fas fa-edit me-1"></i>Editar';
+      }
+  }
+
+  // Validación de seguridad en tiempo real
+  function checkPasswords() {
+      const p1 = document.getElementById('new_password1');
+      const p2 = document.getElementById('new_password2');
+      const feedback = document.getElementById('password-feedback');
+      const btn = document.getElementById('btn-update-password');
+
+      if (!p1.value || !p2.value) {
+          feedback.style.display = 'none';
+          btn.disabled = true;
+          return;
+      }
+
+      feedback.style.display = 'block';
+
+      if (p1.value.length < 8) {
+          feedback.innerHTML = '<i class="fas fa-exclamation-triangle me-1"></i> Demasiado corta (mín. 8)';
+          feedback.className = 'col-12 mt-1 small text-center fw-bold text-danger';
+          btn.disabled = true;
+      } else if (p1.value !== p2.value) {
+          feedback.innerHTML = '<i class="fas fa-times me-1"></i> Las contraseñas no coinciden';
+          feedback.className = 'col-12 mt-1 small text-center fw-bold text-danger';
+          btn.disabled = true;
+      } else {
+          feedback.innerHTML = '<i class="fas fa-check-circle me-1"></i> Las contraseñas coinciden';
+          feedback.className = 'col-12 mt-1 small text-center fw-bold text-success';
+          btn.disabled = false;
+      }
   }
 </script>
 {% endblock %}

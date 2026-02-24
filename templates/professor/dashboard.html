@@ -188,6 +188,7 @@
         </div>
         <div class="card-body p-3 border-bottom bg-light bg-opacity-10">
           <form method="GET" action="{% url 'professor_dashboard' %}" class="row g-3 align-items-end" id="project-filter-form">
+            <input type="hidden" name="sort" value="{{ request.GET.sort|default:'-date' }}">
             <div class="col-md-5">
               <label class="form-label small fw-bold text-muted mb-1"><i class="fas fa-search me-1"></i>Buscar Proyecto o Alumno</label>
               <div class="input-group shadow-sm">
@@ -257,6 +258,13 @@
               el.style.backgroundColor = color;
           }
       });
+      // Clear all modal forms when they are closed
+      document.querySelectorAll('.modal').forEach(modal => {
+          modal.addEventListener('hidden.bs.modal', function() {
+              const form = this.querySelector('form');
+              if (form) form.reset();
+          });
+      });
   });
 </script>
 <!-- Modal Nueva Asignatura -->
@@ -267,10 +275,7 @@
         {% csrf_token %}
         <input type="hidden" name="action" value="create_subject">
         <div class="modal-header border-0 bg-primary text-white py-4 px-4 position-relative overflow-hidden">
-          <div class="position-absolute top-0 end-0 p-5 opacity-10">
-            <i class="fas fa-university fa-10x"></i>
-          </div>
-          <div class="d-flex align-items-center position-relative">
+          <div class="d-flex align-items-center position-relative mt-2 ps-2">
             <div class="rounded-circle p-3 me-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px;">
               <i class="fas fa-graduation-cap fa-lg text-white"></i>
             </div>
@@ -279,7 +284,9 @@
               <p class="text-white-50 small mb-0">Configura un nuevo curso docente en la plataforma.</p>
             </div>
           </div>
-          <button type="button" class="btn-close btn-close-white shadow-none" data-bs-dismiss="modal" aria-label="X"></button>
+          <button type="button" class="bg-transparent border-0 text-white shadow-none" data-bs-dismiss="modal" data-dismiss="modal" aria-label="Cerrar" style="position: absolute; top: 1.5rem; right: 1.5rem; z-index: 10; cursor: pointer;">
+            <i class="fas fa-times fa-lg"></i>
+          </button>
         </div>
         <div class="modal-body p-4 bg-light bg-opacity-50">
           <div class="row g-4">
@@ -326,20 +333,19 @@
                   </div>
                 </div>
                 <div class="mb-0">
-                  <label class="form-label fw-semibold small">Logo</label>
-                  <div id="new-subject-logo-preview" class="mb-3 p-3 border-2 border-dashed rounded-4 text-center bg-light position-relative">
-                    <div id="new-sub-display" class="mx-auto bg-white rounded-3 shadow-sm border overflow-hidden d-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
-                      <i class="fas fa-cloud-upload-alt fa-2x opacity-20"></i>
-                    </div>
+                  <div class="custom-file-premium">
+                    <label for="new-subject-logo-input" class="btn btn-outline-primary rounded-pill w-100 shadow-sm py-2 px-3 d-flex align-items-center justify-content-center transition-all mt-2">
+                      <i class="fas fa-image me-2"></i>Elegir logo...
+                    </label>
+                    <input type="file" name="logo" id="new-subject-logo-input" class="d-none" accept="image/*" onchange="previewNewSubjectLogo(this)">
+                    <div id="new-file-name-display" class="text-center small text-muted mt-2 opacity-75 fw-medium">No se ha seleccionado archivo</div>
                   </div>
-                  <input type="file" name="logo" id="new-subject-logo-input" class="form-control form-control-sm rounded-pill shadow-sm" accept="image/*" onchange="previewNewSubjectLogo(this)">
                 </div>
               </div>
             </div>
           </div>
         </div>
-        <div class="modal-footer border-0 p-4 bg-white justify-content-between">
-          <button type="button" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm" data-bs-dismiss="modal">Cancelar</button>
+        <div class="modal-footer border-0 p-4 bg-white justify-content-end">
           <button type="submit" class="btn btn-primary rounded-pill px-5 py-2 fw-bold shadow-sm">
             <i class="fas fa-plus-circle me-2"></i>Crear Asignatura
           </button>
@@ -351,12 +357,17 @@
 
 <script>
   function previewNewSubjectLogo(input) {
+    const fileNameDisplay = document.getElementById('new-file-name-display');
     if (input.files && input.files[0]) {
+      const fileName = input.files[0].name;
+      if (fileNameDisplay) fileNameDisplay.innerText = fileName;
       const reader = new FileReader();
       reader.onload = function(e) {
         document.getElementById('new-sub-display').innerHTML = `<img src="${e.target.result}" class="w-100 h-100 object-fit-cover">`;
       };
       reader.readAsDataURL(input.files[0]);
+    } else {
+      if (fileNameDisplay) fileNameDisplay.innerText = "No se ha seleccionado archivo";
     }
   }
 </script>

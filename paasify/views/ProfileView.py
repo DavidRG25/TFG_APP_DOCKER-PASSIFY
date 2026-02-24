@@ -57,6 +57,32 @@ def profile_view(request):
     display_student = is_student and not is_teacher and not is_admin
     display_teacher = is_teacher and not is_admin
     
+    # Estadísticas para el perfil
+    from containers.models import Service
+    from paasify.models.ProjectModel import UserProject
+    
+    if is_admin:
+        stats = {
+            'projects': UserProject.objects.count(),
+            'services': Service.objects.exclude(status='removed').count(),
+            'subjects': Subject.objects.count()
+        }
+    elif is_teacher:
+        # Alumnos únicos en las asignaturas del profesor
+        from django.contrib.auth.models import User
+        unique_students_count = User.objects.filter(subjects_as_student__in=subjects_as_teacher).distinct().count()
+        stats = {
+            'students': unique_students_count,
+            'projects': UserProject.objects.filter(subject__teacher_user=user).count(),
+            'subjects': Subject.objects.filter(teacher_user=user).count()
+        }
+    else:
+        stats = {
+            'projects': UserProject.objects.filter(user_profile__user=user).count(),
+            'services': Service.objects.filter(owner=user).exclude(status='removed').count(),
+            'subjects': Subject.objects.filter(students=user).count()
+        }
+
     context = {
         'user': user,
         'profile': profile,
@@ -65,6 +91,8 @@ def profile_view(request):
         'subjects_as_teacher': subjects_as_teacher,
         'is_student': display_student,
         'is_teacher': display_teacher,
+        'is_admin': is_admin,
+        'stats': stats,
     }
     
     return render(request, 'profile.html', context)
@@ -196,3 +224,37 @@ def copy_token_view(request):
             }, status=404)
     
     return JsonResponse({'success': False, 'error': 'Metodo no permitido'}, status=405)
+
+
+@login_required
+def update_profile_view(request):
+    """
+    Actualiza los datos básicos del perfil (Email y Nombre Completo).
+    """
+    if request.method == 'POST':
+        user = request.user
+        email = request.POST.get('email')
+        full_name = request.POST.get('full_name')
+        
+        # 1. Validar email (si cambia)
+        if email and email != user.email:
+            from django.contrib.auth.models import User
+            if User.objects.filter(email=email).exclude(pk=user.pk).exists():
+                messages.error(request, 'Este correo electrónico ya está en uso por otra cuenta.')
+                return redirect('profile')
+            user.email = email
+            user.save()
+            
+        # 2. Validar nombre completo en UserProfile
+        if full_name:
+            try:
+                profile = user.user_profile
+                profile.nombre = full_name
+                profile.save()
+            except UserProfile.DoesNotExist:
+                # Si por alguna razón no tiene perfil, lo creamos
+                UserProfile.objects.create(user=user, nombre=full_name)
+                
+        messages.success(request, 'Tus datos de perfil han sido actualizados.')
+        
+    return redirect('profile')

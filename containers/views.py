@@ -952,7 +952,10 @@ def student_subjects(request):
 
 @login_required
 def student_services_in_subject(request, subject_id):
-    subject = get_object_or_404(Subject, pk=subject_id)
+    try:
+        subject = Subject.objects.get(pk=subject_id)
+    except Subject.DoesNotExist:
+        return render(request, "errors/subject_not_found.html", status=404)
 
     # Si es profesor y entra aqui, lo mandamos a su dashboard salvo que sea superusuario
     if user_is_teacher(request.user) and not request.user.is_superuser:
@@ -1049,7 +1052,22 @@ def service_table(request):
         
     ordering = request.GET.get("ordering")
     if ordering:
-        qs = qs.order_by(ordering)
+        # Mapeo de campos válidos para evitar errores o inyecciones
+        sort_map = {
+            'name': 'name', '-name': '-name',
+            'image': 'image', '-image': '-image',
+            'status': 'status', '-status': '-status',
+            'project': 'project__place', '-project': '-project__place',
+            'subject': 'subject__name', '-subject': '-subject__name',
+            'owner': 'owner__username', '-owner': '-owner__username',
+        }
+        order_field = sort_map.get(ordering)
+        if order_field:
+            qs = qs.order_by(order_field)
+        else:
+            qs = qs.order_by("-id")
+    else:
+        qs = qs.order_by("-id")
 
     # Sincronizar estados con Docker antes de renderizar
     for s in qs:
@@ -1249,7 +1267,20 @@ def professor_dashboard(request):
     if sub_id:
         projects_qs = projects_qs.filter(subject_id=sub_id)
 
-    projects = projects_qs.select_related("subject", "user_profile").order_by("-id")
+    # Ordenación dinámica
+    sort_by = request.GET.get('sort', '-date')  # Por defecto fecha desc
+    sort_map = {
+        'project': 'place',
+        '-project': '-place',
+        'student': 'user_profile__nombre',
+        '-student': '-user_profile__nombre',
+        'subject': 'subject__name',
+        '-subject': '-subject__name',
+        'date': 'date',
+        '-date': '-date',
+    }
+    order_field = sort_map.get(sort_by, '-date')
+    projects = projects_qs.select_related("subject", "user_profile").order_by(order_field, "-time")
 
     # Estadísticas para el profesor
     total_students = subjects.values('students').distinct().count()
@@ -1280,7 +1311,10 @@ def professor_subject_detail(request, subject_id):
         return HttpResponse("No tienes permiso para acceder a esta pagina.", status=403)
 
     base_qs = Subject.objects.all() if request.user.is_superuser else Subject.objects.filter(teacher_user=request.user)
-    subject = get_object_or_404(base_qs.select_related("teacher_user"), pk=subject_id)
+    try:
+        subject = base_qs.select_related("teacher_user").get(pk=subject_id)
+    except Subject.DoesNotExist:
+        return render(request, "errors/subject_not_found.html", status=404)
 
     if request.method == "POST":
         action = request.POST.get("action")
@@ -1336,6 +1370,15 @@ def professor_subject_detail(request, subject_id):
                     messages.success(request, f"Alumno '{student_user.username}' matriculado con éxito.")
                 except Exception as e:
                     messages.error(request, f"Error matriculando al alumno: {str(e)}")
+        elif action == "remove_project":
+            project_id = request.POST.get("project_id")
+            if project_id:
+                try:
+                    p = UserProject.objects.get(pk=project_id)
+                    p.delete()
+                    messages.success(request, "Proyecto eliminado con éxito.")
+                except Exception as e:
+                    messages.error(request, f"Error eliminando el proyecto: {str(e)}")
         elif action == "remove_student":
             student_id = request.POST.get("student_id")
             if student_id:
@@ -1401,9 +1444,15 @@ def professor_subject_detail(request, subject_id):
                 except Exception as e:
                     messages.error(request, f"Error modificando al alumno: {str(e)}")
         elif action == "edit_subject":
+            name = request.POST.get("name")
+            category = request.POST.get("category")
+            genero = request.POST.get("genero")
             color = request.POST.get("color")
-            if color:
-                subject.color = color
+            
+            if name: subject.name = name
+            if category: subject.category = category
+            if genero: subject.genero = genero
+            if color: subject.color = color
             
             # Quitar logo si se solicita
             if request.POST.get("remove_logo") == "true":
@@ -1418,10 +1467,15 @@ def professor_subject_detail(request, subject_id):
 
         return redirect("professor_subject_detail", subject_id=subject.id)
 
-    students = subject.students.all().order_by("username")
+    # Ordenación de estudiantes
+    sort_st = request.GET.get("sort_students", "name")
+    if sort_st == "-name":
+        students = subject.students.all().order_by("-first_name", "-last_name", "-username")
+    else:
+        students = subject.students.all().order_by("first_name", "last_name", "username")
     
     User = get_user_model()
-    # Alumnos disponibles: rol de alumno, NO rol de profesor, no superusuarios y que no estén ya en la asignatura
+    # Alumnos disponibles ... (omitting for brevity as it remains same)
     available_students = User.objects.filter(
         is_superuser=False, 
         groups__name__in=STUDENT_GROUP_NAMES
@@ -1429,7 +1483,7 @@ def professor_subject_detail(request, subject_id):
         groups__name__in=TEACHER_GROUP_NAMES
     ).exclude(
         id__in=subject.students.values_list("id", flat=True)
-    ).distinct().order_by("username")
+    ).distinct().order_by("first_name", "last_name", "username")
     
     services = (
         Service.objects.filter(subject=subject)
@@ -1437,7 +1491,13 @@ def professor_subject_detail(request, subject_id):
         .exclude(status="removed")
         .order_by("owner__username", "name")
     )
-    projects = subject.projects.select_related("user_profile")
+
+    # Ordenación de proyectos
+    sort_prj = request.GET.get("sort_projects", "name")
+    if sort_prj == "-name":
+        projects = subject.projects.select_related("user_profile").order_by("-place")
+    else:
+        projects = subject.projects.select_related("user_profile").order_by("place")
     host = request.get_host().split(":")[0]
 
     return render(
@@ -1749,6 +1809,7 @@ def new_service_page(request):
                 selected_subject_id = int(match.group(1))
                 try:
                     current_subject = Subject.objects.get(pk=selected_subject_id)
+                    user_projects = user_projects.filter(subject=current_subject)
                 except Subject.DoesNotExist:
                     pass
         else:
@@ -1762,6 +1823,7 @@ def new_service_page(request):
             selected_subject_id = int(match.group(1))
             try:
                 current_subject = Subject.objects.get(pk=selected_subject_id)
+                user_projects = user_projects.filter(subject=current_subject)
             except Subject.DoesNotExist:
                 pass
     
@@ -1933,7 +1995,7 @@ def api_command_generator_view(request):
         elif 'subjects/' in referer:
             return_url = referer
         else:
-            return_url = reverse('professor_dashboard' if user_is_teacher(user) else 'containers:student_panel')
+            return_url = reverse('professor_dashboard' if user_is_teacher(request.user) else 'containers:student_panel')
     
     if return_url and 'subjects/' in return_url:
         import re
@@ -2092,3 +2154,25 @@ def logs_page(request, pk):
         "containers": containers,
         "selected_container": selected_container,
     })
+
+
+from django.http import JsonResponse
+from django.contrib.auth import get_user_model
+from paasify.models.ProjectModel import UserProject
+
+def validate_username(request):
+    username = request.GET.get('username', '')
+    User = get_user_model()
+    exists = User.objects.filter(username__iexact=username).exists()
+    return JsonResponse({'exists': exists})
+
+def validate_email(request):
+    email = request.GET.get('email', '')
+    User = get_user_model()
+    exists = User.objects.filter(email__iexact=email).exists()
+    return JsonResponse({'exists': exists})
+
+def validate_project_name(request):
+    name = request.GET.get('name', '')
+    exists = UserProject.objects.filter(place__iexact=name).exists()
+    return JsonResponse({'exists': exists})
