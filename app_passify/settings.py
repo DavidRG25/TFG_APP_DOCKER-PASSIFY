@@ -238,7 +238,7 @@ JAZZMIN_SETTINGS = {
     "site_icon": None,
     "welcome_sign": "Centro de Control PaaSify",
     "copyright": "PaaSify Education Platform",
-    "search_model": ["auth.User", "paasify.Subject", "paasify.Service"],
+    "search_model": ["auth.User", "paasify.Subject", "containers.Service"],
     "user_avatar": None,
     "topmenu_links": [
         {"name": "Volver a PaaSify", "url": "index", "permissions": ["auth.view_user"]},
@@ -256,8 +256,8 @@ JAZZMIN_SETTINGS = {
         "paasify.UserProfile": "fas fa-id-card",
         "paasify.TeacherProfile": "fas fa-chalkboard-teacher",
         "paasify.TokenModel": "fas fa-key",
+        "paasify.UserProject": "fas fa-folder-open",
         "containers.Service": "fas fa-server",
-        "containers.UserProject": "fas fa-folder-open",
         "containers.AllowedImage": "fas fa-box-open",
     },
     "default_icon_parents": "fas fa-chevron-circle-right",

@@ -61,6 +61,7 @@ urlpatterns = [
 
     # Perfil de usuario
     path('profile/', ProfileView.profile_view, name='profile'),
+    path('profile/update/', ProfileView.update_profile_view, name='update_profile'),
     path('profile/change-password/', ProfileView.change_password_view, name='change_password'),
     path('profile/generate-token/', ProfileView.generate_token_view, name='generate_token'),
     path('profile/refresh-token/', ProfileView.refresh_token_view, name='refresh_token'),

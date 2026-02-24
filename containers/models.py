@@ -83,7 +83,7 @@ class Service(models.Model):
         "paasify.Subject",
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         related_name="services",
         verbose_name="Asignatura",
     )
@@ -91,7 +91,7 @@ class Service(models.Model):
         "paasify.UserProject",
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         related_name="services",
         verbose_name="Proyecto",
     )
@@ -232,19 +232,22 @@ class AllowedImage(models.Model):
 
 
 # ==================== SIGNALS PARA LIMPIEZA AUTOMÁTICA ====================
-from django.db.models.signals import post_delete
+from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 import shutil
 from pathlib import Path
 
-@receiver(post_delete, sender=Service)
+@receiver(pre_delete, sender=Service)
 def auto_cleanup_service_files(sender, instance, **kwargs):
     """
     Limpia todos los rastro físicos de un servicio al borrarlo de la BD.
     Ahora centralizado en una única carpeta por servicio.
     """
     try:
-        from .services import cleanup_service_workspace
+        from .services import cleanup_service_workspace, stop_container, remove_container
+        stop_container(instance)
+        remove_container(instance)
         cleanup_service_workspace(instance)
-    except Exception:
+    except Exception as e:
+        print(f"ERROR durante la limpieza del servicio {instance.name}: {e}")
         pass

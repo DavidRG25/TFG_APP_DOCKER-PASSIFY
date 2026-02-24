@@ -22,7 +22,7 @@ class UserProject(models.Model):
     )
     subject = models.ForeignKey(
         to=Subject,
-        on_delete=models.DO_NOTHING,
+        on_delete=models.CASCADE,
         verbose_name="Asignatura Asociada",
         related_name="projects",
     )
