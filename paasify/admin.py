@@ -543,11 +543,23 @@ class UserProfileAdmin(admin.ModelAdmin):
             return self.fieldsets
 
     def get_queryset(self, request):
+        """Filtrar solo perfiles con usuarios Student, excluyendo explícitamente a los profesores."""
+        from django.db.models import Q
         qs = super().get_queryset(request)
+        
+        # Filtro positivo: debe estar en algún grupo de alumnos
+        student_filter = Q()
+        for group_name in [DEFAULT_STUDENT_GROUP] + list(STUDENT_GROUP_NAMES):
+            student_filter |= Q(user__groups__name__iexact=group_name)
+            
+        # Filtro negativo: NO debe estar en ningún grupo de profesores
+        teacher_filter = Q()
+        for group_name in [DEFAULT_TEACHER_GROUP] + list(TEACHER_GROUP_NAMES):
+            teacher_filter |= Q(user__groups__name__iexact=group_name)
+            
         return qs.filter(
-            user__isnull=False,
-            user__groups__name__in=[DEFAULT_STUDENT_GROUP, *STUDENT_GROUP_NAMES],
-        ).distinct()
+            user__isnull=False
+        ).filter(student_filter).exclude(teacher_filter).distinct()
     
     def get_role(self, obj):
         """Muestra el rol del usuario con badge de color"""

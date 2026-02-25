@@ -37,3 +37,4 @@ media/
 # === IA ===
 prompts/
 user_code/
+ignored_scripts/

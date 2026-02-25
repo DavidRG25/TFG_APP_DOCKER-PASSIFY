@@ -3,10 +3,30 @@
     <table class="table table-hover align-middle mb-0">
       <thead style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
         <tr class="text-white small text-uppercase">
-          <th class="py-3 ps-4">Nombre del Proyecto</th>
-          <th class="py-3">Estudiante</th>
-          <th class="py-3">Asignatura</th>
-          <th class="py-3">Fecha Registro</th>
+          <th class="py-3 ps-4" style="cursor: pointer;" 
+              hx-get="{% url 'professor_dashboard' %}?sort={% if request.GET.sort == 'project' %}-project{% else %}project{% endif %}&q={{ request.GET.q }}&subject={{ request.GET.subject }}" 
+              hx-target="#project-table-container">
+            Nombre del Proyecto 
+            {% if request.GET.sort == 'project' %}<i class="fas fa-sort-alpha-down ms-1"></i>{% elif request.GET.sort == '-project' %}<i class="fas fa-sort-alpha-up ms-1"></i>{% else %}<i class="fas fa-sort ms-1 opacity-50"></i>{% endif %}
+          </th>
+          <th class="py-3" style="cursor: pointer;"
+              hx-get="{% url 'professor_dashboard' %}?sort={% if request.GET.sort == 'student' %}-student{% else %}student{% endif %}&q={{ request.GET.q }}&subject={{ request.GET.subject }}" 
+              hx-target="#project-table-container">
+            Estudiante
+            {% if request.GET.sort == 'student' %}<i class="fas fa-sort-alpha-down ms-1"></i>{% elif request.GET.sort == '-student' %}<i class="fas fa-sort-alpha-up ms-1"></i>{% else %}<i class="fas fa-sort ms-1 opacity-50"></i>{% endif %}
+          </th>
+          <th class="py-3" style="cursor: pointer;"
+              hx-get="{% url 'professor_dashboard' %}?sort={% if request.GET.sort == 'subject' %}-subject{% else %}subject{% endif %}&q={{ request.GET.q }}&subject={{ request.GET.subject }}" 
+              hx-target="#project-table-container">
+            Asignatura
+            {% if request.GET.sort == 'subject' %}<i class="fas fa-sort-alpha-down ms-1"></i>{% elif request.GET.sort == '-subject' %}<i class="fas fa-sort-alpha-up ms-1"></i>{% else %}<i class="fas fa-sort ms-1 opacity-50"></i>{% endif %}
+          </th>
+          <th class="py-3" style="cursor: pointer;"
+              hx-get="{% url 'professor_dashboard' %}?sort={% if request.GET.sort == 'date' %}-date{% else %}date{% endif %}&q={{ request.GET.q }}&subject={{ request.GET.subject }}" 
+              hx-target="#project-table-container">
+            Fecha Registro
+            {% if request.GET.sort == 'date' %}<i class="fas fa-sort-numeric-down ms-1"></i>{% elif request.GET.sort == '-date' %}<i class="fas fa-sort-numeric-up ms-1"></i>{% else %}<i class="fas fa-sort ms-1 opacity-50"></i>{% endif %}
+          </th>
           <th class="py-3 pe-4 text-end">Acciones</th>
         </tr>
       </thead>

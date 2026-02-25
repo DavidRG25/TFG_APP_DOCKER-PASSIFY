@@ -43,6 +43,7 @@ En servicios desplegados desde DockerHub (`mode: "dockerhub"`):
 #### ✅ Campos Modificables:
 
 - `name` - Nombre del servicio
+- `image` - **Imagen de DockerHub** (ej: `nginx:latest`). Al cambiarla, el sistema recreará el contenedor.
 - `internal_port` - Puerto interno del contenedor
 - `env_vars` - Variables de entorno (JSON)
 - `container_type` - Tipo (`web`, `api`, `database`, `misc`)
@@ -51,8 +52,6 @@ En servicios desplegados desde DockerHub (`mode: "dockerhub"`):
 
 #### ❌ Campos NO Modificables:
 
-- `image` - **La imagen NO se puede cambiar** en modo DockerHub
-  - Para cambiar la imagen, debes crear un nuevo servicio
 - `dockerfile` - No aplica en este modo
 - `compose` - No aplica en este modo
 - `code` - No aplica en este modo
@@ -147,7 +146,7 @@ curl -X PATCH "{{ PAASIFY_API_URL }}/containers/123/" \
 | Campo            | DockerHub | Custom (Dockerfile) | Custom (Compose)  |
 | ---------------- | --------- | ------------------- | ----------------- |
 | `name`           | ✅        | ✅                  | ✅                |
-| `image`          | ❌        | ❌                  | ❌                |
+| `image`          | ✅        | ❌                  | ❌                |
 | `internal_port`  | ✅        | ✅                  | ❌ (en compose)   |
 | `env_vars`       | ✅        | ✅                  | ✅                |
 | `container_type` | ✅        | ✅                  | ✅ (por servicio) |
@@ -234,7 +233,7 @@ curl -X PATCH "{{ PAASIFY_API_URL }}/containers/123/" \
 <details class="api-errors">
 <summary>Códigos de error de este endpoint</summary>
 <div class="api-error-content">
-    <strong>400 Bad Request:</strong> Datos inválidos, campos no modificables, o intentas modificar la imagen en modo DockerHub.<br>
+    <strong>400 Bad Request:</strong> Datos inválidos o campos no modificables.<br>
     <strong>401 Unauthorized:</strong> Token de autenticación inválido o ausente.<br>
     <strong>403 Forbidden:</strong> Intentas modificar un servicio del catálogo oficial o no eres el propietario.<br>
     <strong>404 Not Found:</strong> El servicio con ese ID no existe.<br>
@@ -247,16 +246,6 @@ curl -X PATCH "{{ PAASIFY_API_URL }}/containers/123/" \
 ```json
 {
   "detail": "Los servicios del catálogo oficial no se pueden editar."
-}
-```
-
-### Ejemplo de Error: Intentar Cambiar Imagen en DockerHub
-
-```json
-{
-  "image": [
-    "La imagen no se puede modificar en servicios DockerHub. Crea un nuevo servicio si necesitas cambiar la imagen."
-  ]
 }
 ```
 
@@ -277,7 +266,7 @@ curl -X PATCH "{{ PAASIFY_API_URL }}/containers/123/" \
 3. 📊 **Verifica el estado** - Usa `GET /api/containers/{id}/` para confirmar que el servicio está `running`
 4. 💾 **Haz backup** - Si subes nuevos archivos, guarda los anteriores por si necesitas revertir
 5. 🧪 **Prueba en desarrollo** - Valida los cambios antes de aplicarlos en producción
-6. 🚫 **No intentes cambiar la imagen en DockerHub** - Crea un nuevo servicio en su lugar
+6. 🐳 **Actualización de imagen** - En modo DockerHub, cambiar `image` fuerza un despliegue de la nueva versión.
 7. 📦 **En Compose, edita el YAML** - Para cambiar puertos o servicios, actualiza el `docker-compose.yml`
 
 ---

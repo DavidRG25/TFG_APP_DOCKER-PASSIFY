@@ -10,14 +10,14 @@ Endpoint para desplegar servicios en PaaSify. Soporta tres modos principales de 
 
 Campos disponibles en **todos** los modos de despliegue:
 
-| Campo              | Tipo   | Obligatorio | Descripción                                                                          |
-| :----------------- | :----- | :---------- | :----------------------------------------------------------------------------------- |
-| **name**           | string | ✅ **Sí**   | Nombre del servicio (slug: minúsculas, números y guiones).                           |
-| **project**        | int    | ✅ **Sí**   | ID del proyecto.                                                                     |
-| **subject**        | int    | ✅ **Sí**   | ID de la asignatura.                                                                 |
-| **container_type** | string | ⭕ No       | Clasificación del servicio. Valores: `web` (default), `api`, `database`, `misc`.     |
-| **is_web**         | bool   | ⭕ No       | `true` (default) o `false`. Si es `true`, aparece el botón "Acceder" en la interfaz. |
-| **keep_volumes**   | bool   | ⭕ No       | `true` (default) o `false`. Conserva los datos en futuras recargas si hay volúmenes. |
+| Campo              | Tipo   | Obligatorio | Descripción                                                                                                                             |
+| :----------------- | :----- | :---------- | :-------------------------------------------------------------------------------------------------------------------------------------- |
+| **name**           | string | ✅ **Sí**   | Nombre del servicio. **Tolerante a fallos humanos**: Convierte espacios y caracteres no válidos a formato `snake_case` automáticamente. |
+| **project**        | int    | ✅ **Sí**   | ID del proyecto.                                                                                                                        |
+| **subject**        | int    | ✅ **Sí**   | ID de la asignatura.                                                                                                                    |
+| **container_type** | string | ⭕ No       | Clasificación del servicio. Valores: `web` (default), `api`, `database`, `misc`.                                                        |
+| **is_web**         | bool   | ⭕ No       | `true` (default) o `false`. Si es `true`, aparece el botón "Acceder" en la interfaz.                                                    |
+| **keep_volumes**   | bool   | ⭕ No       | `true` (default) o `false`. Conserva los datos en futuras recargas si hay volúmenes.                                                    |
 
 > 💡 **Nota sobre Tipos:**
 >
@@ -36,12 +36,12 @@ Despliega una imagen pre-aprobada del catálogo oficial de PaaSify.
 
 #### Parámetros Específicos:
 
-| Campo              | Valor              | Descripción                                  |
-| :----------------- | :----------------- | :------------------------------------------- |
-| **mode**           | `default`          | (Opcional, es el valor por defecto).         |
-| **image**          | ej: `nginx:latest` | Nombre exacto de la imagen en el catálogo.   |
-| **container_type** | string             | `web`, `api`, `database`, `misc` (opcional). |
-| **is_web**         | bool               | `true` o `false` (opcional).                 |
+| Campo              | Tipo   | Valor                            | Descripción                                                                                                                     |
+| :----------------- | :----- | :------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
+| **mode**           | string | `default`                        | (Opcional, es el valor por defecto).                                                                                            |
+| **image**          | string |                                  | Nombre de la imagen del catálogo (ej: `wordpress:latest`). Accede a la documentación técnica para ver las imágenes disponibles. |
+| **container_type** | string | `web`, `api`, `database`, `misc` | (Opcional).                                                                                                                     |
+| **is_web**         | bool   | `true` o `false`                 | (Opcional).                                                                                                                     |
 
 #### 📝 Ejemplo cURL:
 
