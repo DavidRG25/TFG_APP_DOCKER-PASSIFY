@@ -13,6 +13,16 @@ from django.conf.urls.static import static
 from containers.views import ServiceViewSet, AllowedImageViewSet, SubjectViewSet, ProjectViewSet
 from containers import views as container_views
 from paasify.views import ProfileView
+from django.contrib.auth import logout
+from django.shortcuts import redirect
+
+def custom_admin_logout(request):
+    """Solución para Django 5.1 donde no se permite GET en logout.
+    Especialmente necesario porque django-jazzmin envía un simple GET en el enlace Navbar"""
+    if request.user.is_authenticated:
+        logout(request)
+    return redirect('paasify:login')
+
 
 from django.conf.urls import handler404, handler500, handler403
 
@@ -20,9 +30,8 @@ handler404 = 'paasify.views.ErrorViews.handler404'
 handler500 = 'paasify.views.ErrorViews.handler500'
 handler403 = 'paasify.views.ErrorViews.handler403'
 
-# Django REST framework & JWT
+# Django REST framework
 from rest_framework import routers
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 # Router de la API REST
@@ -51,18 +60,18 @@ urlpatterns = [
 
     # Perfil de usuario
     path('profile/', ProfileView.profile_view, name='profile'),
+    path('profile/update/', ProfileView.update_profile_view, name='update_profile'),
     path('profile/change-password/', ProfileView.change_password_view, name='change_password'),
     path('profile/generate-token/', ProfileView.generate_token_view, name='generate_token'),
     path('profile/refresh-token/', ProfileView.refresh_token_view, name='refresh_token'),
     path('profile/copy-token/', ProfileView.copy_token_view, name='copy_token'),
 
-    # Admin
+    # Admin Logout workaround para Django 5.1 (GET no permitido por defecto)
+    path('admin/logout/', custom_admin_logout, name='custom_admin_logout'),
     path('admin/', admin.site.urls),
 
     # API REST
     path('api/', include(router.urls)),
-    path('api/token/',         TokenObtainPairView.as_view(), name='token_obtain'),
-    path('api/token/refresh/', TokenRefreshView.as_view(),   name='token_refresh'),
     
     # Silenciar peticiones de navegador (Chrome DevTools / SourceMaps)
     path('.well-known/appspecific/com.chrome.devtools.json', lambda r: HttpResponse(status=204)),

@@ -45,6 +45,9 @@ CSRF_TRUSTED_ORIGINS = [
 # Apps
 # ---------------------------------------------------------------------
 INSTALLED_APPS = [
+    # Jazzmin Admin UI
+    'jazzmin',
+
     # Django
     'django.contrib.admin',
     'django.contrib.auth',
@@ -61,7 +64,6 @@ INSTALLED_APPS = [
     # Terceros
     'colorfield',
     'rest_framework',
-    'rest_framework_simplejwt',
     # 'rest_framework.authtoken',  # DESHABILITADO: Ahora usamos ExpiringToken (paasify.models.TokenModel)
     'drf_spectacular',
     'channels',
@@ -80,6 +82,7 @@ MIDDLEWARE = [
     'paasify.middleware.TokenAuthMiddleware',  # <â€” Token JWT para API
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'paasify.middleware.must_change_password.ForcePasswordChangeMiddleware',
 ]
 
 # ---------------------------------------------------------------------
@@ -209,7 +212,6 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
 
@@ -221,13 +223,89 @@ LOGIN_REDIRECT_URL = '/post-login/'
 LOGOUT_REDIRECT_URL = '/paasify/login/'
 
 # ---------------------------------------------------------------------
-# Jazzmin (si lo usas)
+# Jazzmin (Django Admin Premium UI)
 # ---------------------------------------------------------------------
 JAZZMIN_SETTINGS = {
-    "welcome_sign": "Bienvenido"
+    "site_title": "PaaSify Admin",
+    "site_header": "PaaSify Administrador",
+    "site_brand": "☁️ PaaSify Admin",
+    "site_logo": None,
+    "login_logo": None,
+    "login_logo_dark": None,
+    "site_logo_classes": "img-fluid",
+    "site_icon": None,
+    "welcome_sign": "Centro de Control PaaSify",
+    "copyright": "PaaSify Education Platform",
+    "search_model": ["auth.User", "paasify.Subject", "containers.Service"],
+    "user_avatar": None,
+    "topmenu_links": [
+        {"name": "Volver a PaaSify", "url": "index", "permissions": ["auth.view_user"]},
+    ],
+    "show_sidebar": True,
+    "navigation_expanded": True,
+    "hide_apps": [],
+    "hide_models": [],
+    "order_with_respect_to": ["auth", "paasify", "containers"],
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "auth.user": "fas fa-user",
+        "auth.Group": "fas fa-users",
+        "paasify.Subject": "fas fa-book",
+        "paasify.UserProfile": "fas fa-id-card",
+        "paasify.TeacherProfile": "fas fa-chalkboard-teacher",
+        "paasify.TokenModel": "fas fa-key",
+        "paasify.UserProject": "fas fa-folder-open",
+        "containers.Service": "fas fa-server",
+        "containers.AllowedImage": "fas fa-box-open",
+    },
+    "default_icon_parents": "fas fa-chevron-circle-right",
+    "default_icon_children": "fas fa-circle",
+    "related_modal_active": False,
+    "custom_css": "admin/css/custom_admin.css",
+    "custom_js": None,
+    "use_google_fonts_cdn": True,
+    "show_ui_builder": False,
+    "changeform_format": "horizontal_tabs",
+    "changeform_format_overrides": {"auth.user": "collapsible", "auth.group": "vertical_tabs"},
+    "language_chooser": False,
 }
+
+# Configuración extendida de Jazzmin: activar autocompletado en filtros sin botón "Buscar"
+JAZZMIN_SETTINGS["show_ui_builder"] = False
+JAZZMIN_SETTINGS["changeform_format"] = "single"
+JAZZMIN_SETTINGS["hide_apps"] = []
+JAZZMIN_SETTINGS["hide_models"] = []
+
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text": False,
+    "footer_small_text": False,
+    "body_small_text": False,
+    "brand_small_text": False,
+    "brand_colour": "navbar-white",
+    "accent": "accent-primary",
+    "navbar": "navbar-white navbar-light",
+    "no_navbar_border": False,
+    "navbar_fixed": True,
+    "layout_boxed": False,
+    "footer_fixed": False,
+    "sidebar_fixed": True,
+    "sidebar": "sidebar-light-primary",
+    "sidebar_nav_small_text": False,
+    "sidebar_disable_expand": False,
+    "sidebar_nav_child_indent": True,
+    "sidebar_nav_compact_style": False,
+    "sidebar_nav_legacy_style": False,
+    "sidebar_nav_flat_style": True,
+    "theme": "lumen",
+    "dark_mode_theme": None,
+    "button_classes": {
+        "primary": "btn-primary",
+        "secondary": "btn-secondary",
+        "info": "btn-info",
+        "warning": "btn-warning",
+        "danger": "btn-danger",
+        "success": "btn-success"
+    }
+}
+
 APPEND_SLASH=False
-
-APPEND_SLASH = False
-
-APPEND_SLASH = False

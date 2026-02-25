@@ -171,7 +171,21 @@ Este comando crea 11 imágenes de ejemplo:
 
 Cada imagen está clasificada con su tipo correspondiente, lo que habilitará funcionalidades específicas a nivel de servicio en futuras versiones.
 
-**Nota:** Ambos comandos se ejecutan automáticamente al usar `bash scripts/start.sh`.
+#### 4.3. Crear Datos de Prueba (Asignaturas, Proyectos y Servicios)
+
+Para tener un entorno con datos realistas listos para interactuar (ideal para testear la API y la interfaz), ejecuta:
+
+```bash
+python manage.py create_test_data
+```
+
+Este script asume que los usuarios demo ya están creados y genera:
+
+- 🎓 **2 Asignaturas** ("Desarrollo Web Fullstack" y "Sistemas Cloud y Contenedores") asignadas a `profesor`.
+- 📂 **2 Proyectos** asignados a `alumno` dentro de dichas asignaturas.
+- 📦 **3 Servicios Docker** (React, API Node/Python y Postgres) en estado "creado pero detenido" (`stopped`).
+
+**Nota:** Todos los comandos de población de datos (4.1 y 4.2) se ejecutan automáticamente al usar `bash scripts/start.sh`. El script `create_test_data` se debe invocar manualmente cuando necesites volumen de pruebas.
 
 ### 5. Arranca la app
 

@@ -6,14 +6,12 @@
 {% endblock %}
 
 {% block body %}
-<div id="subject-theme-container" class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh;">
-  <script>
-    (function() {
-      const container = document.getElementById('subject-theme-container');
-      container.style.setProperty('--subject-primary', '{{ subject.color|default:"#4e73df" }}');
-      container.style.setProperty('--subject-secondary', '{{ subject.color|default:"#224abe" }}');
-    })();
-  </script>
+  <style>
+    :root {
+      --subject-primary: {{ subject.color|default:'#4e73df' }};
+      --subject-secondary: {{ subject.color|default:'#224abe' }};
+    }
+  </style>
 
   {# Breadcrumbs - Ruta encima del banner #}
   <nav aria-label="breadcrumb" class="mb-3">
@@ -38,14 +36,14 @@
         {# Botón de Volver #}
         <a href="{% url 'professor_dashboard' %}" 
            class="btn btn-light rounded-circle shadow-sm d-flex align-items-center justify-content-center" 
-           style="width: 50px; height: 50px; min-width: 50px; margin-right: 2.5rem; color: var(--subject-primary); transition: all 0.2s;"
+           style="width: 50px; height: 50px; min-width: 50px; margin-right: 1.5rem; color: var(--subject-primary); transition: all 0.2s;"
            title="Volver al panel principal">
           <i class="fas fa-arrow-left fa-lg"></i>
         </a>
 
         {# Logo de la Asignatura #}
         <div class="bg-white rounded-4 shadow-sm d-flex align-items-center justify-content-center overflow-hidden border border-white border-2" 
-             style="width: 75px; height: 75px; min-width: 75px; margin-right: 3rem;">
+             style="width: 75px; height: 75px; min-width: 75px; margin-right: 1.5rem;">
           {% if subject.logo %}
             <img src="{{ subject.logo.url }}" alt="Logo" class="w-100 h-100 object-fit-cover">
           {% else %}
@@ -111,9 +109,6 @@
                 data-bs-target="#editSubjectModal" data-target="#editSubjectModal">
           <i class="fas fa-palette"></i> Personalizar
         </button>
-        <a href="{% url 'professor_dashboard' %}" class="btn btn-panel d-flex align-items-center">
-          <i class="fas fa-th-large"></i> Volver al Panel
-        </a>
       </div>
     </div>
   </div>
@@ -122,18 +117,41 @@
     {# Alumnos #}
     <div class="col-md-6">
       <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
-          <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-user-graduate text-primary me-2"></i>Alumnos Matriculados</h6>
-          <div>
-            <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill me-2">{{ students.count }}</span>
-            <button class="btn btn-sm btn-outline-primary rounded-pill" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createStudentModal" data-target="#createStudentModal">
-              <i class="fas fa-plus me-1"></i>Nuevo
-            </button>
+        <div class="card-header bg-white pt-3 pb-2 border-0">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0 fw-bold text-dark">
+              <i class="fas fa-user-graduate text-primary me-2"></i>Alumnos Matriculados
+              <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill ms-2">{{ students.count }}</span>
+            </h6>
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-3">
+            <div class="input-group input-group-sm shadow-sm" style="max-width: 250px;">
+              <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
+              <input type="text" id="search-students" class="form-control border-start-0" placeholder="Buscar alumno..." onkeyup="filterList('list-students', this.value)">
+            </div>
+            
+            <div class="d-inline-flex border rounded-pill p-1 bg-light">
+                <a href="?sort_students=name" class="btn btn-xs rounded-pill px-2 {% if request.GET.sort_students != '-name' %}btn-primary shadow-sm{% else %}btn-light text-muted{% endif %}" title="A-Z">
+                    <i class="fas fa-sort-alpha-down"></i>
+                </a>
+                <a href="?sort_students=-name" class="btn btn-xs rounded-pill px-2 {% if request.GET.sort_students == '-name' %}btn-primary shadow-sm{% else %}btn-light text-muted{% endif %}" title="Z-A">
+                    <i class="fas fa-sort-alpha-up"></i>
+                </a>
+            </div>
+
+            <div class="ms-auto d-flex align-items-center gap-2">
+              <button class="btn btn-sm btn-outline-success rounded-pill px-3 shadow-sm hover-elevate" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#addExistingStudentModal" data-target="#addExistingStudentModal" title="Matricular Alumno Existente">
+                <i class="fas fa-link me-1"></i>Existente
+              </button>
+              <button class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm hover-elevate" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createStudentModal" data-target="#createStudentModal">
+                <i class="fas fa-plus me-1"></i>Nuevo
+              </button>
+            </div>
           </div>
         </div>
-        <div class="card-body p-0 scroll-area" style="max-height: 300px; overflow-y: auto;">
-          {% if students %}
-            <div class="list-group list-group-flush">
+        <div class="card-body p-0 scroll-area" style="max-height: 600px; overflow-y: auto;">
+{% if students %}
+            <div class="list-group list-group-flush" id="list-students">
               {% for student in students %}
                 <div class="list-group-item border-0 py-3 px-4 d-flex align-items-center justify-content-between hover-light">
                   <div class="d-flex align-items-center">
@@ -145,8 +163,16 @@
                     </div>
                   </div>
                   <div>
-                    <button class="btn btn-sm btn-light rounded-circle" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#editStudentModal{{ student.id }}" data-target="#editStudentModal{{ student.id }}" title="Editar Alumno">
+                    <button class="btn btn-sm btn-light rounded-circle me-1" 
+                            onclick="openEditStudentModal('{{ student.id }}')"
+                            title="Editar Alumno">
                       <i class="fas fa-edit text-secondary"></i>
+                    </button>
+                    <!-- Eliminación radical de la asignatura -->
+                    <button class="btn btn-sm btn-danger rounded-circle text-white shadow-sm hover-elevate" 
+                            onclick="confirmRemoveStudent('{{ student.id }}', '{{ student.username }}')"
+                            title="Desmatricular y eliminar datos">
+                      <i class="fas fa-trash-alt"></i>
                     </button>
                   </div>
                 </div>
@@ -164,30 +190,59 @@
     {# Proyectos #}
     <div class="col-md-6">
       <div class="card border-0 shadow-sm h-100">
-        <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
-          <h6 class="mb-0 fw-bold text-dark"><i class="fas fa-folder-open text-primary me-2"></i>Proyectos de la Asignatura</h6>
-          <div>
-            <span class="badge bg-primary bg-opacity-10 text-primary rounded-pill me-2">{{ projects.count }}</span>
-            <button class="btn btn-sm btn-outline-primary rounded-pill" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createProjectModal" data-target="#createProjectModal">
-              <i class="fas fa-plus me-1"></i>Nuevo
-            </button>
+        <div class="card-header bg-white pt-3 pb-2 border-0">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0 fw-bold text-dark">
+              <i class="fas fa-folder-open text-primary me-2"></i>Proyectos de la Asignatura
+              <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill ms-2">{{ projects.count }}</span>
+            </h6>
+          </div>
+          <div class="d-flex flex-wrap align-items-center gap-3">
+            <div class="input-group input-group-sm shadow-sm" style="max-width: 250px;">
+              <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
+              <input type="text" id="search-projects" class="form-control border-start-0" placeholder="Buscar proyecto..." onkeyup="filterList('list-projects', this.value)">
+            </div>
+            
+            <div class="d-inline-flex border rounded-pill p-1 bg-light">
+                <a href="?sort_projects=name" class="btn btn-xs rounded-pill px-2 {% if request.GET.sort_projects != '-name' %}btn-primary shadow-sm{% else %}btn-light text-muted{% endif %}" title="A-Z">
+                    <i class="fas fa-sort-alpha-down"></i>
+                </a>
+                <a href="?sort_projects=-name" class="btn btn-xs rounded-pill px-2 {% if request.GET.sort_projects == '-name' %}btn-primary shadow-sm{% else %}btn-light text-muted{% endif %}" title="Z-A">
+                    <i class="fas fa-sort-alpha-up"></i>
+                </a>
+            </div>
+
+            <div class="ms-auto d-flex align-items-center gap-2">
+              <button class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm hover-elevate" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createProjectModal" data-target="#createProjectModal">
+                <i class="fas fa-plus me-1"></i>Nuevo Proyecto
+              </button>
+            </div>
           </div>
         </div>
-        <div class="card-body p-0 scroll-area" style="max-height: 300px; overflow-y: auto;">
+        <div class="card-body p-0 scroll-area" style="max-height: 500px; overflow-y: auto;">
           {% if projects %}
-            <div class="list-group list-group-flush">
+            <div class="list-group list-group-flush" id="list-projects">
               {% for project in projects %}
                 <div class="list-group-item border-0 py-3 px-4 d-flex justify-content-between align-items-center hover-light">
                   <div class="d-flex align-items-center">
-                    <div class="me-3 text-info"><i class="fas fa-project-diagram fa-lg"></i></div>
+                    <div class="me-4 text-center d-flex align-items-center justify-content-center" style="width: 45px; height: 45px; min-width: 45px; border-radius: 12px; background: rgba(0,0,0,0.03); color: var(--subject-primary);">
+                      <i class="fas fa-layer-group fa-lg"></i>
+                    </div>
                     <div>
                       <div class="fw-semibold text-dark">{{ project.place }}</div>
                       <small class="text-muted">@{{ project.user_profile.user.username }}</small>
                     </div>
                   </div>
-                  <a class="btn btn-sm btn-outline-primary rounded-pill" href="{% url 'professor_project_detail' project.id %}">
-                    Detalles
-                  </a>
+                  <div class="d-flex align-items-center gap-2">
+                    <a class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm hover-elevate fw-bold" href="{% url 'professor_project_detail' project.id %}">
+                      <i class="fas fa-eye me-1"></i>Detalles
+                    </a>
+                    <button class="btn btn-sm btn-outline-danger rounded-circle shadow-sm hover-elevate" 
+                            onclick="confirmDeleteProject('{{ project.id }}', '{{ project.place|escapejs }}')"
+                            title="Eliminar Proyecto">
+                      <i class="fas fa-trash-alt"></i>
+                    </button>
+                  </div>
                 </div>
               {% endfor %}
             </div>
@@ -204,181 +259,436 @@
 </div>
 <!-- Modal Nuevo Alumno -->
 <div class="modal fade" id="createStudentModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border-0 shadow-lg rounded-4">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
       <form method="POST" action="{% url 'professor_subject_detail' subject.id %}">
         {% csrf_token %}
         <input type="hidden" name="action" value="create_student">
-        <div class="modal-header border-0 pb-0">
-          <h5 class="modal-title fw-bold"><i class="fas fa-user-plus text-primary me-2"></i>Añadir Nuevo Alumno</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-header border-0 text-white py-4 px-4 position-relative overflow-hidden" style="background-color: var(--subject-primary);">
+          <div class="d-flex align-items-center position-relative mt-2 ps-2">
+            <div class="rounded-circle p-3 me-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px;">
+              <i class="fas fa-user-plus fa-lg text-white"></i>
+            </div>
+            <div>
+              <h5 class="modal-title fw-bold mb-0">Añadir Nuevo Alumno</h5>
+              <p class="text-white-50 small mb-0">Crea una cuenta para un alumno y matricúlalo directamente.</p>
+            </div>
+          </div>
+          <button type="button" class="bg-transparent border-0 text-white shadow-none" data-bs-dismiss="modal" data-dismiss="modal" aria-label="Cerrar" style="position: absolute; top: 1.5rem; right: 1.5rem; z-index: 10; cursor: pointer;">
+            <i class="fas fa-times fa-lg"></i>
+          </button>
         </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label text-muted small fw-semibold">Nombre de Usuario</label>
-            <input type="text" name="username" class="form-control rounded-3" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label text-muted small fw-semibold">Nombre Completo</label>
-            <input type="text" name="nombre" class="form-control rounded-3" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label text-muted small fw-semibold">Correo Electrónico</label>
-            <input type="email" name="email" class="form-control rounded-3" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label text-muted small fw-semibold">Contraseña Inicial</label>
-            <input type="password" name="password" class="form-control rounded-3" required>
+        <div class="modal-body p-4 bg-light bg-opacity-50">
+          <div class="row g-4">
+            <div class="col-md-4 text-center d-none d-md-flex flex-column align-items-center justify-content-center">
+              <div class="p-4 bg-white rounded-4 shadow-sm border border-light w-100">
+                <i class="fas fa-graduation-cap fa-5x opacity-25 mb-3" style="color: var(--subject-primary);"></i>
+                <h5 class="text-dark fw-bold">Registro Directo</h5>
+                <p class="text-muted small">El alumno recibirá acceso instantáneo. Los datos se sincronizarán automáticamente.</p>
+              </div>
+            </div>
+            <div class="col-md-8">
+              <div class="bg-white p-4 rounded-4 shadow-sm border border-light">
+                <div class="row g-3">
+                  <div class="col-12">
+                    <label class="form-label text-muted small fw-bold text-uppercase">Nombre de Usuario</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="fas fa-at text-muted"></i></span>
+                      <input type="text" name="username" class="form-control bg-light border-start-0 ps-0" placeholder="Ej: alu0102" required>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label text-muted small fw-bold text-uppercase">Nombre Completo</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="fas fa-id-card text-muted"></i></span>
+                      <input type="text" name="nombre" class="form-control bg-light border-start-0 ps-0" placeholder="Ej: Juan Pérez" required>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label text-muted small fw-bold text-uppercase">Correo Electrónico</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="fas fa-envelope text-muted"></i></span>
+                      <input type="email" name="email" class="form-control bg-light border-start-0 ps-0" placeholder="juan@ejemplo.com" required>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label text-muted small fw-bold text-uppercase">Contraseña</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="fas fa-lock text-muted"></i></span>
+                      <input type="password" name="password" id="pass1" class="form-control bg-light border-start-0 ps-0" placeholder="••••••••" required>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label text-muted small fw-bold text-uppercase">Repetir</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-light border-end-0"><i class="fas fa-shield-alt text-muted"></i></span>
+                      <input type="password" name="password_confirm" id="pass2" class="form-control bg-light border-start-0 ps-0" placeholder="••••••••" required onkeyup="checkPasswordMatch()">
+                    </div>
+                  </div>
+                  <div id="password-error" class="col-12 text-danger small d-none"><i class="fas fa-exclamation-circle me-1"></i> Las contraseñas no coinciden.</div>
+                  
+                  <div class="col-12 mt-3">
+                    <div class="form-check form-switch p-3 bg-light rounded-3 border">
+                      <input class="form-check-input ms-0 me-3" type="checkbox" name="must_change_password" value="1" id="mustChangeCheck" checked>
+                      <label class="form-check-label fw-bold small text-dark" for="mustChangeCheck">
+                        <i class="fas fa-key me-1 text-primary"></i> Obligar a cambiar contraseña al inicio
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="modal-footer border-0 pt-0">
-          <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-primary rounded-pill px-4">Crear y Matricular</button>
+        <div class="modal-footer border-0 p-4 bg-white justify-content-between">
+          <button type="button" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" id="btn-submit-student" class="btn text-white rounded-pill px-5 py-2 fw-bold shadow-sm" style="background-color: var(--subject-primary);">
+            <i class="fas fa-save me-2"></i>Crear y Matricular
+          </button>
         </div>
       </form>
     </div>
   </div>
 </div>
+
+<script>
+  function checkPasswordMatch() {
+    const p1 = document.getElementById('pass1').value;
+    const p2 = document.getElementById('pass2').value;
+    const btn = document.getElementById('btn-submit-student');
+    const err = document.getElementById('password-error');
+    if (p1 && p2 && p1 !== p2) {
+      err.classList.remove('d-none');
+      btn.disabled = true;
+    } else {
+      err.classList.add('d-none');
+      btn.disabled = false;
+    }
+  }
+</script>
 
 <!-- Modal Nuevo Proyecto -->
 <div class="modal fade" id="createProjectModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border-0 shadow-lg rounded-4">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
       <form method="POST" action="{% url 'professor_subject_detail' subject.id %}">
         {% csrf_token %}
         <input type="hidden" name="action" value="create_project">
-        <div class="modal-header border-0 pb-0">
-          <h5 class="modal-title fw-bold"><i class="fas fa-folder-plus text-primary me-2"></i>Crear Nuevo Proyecto</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label class="form-label text-muted small fw-semibold">Nombre del Proyecto</label>
-            <input type="text" name="place" class="form-control rounded-3" placeholder="Ej: Práctica Final AWS" required>
+        <div class="modal-header border-0 text-white py-4 px-4 position-relative overflow-hidden" style="background-color: var(--subject-primary);">
+          <div class="d-flex align-items-center position-relative mt-2 ps-2">
+            <div class="rounded-circle p-3 me-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px;">
+              <i class="fas fa-folder-open fa-lg text-white"></i>
+            </div>
+            <div>
+              <h5 class="modal-title fw-bold mb-0">Crear Nuevo Proyecto</h5>
+              <p class="text-white-50 small mb-0">Asigna un espacio de trabajo a un alumno matriculado.</p>
+            </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label text-muted small fw-semibold">Asignar a Alumno</label>
-            <select name="student_id" class="form-select rounded-3" required>
-              <option value="" disabled selected>Seleccione un alumno matriculado...</option>
-              {% for student in students %}
-                <option value="{{ student.id }}">{{ student.get_full_name|default:student.username }}</option>
-              {% endfor %}
-            </select>
+          <button type="button" class="bg-transparent border-0 text-white shadow-none" data-bs-dismiss="modal" data-dismiss="modal" aria-label="Cerrar" style="position: absolute; top: 1.5rem; right: 1.5rem; z-index: 10; cursor: pointer;">
+            <i class="fas fa-times fa-lg"></i>
+          </button>
+        </div>
+        <div class="modal-body p-4 bg-light bg-opacity-30">
+          <div class="row g-4">
+            <div class="col-md-5">
+              <div class="p-3 bg-white rounded-4 h-100 border border-light shadow-sm">
+                <label class="form-label text-muted small fw-bold text-uppercase mb-3">1. Detalles Básicos</label>
+                <div class="mb-4">
+                  <label class="form-label fw-semibold small">Nombre del Proyecto</label>
+                  <input type="text" name="place" class="form-control border-0 bg-light shadow-sm py-2 px-3" placeholder="Ej: Práctica Final AWS" required>
+                  <small class="text-muted d-block mt-2">Usa un nombre descriptivo para identificar el trabajo del alumno.</small>
+                </div>
+                <div class="text-center mt-5 pt-3 d-none d-md-block opacity-20">
+                  <i class="fas fa-helmet-safety fa-5x" style="color: var(--subject-primary);"></i>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-7">
+              <div class="p-3">
+                <label class="form-label text-muted small fw-bold text-uppercase mb-3">2. Asignar a Alumno</label>
+                
+                <div class="input-group mb-3 shadow-sm border rounded-pill overflow-hidden bg-white">
+                  <span class="input-group-text bg-transparent border-0 text-muted ps-3"><i class="fas fa-search"></i></span>
+                  <input type="text" class="form-control border-0 py-2 ps-0" placeholder="Filtrar por nombre o usuario..." oninput="filterProjectStudents(this.value)">
+                </div>
+
+                <div class="border rounded-4 bg-white overflow-hidden shadow-sm" style="max-height: 280px; overflow-y: auto;">
+                  <div class="list-group list-group-flush" id="project-students-list">
+                    {% for student in students %}
+                      <label class="list-group-item list-group-item-action d-flex align-items-center py-3 px-4 border-0 student-selectable-item" style="cursor: pointer;">
+                        <input class="form-check-input me-3" type="radio" name="student_id" value="{{ student.id }}" required style="width: 1.2rem; height: 1.2rem; cursor: pointer;">
+                        <div class="d-flex align-items-center">
+                          <div class="avatar-xs me-3 bg-light rounded-circle d-flex align-items-center justify-content-center border" style="width: 35px; height: 35px;">
+                            <i class="fas fa-user opacity-50 small"></i>
+                          </div>
+                          <div class="student-info-box">
+                            <div class="fw-bold text-dark small student-name-searchable">{{ student.get_full_name|default:student.username }}</div>
+                            <div class="text-muted student-username-searchable" style="font-size: 0.75rem;">@{{ student.username }} · {{ student.email }}</div>
+                          </div>
+                        </div>
+                      </label>
+                    {% endfor %}
+                    <div id="no-students-found" class="p-4 text-center d-none">
+                      <i class="fas fa-user-slash fa-2x text-muted opacity-20 mb-2"></i>
+                      <p class="text-muted small mb-0 italic">No se encontraron alumnos con ese nombre.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="modal-footer border-0 pt-0">
-          <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-primary rounded-pill px-4">Crear Proyecto</button>
+        <div class="modal-footer border-0 p-4 bg-white justify-content-between">
+          <button type="button" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm" data-bs-dismiss="modal" data-dismiss="modal">Cerrar</button>
+          <button type="submit" class="btn text-white rounded-pill px-5 py-2 fw-bold shadow-sm" style="background-color: var(--subject-primary);">
+            <i class="fas fa-check-circle me-2"></i>Crear Proyecto
+          </button>
         </div>
       </form>
     </div>
   </div>
 </div>
+
+<script>
+  function filterProjectStudents(val) {
+    const filter = val.toLowerCase().trim();
+    const items = document.querySelectorAll('.student-selectable-item');
+    let found = 0;
+    
+    items.forEach(item => {
+      const name = item.querySelector('.student-name-searchable').textContent.toLowerCase();
+      const username = item.querySelector('.student-username-searchable').textContent.toLowerCase();
+      
+      if (name.includes(filter) || username.includes(filter)) {
+        item.classList.remove('d-none');
+        item.classList.add('d-flex');
+        found++;
+      } else {
+        item.classList.add('d-none');
+        item.classList.remove('d-flex');
+      }
+    });
+    
+    const noResults = document.getElementById('no-students-found');
+    if (found === 0 && filter !== "") {
+      noResults.classList.remove('d-none');
+    } else {
+      noResults.classList.add('d-none');
+    }
+  }
+</script>
 
 <!-- Modal Personalizar Asignatura -->
 <div class="modal fade" id="editSubjectModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border-0 shadow-lg rounded-4">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
       <form method="POST" action="{% url 'professor_subject_detail' subject.id %}" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="hidden" name="action" value="edit_subject">
-        <div class="modal-header border-0 pb-0">
-          <h5 class="modal-title fw-bold"><i class="fas fa-palette text-primary me-2"></i>Personalizar Asignatura</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-4">
-            <label class="form-label text-muted small fw-semibold">Color de Fondo (Hex)</label>
-            <input type="color" name="color" class="form-control form-control-color w-100 rounded-3 shadow-sm" value="{{ subject.color|default:'#4e73df' }}" style="height: 45px;">
-          </div>
-          <div class="mb-3">
-            <label class="form-label text-muted small fw-semibold">Icono/Logo de la Asignatura</label>
-            
-            <div id="logo-preview-container" class="mb-3 p-3 border rounded-4 bg-light text-center">
-              <div class="position-relative ms-auto me-auto" style="width: 100px; height: 100px;">
-                <div id="logo-display" class="w-100 h-100 rounded-3 border bg-white d-flex align-items-center justify-content-center overflow-hidden shadow-sm">
-                  {% if subject.logo %}
-                    <img src="{{ subject.logo.url }}" class="w-100 h-100 object-fit-cover" id="current-logo-img">
-                  {% else %}
-                    <i class="fas fa-book fa-3x text-muted opacity-50"></i>
-                  {% endif %}
-                </div>
-                {% if subject.logo %}
-                <button type="button" id="btn-remove-logo" class="btn btn-danger btn-sm rounded-circle position-absolute top-0 start-100 translate-middle shadow-sm" title="Quitar logo">
-                  <i class="fas fa-times"></i>
-                </button>
-                {% endif %}
-              </div>
-              <input type="hidden" name="remove_logo" id="remove-logo-input" value="false">
+        <div class="modal-header border-0 text-white py-4 px-4 position-relative overflow-hidden" style="background-color: var(--subject-primary);">
+          <div class="d-flex align-items-center position-relative mt-2 ps-2">
+            <div class="rounded-circle p-3 me-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px;">
+              <i class="fas fa-palette fa-lg text-white"></i>
             </div>
+            <div>
+              <h5 class="modal-title fw-bold mb-0">Personalizar Asignatura</h5>
+              <p class="text-white-50 small mb-0">Configura la identidad visual y el logo de este curso.</p>
+            </div>
+          </div>
+          <button type="button" class="bg-transparent border-0 text-white shadow-none" data-bs-dismiss="modal" data-dismiss="modal" aria-label="Cerrar" style="position: absolute; top: 1.5rem; right: 1.5rem; z-index: 10; cursor: pointer;">
+            <i class="fas fa-times fa-lg"></i>
+          </button>
+        </div>
+        <div class="modal-body p-4 bg-light bg-opacity-30">
+          <div class="row g-4 mb-4">
+            <div class="col-12">
+              <div class="bg-white p-4 rounded-4 shadow-sm border border-light">
+                <label class="form-label text-muted small fw-bold text-uppercase mb-3">Información General</label>
+                <div class="row g-3">
+                  <div class="col-md-12">
+                    <label class="form-label fw-semibold small">Nombre de la Asignatura</label>
+                    <div class="input-group input-group-sm">
+                      <span class="input-group-text bg-light border-0"><i class="fas fa-signature text-muted"></i></span>
+                      <input type="text" name="name" class="form-control bg-light border-0" value="{{ subject.name }}" required>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Curso / Generación</label>
+                    <div class="input-group input-group-sm">
+                      <span class="input-group-text bg-light border-0"><i class="fas fa-calendar-alt text-muted"></i></span>
+                      <input type="text" name="genero" class="form-control bg-light border-0" value="{{ subject.genero }}">
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label fw-semibold small">Categoría</label>
+                    <div class="input-group input-group-sm">
+                      <span class="input-group-text bg-light border-0"><i class="fas fa-tag text-muted"></i></span>
+                      <select name="category" class="form-select bg-light border-0">
+                        <option value="obligatoria" {% if subject.category == 'obligatoria' %}selected{% endif %}>Obligatoria</option>
+                        <option value="optativa" {% if subject.category == 'optativa' %}selected{% endif %}>Optativa</option>
+                        <option value="laboratorio" {% if subject.category == 'laboratorio' %}selected{% endif %}>Laboratorio</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
 
-            <input type="file" name="logo" id="logo-input" class="form-control rounded-3" accept="image/*">
-            <small class="text-muted">Se recomienda una imagen cuadrada con fondo transparente.</small>
+          <div class="row g-4">
+            <div class="col-md-5">
+              <div class="bg-white p-4 rounded-4 shadow-sm border border-light h-100">
+                <label class="form-label text-muted small fw-bold text-uppercase mb-3">Color Temático</label>
+                <div class="mb-4 text-center">
+                  <div class="p-3 rounded-circle d-inline-block border shadow-sm mb-3" style="background-color: white;">
+                    <input type="color" name="color" id="subject-color-picker" class="form-control form-control-color border-0" value="{{ subject.color|default:'#4e73df' }}" style="width: 80px; height: 80px; border-radius: 50%; cursor: pointer;">
+                  </div>
+                  <p class="small text-muted">Este color definirá los acentos visuales de la interfaz para tus alumnos.</p>
+                </div>
+              </div>
+            </div>
+            <div class="col-md-7">
+              <div class="bg-white p-4 rounded-4 shadow-sm border border-light h-100">
+                <label class="form-label text-muted small fw-bold text-uppercase mb-3">Identidad Visual (Logo)</label>
+                
+                <div id="logo-preview-container-new" class="mb-3 p-4 border-2 border-dashed rounded-4 bg-light text-center position-relative overflow-hidden">
+                  <div id="logo-display-new" class="mx-auto bg-white rounded-3 shadow-sm border overflow-hidden d-flex align-items-center justify-content-center" style="width: 120px; height: 120px;">
+                    {% if subject.logo %}
+                      <img src="{{ subject.logo.url }}" class="w-100 h-100 object-fit-cover" id="current-logo-img-new">
+                    {% else %}
+                      <i class="fas fa-cloud-upload-alt fa-3x opacity-20"></i>
+                    {% endif %}
+                  </div>
+                  
+                  {% if subject.logo %}
+                  <div class="mt-3" id="remove-logo-btn-wrapper">
+                    <button type="button" onclick="markLogoForRemoval()" class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-bold">
+                      <i class="fas fa-trash-alt me-1"></i> Quitar Logo actual
+                    </button>
+                  </div>
+                  {% endif %}
+                  <input type="hidden" name="remove_logo" id="remove-logo-input-new" value="false">
+                </div>
+
+                <div class="mb-0">
+                  <div class="custom-file-premium">
+                    <label for="logo-input-new" class="btn btn-outline-primary rounded-pill w-100 shadow-sm py-2 px-3 d-flex align-items-center justify-content-center transition-all">
+                      <i class="fas fa-image me-2"></i>Elegir nuevo logo...
+                    </label>
+                    <input type="file" name="logo" id="logo-input-new" class="d-none" accept="image/*" onchange="previewLogo(this)">
+                    <div id="file-name-display" class="text-center small text-muted mt-2 opacity-75 fw-medium">No se ha seleccionado archivo</div>
+                  </div>
+                  <small class="text-muted d-block mt-3 text-center" style="font-size: 0.70rem; font-style: italic;">
+                    Dimensiones recomendadas: 512x512px (Formato cuadrado).
+                  </small>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <script>
-          document.getElementById('logo-input').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-              const reader = new FileReader();
-              reader.onload = function(event) {
-                const display = document.getElementById('logo-display');
-                display.innerHTML = `<img src="${event.target.result}" class="w-100 h-100 object-fit-cover">`;
-                document.getElementById('remove-logo-input').value = 'false';
-              };
-              reader.readAsDataURL(file);
-            }
-          });
-
-          const btnRemove = document.getElementById('btn-remove-logo');
-          if (btnRemove) {
-            btnRemove.addEventListener('click', function() {
-              document.getElementById('logo-display').innerHTML = '<i class="fas fa-book fa-3x text-muted opacity-50"></i>';
-              document.getElementById('remove-logo-input').value = 'true';
-              document.getElementById('logo-input').value = '';
-              this.style.display = 'none';
-            });
-          }
-        </script>
-        <div class="modal-footer border-0 pt-0">
-          <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-primary rounded-pill px-4">Guardar Cambios</button>
+        <div class="modal-footer border-0 p-4 bg-white justify-content-end">
+          <button type="submit" class="btn text-white rounded-pill px-5 py-2 fw-bold shadow-sm" style="background-color: var(--subject-primary);">
+            <i class="fas fa-save me-2"></i>Guardar Cambios
+          </button>
         </div>
       </form>
     </div>
   </div>
 </div>
+
+<script>
+  function previewLogo(input) {
+    const fileNameDisplay = document.getElementById('file-name-display');
+    if (input.files && input.files[0]) {
+      const fileName = input.files[0].name;
+      if (fileNameDisplay) fileNameDisplay.innerText = fileName;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const display = document.getElementById('logo-display-new');
+        display.innerHTML = `<img src="${e.target.result}" class="w-100 h-100 object-fit-cover">`;
+        document.getElementById('remove-logo-input-new').value = 'false';
+        const wrapper = document.getElementById('remove-logo-btn-wrapper');
+        if (wrapper) wrapper.classList.add('d-none');
+      };
+      reader.readAsDataURL(input.files[0]);
+    } else {
+      if (fileNameDisplay) fileNameDisplay.innerText = "No se ha seleccionado archivo";
+    }
+  }
+
+  function markLogoForRemoval() {
+    document.getElementById('remove-logo-input-new').value = 'true';
+    document.getElementById('logo-display-new').innerHTML = '<i class="fas fa-cloud-upload-alt fa-3x opacity-20"></i>';
+    document.getElementById('logo-input-new').value = '';
+    const wrapper = document.getElementById('remove-logo-btn-wrapper');
+    if (wrapper) wrapper.classList.add('d-none');
+  }
+</script>
 
 <!-- Modales Editar Alumno -->
 {% for student in students %}
 <div class="modal fade" id="editStudentModal{{ student.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow-lg rounded-4">
-      <form method="POST" action="{% url 'professor_subject_detail' subject.id %}">
+      <form method="POST" action="{% url 'professor_subject_detail' subject.id %}" id="formEditStudent{{ student.id }}">
         {% csrf_token %}
         <input type="hidden" name="action" value="edit_student">
         <input type="hidden" name="student_id" value="{{ student.id }}">
-        <div class="modal-header border-0 pb-0">
-          <h5 class="modal-title fw-bold"><i class="fas fa-user-edit text-primary me-2"></i>Editar Alumno</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <div class="modal-header border-0 text-white py-4 px-4 position-relative overflow-hidden" style="background-color: var(--subject-primary);">
+          <div class="d-flex align-items-center position-relative mt-2 ps-2">
+            <div class="rounded-circle p-3 me-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px;">
+              <i class="fas fa-user-edit fa-lg text-white"></i>
+            </div>
+            <div>
+              <h5 class="modal-title fw-bold mb-0">Editar Alumno</h5>
+              <p class="text-white-50 small mb-0">{{ student.get_full_name|default:student.username }} (@{{ student.username }})</p>
+            </div>
+          </div>
+          <button type="button" class="bg-transparent border-0 text-white shadow-none" data-bs-dismiss="modal" data-dismiss="modal" aria-label="Cerrar" style="position: absolute; top: 1.5rem; right: 1.5rem; z-index: 10; cursor: pointer;">
+            <i class="fas fa-times fa-lg"></i>
+          </button>
         </div>
-        <div class="modal-body">
-          <div class="mb-3 text-center">
-             <div class="fw-bold fs-5 text-dark">{{ student.get_full_name|default:student.username }}</div>
-             <div class="text-muted small">@{{ student.username }}</div>
-          </div>
-          <div class="mb-3">
-            <label class="form-label text-muted small fw-semibold">Nuevo Correo Electrónico</label>
-            <input type="email" name="email" class="form-control rounded-3" value="{{ student.email }}" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label text-muted small fw-semibold">Nueva Contraseña (dejar en blanco para no cambiar)</label>
-            <input type="password" name="password" class="form-control rounded-3" placeholder="••••••••">
+        <div class="modal-body p-4 bg-light bg-opacity-50">
+          <div class="bg-white p-4 rounded-4 shadow-sm border border-light">
+            <div class="mb-4">
+              <label class="form-label text-muted small fw-bold text-uppercase">Correo Electrónico</label>
+              <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="fas fa-envelope text-muted"></i></span>
+                <input type="email" name="email" class="form-control bg-light border-start-0 ps-0" value="{{ student.email }}" required>
+              </div>
+            </div>
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label class="form-label text-muted small fw-bold text-uppercase">Nueva Contraseña</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light border-end-0"><i class="fas fa-lock text-muted"></i></span>
+                  <input type="password" name="password" id="editPassword{{ student.id }}" class="form-control bg-light border-start-0 ps-0" placeholder="••••••••">
+                </div>
+                <small class="text-muted mt-1 d-block" style="font-size: 0.70rem;">Dejar en blanco para no cambiar</small>
+              </div>
+              <div class="col-md-6">
+                <label class="form-label text-muted small fw-bold text-uppercase">Repetir Nueva Contraseña</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light border-end-0"><i class="fas fa-shield-alt text-muted"></i></span>
+                  <input type="password" name="password_confirm" id="editPasswordConfirm{{ student.id }}" class="form-control bg-light border-start-0 ps-0" placeholder="••••••••">
+                </div>
+              </div>
+            </div>
+            <div class="col-12 mt-2">
+              <div class="form-check form-switch p-3 bg-light rounded-3 border">
+                <input class="form-check-input ms-0 me-3" type="checkbox" name="must_change_password" value="1" id="mustChangePwd{{ student.id }}" {% if student.user_profile.must_change_password %}checked{% endif %}>
+                <label class="form-check-label fw-bold small text-dark" for="mustChangePwd{{ student.id }}">
+                  <i class="fas fa-key me-1 text-primary"></i> Obligar a cambiar contraseña al inicio
+                </label>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="modal-footer border-0 pt-0">
-          <button type="button" class="btn btn-light rounded-pill" data-bs-dismiss="modal">Cancelar</button>
-          <button type="submit" class="btn btn-primary rounded-pill px-4">Actualizar Datos</button>
+        <div class="modal-footer border-0 p-4 bg-white justify-content-center">
+          <button type="button" class="btn text-white rounded-pill px-5 py-2 fw-bold shadow-sm w-100" style="background-color: var(--subject-primary);" onclick="confirmEditStudent('{{ student.id }}', '{{ student.username }}')">
+            <i class="fas fa-save me-2"></i>Actualizar Datos
+          </button>
         </div>
       </form>
     </div>
@@ -386,5 +696,340 @@
 </div>
 {% endfor %}
 
+<!-- Modal Matricular Alumno Existente -->
+<div class="modal fade" id="addExistingStudentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+      <form method="POST" action="{% url 'professor_subject_detail' subject.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_existing_student">
+        <div class="modal-header border-0 text-white py-4 px-4 position-relative overflow-hidden" style="background-color: var(--subject-primary);">
+          <div class="d-flex align-items-center position-relative mt-2 ps-2">
+            <div class="rounded-circle p-3 me-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px;">
+              <i class="fas fa-link fa-lg text-white"></i>
+            </div>
+            <div>
+              <h5 class="modal-title fw-bold mb-0">Matricular Alumno Existente</h5>
+              <p class="text-white-50 small mb-0">Busca alumnos registrados en Passify para añadirlos a este curso.</p>
+            </div>
+          </div>
+          <button type="button" class="bg-transparent border-0 text-white shadow-none" data-bs-dismiss="modal" data-dismiss="modal" aria-label="Cerrar" style="position: absolute; top: 1.5rem; right: 1.5rem; z-index: 10; cursor: pointer;">
+            <i class="fas fa-times fa-lg"></i>
+          </button>
+        </div>
+        <div class="modal-body p-4 bg-light bg-opacity-50">
+          <div class="row g-4">
+            <div class="col-md-5">
+              <div class="p-3 bg-white rounded-4 shadow-sm border h-100">
+                <label class="form-label text-muted small fw-bold text-uppercase mb-3" style="letter-spacing: 0.5px;">1. Buscar Alumno</label>
+                <div class="input-group shadow-sm border rounded-3 overflow-hidden">
+                  <span class="input-group-text bg-white border-0 text-muted"><i class="fas fa-search"></i></span>
+                  <input type="text" id="search-available-input" class="form-control border-0 ps-0 py-2" placeholder="Nombre, @usuario o correo..." onkeyup="filterAvailableStudents(this.value)">
+                </div>
+                <div class="mt-4 p-3 rounded-3 bg-light border border-light">
+                    <p class="small text-muted mb-0"><i class="fas fa-info-circle text-info me-2"></i>Escribe cualquier dato del alumno para filtrar instantáneamente la lista de la derecha y seleccionarlo.</p>
+                </div>
+              </div>
+            </div>
+            
+            <div class="col-md-7">
+              <div class="p-3 bg-white rounded-4 shadow-sm border">
+                <label class="form-label text-muted small fw-bold text-uppercase mb-3" style="letter-spacing: 0.5px;">2. Seleccionar Alumno</label>
+                <select name="student_id" id="available-students-select" class="form-select form-select-lg rounded-3 border bg-light bg-opacity-50" required size="8" style="font-size: 0.95rem; cursor: pointer;">
+                  <option value="" disabled>Seleccione un alumno disponible...</option>
+                  {% for available in available_students %}
+                    <option value="{{ available.id }}" class="py-2 px-3 border-bottom-1" data-search="{{ available.get_full_name|lower }} {{ available.username|lower }} {{ available.email|lower }}">
+                      👤 {{ available.get_full_name|default:available.username }} (@{{ available.username }}) · {{ available.email }}
+                    </option>
+                  {% endfor %}
+                </select>
+                {% if not available_students %}
+                  <div class="alert alert-warning border-0 mt-3 small fw-bold py-2 mb-0">
+                    <i class="fas fa-exclamation-triangle me-2"></i> No hay más alumnos en Passify para matricular.
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0 p-4 bg-white justify-content-between">
+          <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" data-bs-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn text-white rounded-pill px-5 py-2 fw-bold shadow-sm hover-elevate" style="background-color: var(--subject-primary);" {% if not available_students %}disabled{% endif %}>
+            <i class="fas fa-user-plus me-2"></i>Confirmar Matriculación
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {% include "containers/_partials/panels/_modals.html" %}
+{% endblock %}
+
+{% block extrascripts %}
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script>
+  function openEditStudentModal(studentId) {
+    const modalEl = document.getElementById('editStudentModal' + studentId);
+    if (modalEl) {
+        const myModal = new bootstrap.Modal(modalEl);
+        myModal.show();
+    } else {
+        console.error('Modal not found: editStudentModal' + studentId);
+    }
+  }
+
+  function confirmEditStudent(studentId, username) {
+    const form = document.getElementById('formEditStudent' + studentId);
+    const pwdInput = document.getElementById('editPassword' + studentId).value.trim();
+    const pwdConfirm = document.getElementById('editPasswordConfirm' + studentId).value.trim();
+    
+    if (pwdInput !== "") {
+        if (pwdInput !== pwdConfirm) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Contraseñas no coinciden',
+                text: 'Las contraseñas no son iguales, por favor revisa.',
+                confirmButtonColor: '#4e73df',
+                customClass: { confirmButton: 'btn btn-primary rounded-pill' },
+                buttonsStyling: false
+            });
+            return;
+        }
+
+        Swal.fire({
+          title: '<h4 class="fw-bold mb-0">Confirmar cambio de clave</h4>',
+          html: `<p class="text-muted mt-2 mb-0">Estás a punto de cambiar la contraseña de <strong>@${username}</strong>. ¿Estás seguro?</p>`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: '<i class="fas fa-save me-2"></i>Sí, guardar',
+          cancelButtonText: 'Cancelar',
+          reverseButtons: true,
+          confirmButtonColor: '#f6c23e',
+          cancelButtonColor: '#858796',
+          customClass: {
+            confirmButton: 'btn btn-warning px-4 py-2 fw-bold text-dark shadow-sm me-2',
+            cancelButton: 'btn btn-light px-4 py-2 fw-bold shadow-sm'
+          },
+          buttonsStyling: false,
+          showLoaderOnConfirm: true,
+          preConfirm: () => {
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    resolve();
+                }, 600);
+            });
+          }
+        }).then((result) => {
+          if (result.isConfirmed) {
+            form.submit();
+          }
+        });
+    } else {
+        form.submit();
+    }
+  }
+
+  function filterList(listId, value) {
+    const list = document.getElementById(listId);
+    const items = list.getElementsByClassName('list-group-item');
+    const filter = value.toLowerCase();
+    
+    for (let i = 0; i < items.length; i++) {
+      const text = items[i].textContent || items[i].innerText;
+      if (text.toLowerCase().indexOf(filter) > -1) {
+        items[i].style.setProperty('display', 'flex', 'important');
+      } else {
+        items[i].style.setProperty('display', 'none', 'important');
+      }
+    }
+  }
+
+  function filterAvailableStudents(value) {
+    const filter = value.toLowerCase();
+    const select = document.getElementById('available-students-select');
+    const options = select.getElementsByTagName('option');
+    
+    for (let i = 0; i < options.length; i++) {
+      const option = options[i];
+      if (option.disabled) continue; // Saltar el placeholder
+      
+      const searchText = option.getAttribute('data-search') || option.textContent.toLowerCase();
+      if (searchText.indexOf(filter) > -1) {
+        option.classList.remove('d-none');
+        option.style.display = "block";
+      } else {
+        option.classList.add('d-none');
+        option.style.display = "none";
+      }
+    }
+  }
+
+  function confirmRemoveStudent(studentId, username) {
+      Swal.fire({
+          title: '<h4 class="fw-bold mb-0 text-danger">Eliminación Radical</h4>',
+          html: `<div class="text-muted mt-2 mb-0 text-start">
+                  <p>Estás a punto de <strong>desmatricular</strong> al alumno <strong>@${username}</strong> de esta asignatura.</p>
+                  <p class="text-danger fw-bold"><i class="fas fa-exclamation-triangle me-1"></i> ¡ADVERTENCIA!</p>
+                  <ul class="small mb-0 pb-0">
+                    <li>Se apagarán y borrarán <strong>TODOS</strong> sus servicios.</li>
+                    <li>Se borrarán todas sus asignaciones de proyectos de esta asignatura.</li>
+                    <li>Este proceso <strong>NO</strong> se puede deshacer.</li>
+                  </ul>
+                 </div>`,
+          icon: 'error',
+          showCancelButton: true,
+          confirmButtonText: '<i class="fas fa-trash-alt me-2"></i>Eliminar Todo',
+          cancelButtonText: 'Cancelar',
+          reverseButtons: true,
+          confirmButtonColor: '#e74a3b',
+          cancelButtonColor: '#858796',
+          customClass: {
+            confirmButton: 'btn btn-danger px-4 py-2 fw-bold shadow-sm rounded-pill me-2',
+            cancelButton: 'btn btn-light px-4 py-2 fw-bold shadow-sm rounded-pill'
+          },
+          buttonsStyling: false,
+          showLoaderOnConfirm: true,
+          allowOutsideClick: () => !Swal.isLoading(),
+          preConfirm: () => {
+              return new Promise((resolve) => {
+                  setTimeout(() => {
+                      resolve();
+                  }, 1200);
+              });
+          }
+      }).then((result) => {
+          if (result.isConfirmed) {
+              const form = document.createElement("form");
+              form.method = "POST";
+              form.action = "{% url 'professor_subject_detail' subject.id %}";
+              
+              const csrfInput = document.createElement("input");
+              csrfInput.type = "hidden";
+              csrfInput.name = "csrfmiddlewaretoken";
+              csrfInput.value = "{{ csrf_token }}";
+              
+              const actionInput = document.createElement("input");
+              actionInput.type = "hidden";
+              actionInput.name = "action";
+              actionInput.value = "remove_student";
+              
+              const studentIdInput = document.createElement("input");
+              studentIdInput.type = "hidden";
+              studentIdInput.name = "student_id";
+              studentIdInput.value = studentId;
+
+              form.appendChild(csrfInput);
+              form.appendChild(actionInput);
+              form.appendChild(studentIdInput);
+              document.body.appendChild(form);
+              
+              Swal.fire({
+                  title: 'Procesando...',
+                  text: 'Eliminando datos y contenedores, por favor espera.',
+                  allowOutsideClick: false,
+                  showConfirmButton: false,
+                  didOpen: () => {
+                      Swal.showLoading();
+                  }
+              });
+              
+              form.submit();
+          }
+      });
+  }
+  function confirmDeleteProject(projectId, projectName) {
+      Swal.fire({
+          title: '<h4 class="fw-bold mb-0 text-danger">Eliminar Proyecto</h4>',
+          html: `<div class="text-muted mt-2 mb-0 text-start">
+                  <p>Estás a punto de eliminar el proyecto <strong>${projectName}</strong>.</p>
+                  <p class="text-danger fw-bold"><i class="fas fa-exclamation-triangle me-1"></i> ¡ADVERTENCIA!</p>
+                  <ul class="small mb-0 pb-0">
+                    <li>Se apagarán y borrarán <strong>TODOS</strong> los servicios asociados a este proyecto.</li>
+                    <li>Este proceso <strong>NO</strong> se puede deshacer.</li>
+                  </ul>
+                 </div>`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: '<i class="fas fa-trash-alt me-2"></i>Eliminar Proyecto',
+          cancelButtonText: 'Cancelar',
+          reverseButtons: true,
+          confirmButtonColor: '#e74a3b',
+          cancelButtonColor: '#858796',
+          customClass: {
+            confirmButton: 'btn btn-danger px-4 py-2 fw-bold shadow-sm rounded-pill me-2',
+            cancelButton: 'btn btn-light px-4 py-2 fw-bold shadow-sm rounded-pill'
+          },
+          buttonsStyling: false,
+          showLoaderOnConfirm: true,
+          allowOutsideClick: () => !Swal.isLoading(),
+          preConfirm: () => {
+              return new Promise((resolve) => {
+                  setTimeout(() => {
+                      resolve();
+                  }, 800);
+              });
+          }
+      }).then((result) => {
+          if (result.isConfirmed) {
+              const form = document.createElement("form");
+              form.method = "POST";
+              form.action = "{% url 'professor_subject_detail' subject.id %}";
+              
+              const csrfInput = document.createElement("input");
+              csrfInput.type = "hidden";
+              csrfInput.name = "csrfmiddlewaretoken";
+              csrfInput.value = "{{ csrf_token }}";
+              
+              const actionInput = document.createElement("input");
+              actionInput.type = "hidden";
+              actionInput.name = "action";
+              actionInput.value = "remove_project";
+              
+              const projectIdInput = document.createElement("input");
+              projectIdInput.type = "hidden";
+              projectIdInput.name = "project_id";
+              projectIdInput.value = projectId;
+
+              form.appendChild(csrfInput);
+              form.appendChild(actionInput);
+              form.appendChild(projectIdInput);
+              document.body.appendChild(form);
+              
+              Swal.fire({
+                  title: 'Eliminando...',
+                  text: 'Borrando proyecto y contenedores asociados.',
+                  allowOutsideClick: false,
+                  showConfirmButton: false,
+                  didOpen: () => {
+                      Swal.showLoading();
+                  }
+              });
+              
+              form.submit();
+          }
+      });
+  }
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    // Apply subject theme colors to elements with subject-theme-bg or subject-theme-color classes
+    document.querySelectorAll('.subject-theme-bg').forEach(el => {
+      const color = el.getAttribute('data-subject-color');
+      if (color) el.style.backgroundColor = color;
+    });
+    document.querySelectorAll('.subject-theme-color').forEach(el => {
+      const color = el.getAttribute('data-subject-color');
+      if (color) el.style.color = color;
+    });
+    // Clear all modal forms when they are closed
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('hidden.bs.modal', function() {
+            const form = this.querySelector('form');
+            if (form) form.reset();
+        });
+    });
+  });
+</script>
 {% endblock %}

@@ -1,7 +1,7 @@
 ﻿{# Template refactorizado: Filas de servicios #}
 {% for s in services %}
 <tr id="service-{{ s.id }}">
-  {% if not hide_redundant and not current_subject %}
+  {% if not hide_redundant and not hide_subject_column %}
   <td class="ps-4">
     {% if s.subject %}
     <div class="fw-bold text-dark">{{ s.subject.name }}</div>
@@ -11,9 +11,11 @@
   </td>
   {% endif %}
   
-  <td class="{% if hide_redundant or current_subject %}ps-4{% endif %}">
+  {% if not hide_project_column %}
+  <td class="{% if hide_redundant or hide_subject_column %}ps-4{% endif %}">
     <div class="fw-bold text-primary">{{ s.project.place|default:"General" }}</div>
   </td>
+  {% endif %}
   
   {% if not hide_redundant and is_supervisor %}
   <td>
@@ -22,7 +24,7 @@
   </td>
   {% endif %}
 
-  <td {% if hide_redundant %}class="ps-4"{% endif %}>
+  <td {% if hide_redundant or hide_project_column %}class="ps-4"{% endif %}>
     <div class="fw-bold text-dark mb-1">{{ s.name }}</div>
     <small class="text-muted d-block mb-1" style="font-size: 0.7rem;">ID: #{{ s.id }}</small>
     <div>
@@ -122,7 +124,7 @@
 {# Autorefresco inteligente si hay estados transitorios #}
 {% if has_transient %}
 <tr style="display:none;" 
-    hx-get="{% url 'containers:service_table' %}?subject={{ subject_id|default:'' }}&project={{ project_id|default:'' }}" 
+    hx-get="{% url 'containers:service_table' %}?subject={{ subject_id|default:'' }}&project={{ project_id|default:'' }}{% if hide_subject_column %}&hide_subject=1{% endif %}" 
     hx-trigger="load delay:2s" 
     hx-target="#service-table" 
     hx-swap="innerHTML">

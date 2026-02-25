@@ -25,6 +25,11 @@ class UserProfile(models.Model):
         max_length=100,
         verbose_name="Email",
     )
+    must_change_password = models.BooleanField(
+        default=False,
+        verbose_name="Debe cambiar contraseña",
+        help_text="Si está marcado, se obligará al usuario a cambiar su contraseña en el próximo inicio de sesión."
+    )
     
     # Campos para Bearer Token API (JWT)
     api_token = models.TextField(

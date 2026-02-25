@@ -1187,6 +1187,14 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
         safe_name = re.sub(r'[^a-z0-9_-]', '_', (service.name or slug).lower())
         container_name = f"{safe_name}_{service.id}_ctr"
 
+        # Eliminar si ya existe un contenedor con este nombre (prevención de conflictos 409)
+        try:
+            existing_ctr = docker_client.containers.get(container_name)
+            existing_ctr.remove(force=True)
+            _append_log(service, f"Eliminado contenedor residual con nombre: {container_name}")
+        except NotFound:
+            pass
+
         _append_log(service, f"Arrancando nuevo contenedor: {container_name}")
 
         normalized_command = command
@@ -1205,17 +1213,36 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
 
         run_command = normalized_command if normalized_command is not None else normalized_image_cmd
 
-        container = docker_client.containers.run(
-            image=image_to_run,
-            command=run_command,
-            detach=True,
-            tty=True,                 # importante para la terminal
-            stdin_open=True,
-            name=container_name,
-            ports=ports,
-            volumes=volumes or None,
-            environment=env_vars or None,
-        )
+        import time
+        max_retries = 3
+        container = None
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:
+                    try:
+                        c = docker_client.containers.get(container_name)
+                        c.remove(force=True)
+                    except NotFound:
+                        pass
+                    time.sleep(1)
+
+                container = docker_client.containers.run(
+                    image=image_to_run,
+                    command=run_command,
+                    detach=True,
+                    tty=True,                 # importante para la terminal
+                    stdin_open=True,
+                    name=container_name,
+                    ports=ports,
+                    volumes=volumes or None,
+                    environment=env_vars or None,
+                )
+                break
+            except APIError as e:
+                if e.response is not None and e.response.status_code == 409 and attempt < max_retries - 1:
+                    _append_log(service, f"Conflicto de nombre detectado (race condition), reintentando creación en 1 segundo ({attempt+1}/{max_retries})...")
+                    continue
+                raise
         _append_log(service, "Contenedor creado, esperando verificación...")
         _ensure_container_running(service, container, port)
 

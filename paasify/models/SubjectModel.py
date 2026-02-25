@@ -32,21 +32,11 @@ class Subject(models.Model):
     genero = models.CharField(
         max_length=100,
         verbose_name="Ano",
-        choices=[
-            ("2024", "2024"),
-            ("2025", "2025"),
-            ("2026", "2026"),
-        ],
     )
 
     category = models.CharField(
         max_length=100,
         verbose_name="Categoria",
-        choices=[
-            ("Asignatura obligatorias", "Asignatura obligatorias"),
-            ("Asignatura optativa", "Asignatura optativa"),
-            ("Asignatura electiva", "Asignatura electiva"),
-        ],
     )
 
     teacher_user = models.ForeignKey(

@@ -6,22 +6,84 @@
 {% endblock %}
 
 {% block body %}
-<div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh;">
-  {# Header con degradado Premium #}
-  <div class="rounded-3 p-4 mb-4 shadow-sm" style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%);">
-    <div class="d-flex justify-content-between align-items-center">
-      <div>
-        <h1 class="h3 mb-1 text-white fw-bold"><i class="fas fa-folder-open me-2"></i>{{ project.place }}</h1>
-        <p class="text-white-50 mb-0">
-          Asignatura: {{ project.subject.name }} · 
-          <i class="far fa-clock ms-2 me-1"></i>Actualización: {{ project.date|date:"d M Y" }}
-        </p>
-      </div>
-      <div class="d-flex gap-2">
-        <a href="{% url 'professor_dashboard' %}" class="btn btn-light shadow-sm">
-          <i class="fas fa-arrow-left me-2"></i>Volver al Panel
+<div id="subject-theme-container" class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh;">
+  <script>
+    (function() {
+      const container = document.getElementById('subject-theme-container');
+      container.style.setProperty('--subject-primary', '{{ project.subject.color|default:"#4e73df" }}');
+      container.style.setProperty('--subject-secondary', '{{ project.subject.color|default:"#224abe" }}');
+    })();
+  </script>
+
+  {# Breadcrumbs - Ruta encima del banner #}
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb mb-0">
+      <li class="breadcrumb-item">
+        <a href="{% url 'professor_dashboard' %}" class="text-decoration-none text-muted">
+          <i class="fas fa-home me-1"></i>Inicio
         </a>
+      </li>
+      <li class="breadcrumb-item">
+        <a href="{% url 'professor_dashboard' %}" class="text-decoration-none text-muted">Panel Profesor</a>
+      </li>
+      <li class="breadcrumb-item">
+        <a href="{% url 'professor_subject_detail' project.subject.id %}" class="text-decoration-none text-muted">{{ project.subject.name }}</a>
+      </li>
+      <li class="breadcrumb-item active text-primary fw-bold" aria-current="page">{{ project.place }}</li>
+    </ol>
+  </nav>
+
+  {# Header con degradado Premium - Estilo Unificado #}
+  <div class="rounded-4 p-4 mb-4 shadow" 
+       style="background: linear-gradient(135deg, var(--subject-primary) 0%, var(--subject-secondary) 100%); min-height: 160px; display: flex; align-items: center;">
+    <div class="d-flex justify-content-between align-items-center w-100">
+      <div class="d-flex align-items-center">
+        {# Botón de Volver #}
+        <a href="{% url 'professor_subject_detail' project.subject.id %}" 
+           class="btn btn-light rounded-circle shadow-sm d-flex align-items-center justify-content-center" 
+           style="width: 50px; height: 50px; min-width: 50px; margin-right: 1.5rem; color: var(--subject-primary); transition: all 0.2s;"
+           title="Volver a la Asignatura">
+          <i class="fas fa-arrow-left fa-lg"></i>
+        </a>
+
+        {# Textos #}
+        <div class="text-container text-white">
+          <h1 class="h1 mb-1 fw-bold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15); line-height: 1.2; font-size: 2.5rem;">
+            <i class="fas fa-folder-open me-2 opacity-75"></i>{{ project.place }}
+          </h1>
+          <p class="text-white-50 mb-0 opacity-90 fw-semibold fs-5 mt-2">
+            <i class="fas fa-user-graduate me-2"></i>Alumno: @{{ project.user_profile.user.username }}<span class="mx-2">·</span>
+            <i class="far fa-clock me-1"></i>Actualización: {{ project.date|date:"d M Y" }}
+          </p>
+        </div>
       </div>
+
+      <style>
+        .prof-action-group {
+            background: rgba(0, 0, 0, 0.15);
+            padding: 4px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .btn-panel {
+            background: #ffffff !important;
+            color: var(--subject-primary, #4e73df) !important;
+            border-radius: 12px !important;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            border: none;
+            padding: 0.7rem 1.5rem;
+            font-weight: 700;
+            font-size: 0.82rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: 0.3px;
+        }
+        .btn-panel:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+            background: #f8fafc !important;
+        }
+      </style>
+
     </div>
   </div>
 
@@ -32,6 +94,10 @@
     </div>
     <div class="card-body p-3 border-bottom bg-light bg-opacity-10">
       <form class="row g-3 align-items-end" id="filter-form">
+        <input type="hidden" name="ordering" id="ordering-input" value="{{ request.GET.ordering|default:'-id' }}">
+        <input type="hidden" name="hide_project" value="1">
+        <input type="hidden" name="hide_owner" value="1">
+        <input type="hidden" name="hide_subject" value="1">
         <div class="col-md-5">
           <label class="form-label small fw-bold text-muted mb-1"><i class="fas fa-search me-1"></i>Nombre/Imagen</label>
           <div class="input-group shadow-sm">
@@ -78,27 +144,30 @@
     <div class="card-body p-0">
       {% if related_services %}
         <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
-            <thead style="background: linear-gradient(135deg, #4e73df 0%, #224abe 100%); cursor: pointer;">
-              <tr class="text-white small text-uppercase">
-                <th class="py-3 ps-4" hx-get="{% url 'containers:service_table' %}?project={{ project.id }}&ordering=name" hx-target="#service-table" hx-include="#filter-form">
-                    Nombre <i class="fas fa-sort ms-1 opacity-50"></i>
+          <table class="table table-hover align-middle mb-0" style="table-layout: fixed;">
+            <thead style="background: linear-gradient(135deg, var(--subject-primary, #4e73df) 0%, var(--subject-secondary, #224abe) 100%);">
+              <tr class="text-white small text-uppercase fw-bold" style="letter-spacing: 0.8px; font-size: 0.75rem;">
+                <th class="py-3 ps-4 border-0" style="cursor: pointer; width: 25%;" 
+                    onclick="toggleServiceOrdering('name')">
+                    Nombre <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-name"></i>
                 </th>
-                <th class="py-3" hx-get="{% url 'containers:service_table' %}?project={{ project.id }}&ordering=image" hx-target="#service-table" hx-include="#filter-form">
-                    Imagen <i class="fas fa-sort ms-1 opacity-50"></i>
+                <th class="py-3 border-0" style="cursor: pointer; width: 20%;"
+                    onclick="toggleServiceOrdering('image')">
+                    Imagen <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-image"></i>
                 </th>
-                <th class="py-3">Puerto</th>
-                <th class="py-3" hx-get="{% url 'containers:service_table' %}?project={{ project.id }}&ordering=status" hx-target="#service-table" hx-include="#filter-form">
-                    Estado <i class="fas fa-sort ms-1 opacity-50"></i>
+                <th class="py-3 border-0" style="width: 15%;">Puerto</th>
+                <th class="py-3 border-0 text-center" style="cursor: pointer; width: 15%;"
+                    onclick="toggleServiceOrdering('status')">
+                    Estado <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-status"></i>
                 </th>
-                <th class="py-3 pe-4 text-end">Acciones</th>
+                <th class="py-3 pe-4 text-end border-0" style="width: 25%;">Acciones</th>
               </tr>
             </thead>
             <tbody class="bg-white" id="service-table"
                    hx-get="{% url 'containers:service_table' %}?project={{ project.id }}"
                    hx-trigger="load, every 3s, service:table-refresh from:body"
                    hx-include="#filter-form">
-              {% include "containers/_service_rows.html" with services=related_services hide_redundant=True %}
+              {% include "containers/_service_rows.html" with services=related_services hide_redundant=True hide_project_column=True hide_owner=True hide_subject_column=True %}
             </tbody>
           </table>
         </div>
@@ -115,6 +184,38 @@
 {% endblock %}
 
 {% block extrascripts %}
+<script>
+  function toggleServiceOrdering(field) {
+    const input = document.getElementById('ordering-input');
+    const current = input.value;
+    let newValue = field;
+    
+    if (current === field) {
+      newValue = '-' + field;
+    } else if (current === '-' + field) {
+      newValue = field;
+    }
+    
+    input.value = newValue;
+    
+    // Update icons
+    ['name', 'image', 'status'].forEach(f => {
+      const icon = document.getElementById('sort-icon-' + f);
+      if (icon) {
+        icon.className = 'fas fa-sort ms-1 opacity-50';
+      }
+    });
+    
+    const activeIcon = document.getElementById('sort-icon-' + field);
+    if (activeIcon) {
+      activeIcon.className = newValue.startsWith('-') ? 'fas fa-sort-down ms-1 text-white' : 'fas fa-sort-up ms-1 text-white';
+      activeIcon.classList.remove('opacity-50');
+    }
+    
+    // Trigger HTMX update on the table body
+    htmx.trigger('#service-table', 'service:table-refresh');
+  }
+</script>
 {% include "containers/_partials/panels/_scripts.html" %}
 {% endblock %}
 

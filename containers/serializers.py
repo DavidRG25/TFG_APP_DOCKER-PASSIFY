@@ -51,12 +51,20 @@ class ServiceSerializer(serializers.ModelSerializer):
       - image: no permitida
       - code: opcional (se usará como contexto de build o se montará en /app)
     """
+    name = serializers.CharField(
+        help_text="Nombre descriptivo del contenedor. Tolerante a fallos humanos: Convierte espacios y caracteres no válidos a formato snake_case automáticamente."
+    )
     # Importante: permitir que image no sea obligatoria en modo CUSTOM
     image = serializers.CharField(required=False, allow_blank=True)
 
     # Extras de entrada
     custom_port = serializers.IntegerField(required=False, write_only=True)
-    mode = serializers.CharField(required=False, write_only=True, default="default")
+    mode = serializers.CharField(
+        required=False, 
+        write_only=True, 
+        default="default",
+        help_text="['dockerhub', 'custom']. Una vez definido en POST, el sistema bloquea con un error 400 Bad Request cualquier intento de mutarlo vía PATCH."
+    )
     env_vars = serializers.JSONField(required=False)
     volumes = serializers.JSONField(required=False)
     internal_port = serializers.IntegerField(required=False, allow_null=True)
@@ -335,8 +343,27 @@ class ServiceSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         user = getattr(request, "user", None)
 
-        # En PATCH, usar valores de la instancia existente si no se proporcionan
-        mode = attrs.get("mode", getattr(self.instance, "mode", "default")).lower()
+        # Detectar si es una actualización (PATCH) o creación (POST)
+        is_update = self.instance is not None
+
+        # Determinar el modo real del servicio existente
+        if is_update:
+            existing_mode = "custom" if getattr(self.instance, 'dockerfile', None) or getattr(self.instance, 'compose', None) else "dockerhub"
+            
+            # Revisar si se intentó enviar mode en la petición cruda
+            print("PATCH DEBUG attrs:", attrs)
+            if hasattr(self, 'initial_data'):
+                print("PATCH DEBUG initial_data:", self.initial_data)
+                
+            if hasattr(self, 'initial_data') and "mode" in self.initial_data:
+                requested_mode = str(self.initial_data["mode"]).lower()
+                if requested_mode != existing_mode and requested_mode != "default":
+                    raise serializers.ValidationError({"mode": _("No se puede cambiar el modo constructivo de un servicio existente.")})
+            
+            # En PATCH, forzar el uso del modo existente
+            mode = existing_mode
+        else:
+            mode = attrs.get("mode", "default").lower()
         image = attrs.get("image") or getattr(self.instance, "image", None)
         dockerfile = attrs.get("dockerfile")
         compose = attrs.get("compose")
@@ -349,9 +376,6 @@ class ServiceSerializer(serializers.ModelSerializer):
         has_compose = bool(compose)
         has_code = bool(attrs.get("code"))
         
-        # Detectar si es una actualización (PATCH) o creación (POST)
-        is_update = self.instance is not None
-
         # ---- Reglas de modo ----
         if mode == "custom":
             # Modo Custom: ignorar imagen si se envió por error
@@ -575,6 +599,13 @@ class ServiceSerializer(serializers.ModelSerializer):
             return []
 
     def update(self, instance, validated_data):
+        # SEGURIDAD: Bloquear cambios de modo
+        if hasattr(self, 'initial_data') and "mode" in self.initial_data:
+            requested_mode = str(self.initial_data["mode"]).lower()
+            existing_mode = "custom" if instance.dockerfile or instance.compose else "dockerhub"
+            if requested_mode != "default" and requested_mode != existing_mode:
+                raise serializers.ValidationError({"mode": _("No se puede cambiar el modo constructivo de un servicio existente.")})
+
         # Evitar que alguien cambie el owner o el modo una vez creado
         validated_data.pop("owner", None)
         validated_data.pop("mode", None)
