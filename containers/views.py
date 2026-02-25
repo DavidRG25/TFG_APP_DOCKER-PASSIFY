@@ -22,6 +22,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response as DRF_Response
 from rest_framework.exceptions import ValidationError
 
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiResponse
+
 from docker.errors import DockerException, NotFound
 
 from django.contrib.auth import get_user_model
@@ -45,9 +47,9 @@ from .services import (
     stop_container,
     start_service_container_record,
     stop_service_container_record,
-    fetch_container_logs,
     sync_service_status
 )
+from .utils import fetch_container_logs
 
 @login_required
 @require_POST
@@ -97,6 +99,11 @@ def user_is_admin(user) -> bool:
 
 # ------------------------------ API --------------------------------
 
+@extend_schema_view(
+    create=extend_schema(description="Crea un servicio contenedor. El nombre es tolerante a fallos (se sanitiza)."),
+    update=extend_schema(description="Actualiza el servicio completo. Si se intenta alterar el mode constructivo saltará 400 Bad Request."),
+    partial_update=extend_schema(description="Parchea el servicio. Evita cambiar el mode preestablecido para no romper referencias (devuelve 400)."),
+)
 class ServiceViewSet(viewsets.ModelViewSet):
     CODE_MAX = 1024 * 1024  # 1 MB max para mostrar código
     serializer_class = ServiceSerializer
@@ -371,6 +378,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if updated_fields:
             service.save(update_fields=updated_fields)
 
+    @extend_schema(description="Inicia un contenedor detenido.", responses={200: OpenApiResponse(description="Éxito"), 500: OpenApiResponse(description="Docker Error")})
     @action(detail=True, methods=["post"])
     def start(self, request, pk=None):
         service = self.get_object()
@@ -394,6 +402,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
             )
         return DRF_Response({"status": "queued", "message": "Servicio encolado para iniciar."})
 
+    @extend_schema(description="Detiene un contenedor en ejecución.", responses={200: OpenApiResponse(description="Éxito"), 500: OpenApiResponse(description="Docker Error")})
     @action(detail=True, methods=["post"])
     def stop(self, request, pk=None):
         service = self.get_object()
@@ -419,6 +428,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
             )
         return DRF_Response({"status": "stopping", "message": "Servicio deteniendo."})
 
+    @extend_schema(description="Reinicia un contenedor en caliente.", responses={200: OpenApiResponse(description="Éxito"), 500: OpenApiResponse(description="Docker Error")})
     @action(detail=True, methods=["post"])
     def restart(self, request, pk=None):
         service = self.get_object()
@@ -438,6 +448,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
             )
         return DRF_Response({"status": "restarting", "message": "Servicio reiniciando."})
 
+    @extend_schema(description="Obtiene los logs del contenedor (si no usa websockets).", responses={200: OpenApiResponse(description="Éxito")})
     @action(detail=True, methods=["get"])
     def logs(self, request, pk=None):
         """

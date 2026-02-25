@@ -1,5 +1,7 @@
 # Plan de Testing Maestro: Verificación Total de la API REST
 
+# ESTADO: COMPLETADO
+
 Este documento es una lista de verificación exhaustiva para validar cada endpoint, parámetro y caso de error de la API de PaaSify, incluyendo comandos `curl` detallados para su rápida ejecución.
 
 _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `http://localhost:8000/api`) y `{{TOKEN}}` por un token JWT válido.
@@ -8,14 +10,14 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
 
 ## 🔑 1. Autenticación y Seguridad
 
-- [ ] **Sin Token**:
+- [SI] **Sin Token**:
 
   ```bash
   curl -i -X GET {{API_URL}}/containers/
   # Esperado: 401 Unauthorized
   ```
 
-- [ ] **Token Mal Formado**:
+- [SI] **Token Mal Formado**:
 
   ```bash
   curl -i -X GET {{API_URL}}/containers/ \
@@ -23,7 +25,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 401 Unauthorized
   ```
 
-- [ ] **Obtener Token**:
+- [SI] **Obtener Token**:
 
   ```bash
   curl -i -X POST {{API_URL}}/token/ \
@@ -32,7 +34,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 200 OK con 'access' y 'refresh'
   ```
 
-- [ ] **Refrescar Token**:
+- [SI] **Refrescar Token**:
   ```bash
   curl -i -X POST {{API_URL}}/token/refresh/ \
        -H "Content-Type: application/json" \
@@ -46,28 +48,28 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
 
 ### 2.1 Recursos Base
 
-- [ ] **Listar Asignaturas**:
+- [SI] **Listar Asignaturas**:
 
   ```bash
   curl -X GET {{API_URL}}/subjects/ \
        -H "Authorization: Bearer {{TOKEN}}"
   ```
 
-- [ ] **Listar Proyectos**:
+- [SI] **Listar Proyectos**:
 
   ```bash
   curl -X GET {{API_URL}}/projects/ \
        -H "Authorization: Bearer {{TOKEN}}"
   ```
 
-- [ ] **Listar Imágenes del Catálogo**:
+- [SI] **Listar Imágenes del Catálogo**:
 
   ```bash
   curl -X GET {{API_URL}}/images/ \
        -H "Authorization: Bearer {{TOKEN}}"
   ```
 
-- [ ] **Detalle de Recurso (Asignatura)**:
+- [SI] **Detalle de Recurso (Asignatura)**:
   ```bash
   curl -X GET {{API_URL}}/subjects/1/ \
        -H "Authorization: Bearer {{TOKEN}}"
@@ -76,35 +78,35 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
 
 ### 2.2 Servicios (Contenedores)
 
-- [ ] **Listado Global**:
+- [SI] **Listado Global**:
 
   ```bash
   curl -X GET {{API_URL}}/containers/ \
        -H "Authorization: Bearer {{TOKEN}}"
   ```
 
-- [ ] **Filtro por Proyecto**:
+- [SI] **Filtro por Proyecto**:
 
   ```bash
   curl -X GET "{{API_URL}}/containers/?project=1" \
        -H "Authorization: Bearer {{TOKEN}}"
   ```
 
-- [ ] **Filtro por Asignatura**:
+- [SI] **Filtro por Asignatura**:
 
   ```bash
   curl -X GET "{{API_URL}}/containers/?subject=1" \
        -H "Authorization: Bearer {{TOKEN}}"
   ```
 
-- [ ] **Búsqueda por Nombre**:
+- [SI] **Búsqueda por Nombre**:
 
   ```bash
   curl -X GET "{{API_URL}}/containers/?search=mi-app" \
        -H "Authorization: Bearer {{TOKEN}}"
   ```
 
-- [ ] **Detalle Completo**:
+- [SI] **Detalle Completo**:
   ```bash
   curl -X GET {{API_URL}}/containers/1/ \
        -H "Authorization: Bearer {{TOKEN}}"
@@ -117,7 +119,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
 
 ### 3.1 Modo Catálogo (Éxito y Error)
 
-- [ ] **Éxito (DockerHub Oficial)**:
+- [SI] **Éxito (DockerHub Oficial)**:
 
   ```bash
   curl -i -X POST {{API_URL}}/containers/ \
@@ -127,7 +129,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 201 Created
   ```
 
-- [ ] **Error Nombre (Espacios o Mayúsculas)**:
+- [SI] **Error Nombre (Espacios o Mayúsculas)**:
   ```bash
   curl -i -X POST {{API_URL}}/containers/ \
        -H "Authorization: Bearer {{TOKEN}}" \
@@ -138,7 +140,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
 
 ### 3.2 Modo DockerHub
 
-- [ ] **Éxito con Puerto y Entorno**:
+- [SI] **Éxito con Puerto y Entorno**:
 
   ```bash
   curl -i -X POST {{API_URL}}/containers/ \
@@ -148,7 +150,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 201 Created
   ```
 
-- [ ] **Error Imagen Inexistente**:
+- [SI] **Error Imagen Inexistente**:
   ```bash
   curl -i -X POST {{API_URL}}/containers/ \
        -H "Authorization: Bearer {{TOKEN}}" \
@@ -159,7 +161,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
 
 ### 3.3 Modo Custom (Código Propio mediante multipart/form-data)
 
-- [ ] **Dockerfile**:
+- [SI] **Dockerfile**:
 
   ```bash
   curl -i -X POST {{API_URL}}/containers/ \
@@ -174,7 +176,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 201 Created, inicializa build.
   ```
 
-- [ ] **Docker Compose con Configuración**:
+- [SI] **Docker Compose con Configuración**:
   ```bash
   curl -i -X POST {{API_URL}}/containers/ \
        -H "Authorization: Bearer {{TOKEN}}" \
@@ -194,7 +196,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
 
 ### 4.1 Modificaciones Permitidas
 
-- [ ] **Cambio de Imagen (DockerHub)**:
+- [SI] **Cambio de Imagen (DockerHub)**:
 
   ```bash
   curl -i -X PATCH {{API_URL}}/containers/1/ \
@@ -204,7 +206,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 200 OK y actualización de la imagen del contenedor.
   ```
 
-- [ ] **Actualización con Retención de Volúmenes (keep_volumes=True)**:
+- [SI] **Actualización con Retención de Volúmenes (keep_volumes=True)**:
 
   ```bash
   curl -i -X PATCH {{API_URL}}/containers/1/ \
@@ -214,7 +216,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 200 OK. El contenedor se recrea pero los datos del volumen persisten.
   ```
 
-- [ ] **Actualización con Eliminación de Volúmenes (keep_volumes=False)**:
+- [SI] **Actualización con Eliminación de Volúmenes (keep_volumes=False)**:
 
   ```bash
   curl -i -X PATCH {{API_URL}}/containers/1/ \
@@ -224,7 +226,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 200 OK. El contenedor se recrea desde cero y se pierden los datos anteriores.
   ```
 
-- [ ] **Cambio de Nombre y Tipo**:
+- [SI] **Cambio de Nombre y Tipo**:
 
   ```bash
   curl -i -X PATCH {{API_URL}}/containers/1/ \
@@ -234,7 +236,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 200 OK
   ```
 
-- [ ] **Cambio de Entorno (Reemplazo de Variables)**:
+- [SI] **Cambio de Entorno (Reemplazo de Variables)**:
 
   ```bash
   curl -i -X PATCH {{API_URL}}/containers/1/ \
@@ -244,7 +246,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 200 OK y reinicio/recreación de contenedor si aplica.
   ```
 
-- [ ] **Actualización de Código/Archivos (Custom)**:
+- [SI] **Actualización de Código/Archivos (Custom)**:
   ```bash
   curl -i -X PATCH {{API_URL}}/containers/2/ \
        -H "Authorization: Bearer {{TOKEN}}" \
@@ -255,7 +257,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
 
 ### 4.2 Restricciones (Validación de Seguridad)
 
-- [ ] **Editar Catálogo (Default)**:
+- [SI] **Editar Catálogo (Default)**:
 
   ```bash
   # Supongamos que el ID 3 es un servicio auto-gestionado de catálogo restringido
@@ -266,7 +268,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 403 Forbidden o mensaje explicativo.
   ```
 
-- [ ] **Cambiar Modo Indebidamente**:
+- [SI] **Cambiar Modo Indebidamente**:
 
   ```bash
   curl -i -X PATCH {{API_URL}}/containers/1/ \
@@ -289,7 +291,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
 
 ## ⚙️ 5. Acciones de Control de Estado
 
-- [ ] **Detener Servicio**:
+- [SI] **Detener Servicio**:
 
   ```bash
   curl -i -X POST {{API_URL}}/containers/1/stop/ \
@@ -297,7 +299,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 200 OK
   ```
 
-- [ ] **Iniciar Servicio**:
+- [SI] **Iniciar Servicio**:
 
   ```bash
   curl -i -X POST {{API_URL}}/containers/1/start/ \
@@ -305,7 +307,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 200 OK
   ```
 
-- [ ] **Reiniciar Servicio**:
+- [SI] **Reiniciar Servicio**:
 
   ```bash
   curl -i -X POST {{API_URL}}/containers/1/restart/ \
@@ -313,7 +315,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 200 OK
   ```
 
-- [ ] **Consultar Logs**:
+- [SI] **Consultar Logs**:
 
   ```bash
   curl -s -X GET {{API_URL}}/containers/1/logs/ \
@@ -321,7 +323,7 @@ _Nota:_ Asegúrate de sustituir `{{API_URL}}` por la URL real de la API (ej. `ht
   # Esperado: 200 OK con texto plano o JSON de logs.
   ```
 
-- [ ] **Eliminación Permanente (DELETE)**:
+- [SI] **Eliminación Permanente (DELETE)**:
   ```bash
   curl -i -X DELETE {{API_URL}}/containers/1/ \
        -H "Authorization: Bearer {{TOKEN}}"

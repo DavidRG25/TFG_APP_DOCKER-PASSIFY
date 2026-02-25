@@ -167,6 +167,39 @@
       position: relative;
       overflow-x: auto;
   }
+
+  /* Tabs mejorados para el Switch */
+  .premium-tabs-wrapper {
+    background: #f1f5f9;
+    padding: 6px;
+    border-radius: 100px;
+    border: 1px solid #e2e8f0;
+  }
+  
+  .premium-tabs-wrapper .nav-link {
+    border-radius: 100px !important;
+    padding: 12px 24px !important;
+    color: #64748b !important;
+    font-weight: 700 !important;
+    font-size: 0.85rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    border: none !important;
+    background: transparent !important;
+  }
+  
+  .premium-tabs-wrapper .nav-link.active {
+    background: white !important;
+    color: var(--premium-blue) !important;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1) !important;
+    transform: translateY(-1px);
+  }
+
+  .premium-tabs-wrapper .nav-link:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.5) !important;
+    color: var(--premium-blue-dark) !important;
+  }
 </style>
 {% endblock %}
 
@@ -291,139 +324,104 @@
 
   <div class="container">
     <div class="row g-4">
-    <!-- Columna izquierda: Datos personales y contraseña -->
-    <div class="col-lg-6">
-      
-      <!-- Datos personales (Editable) -->
-      <div class="card premium-card mb-4">
-        <div class="card-header d-flex align-items-center justify-content-between">
-          <div class="d-flex align-items-center">
-              <div class="card-icon-container bg-primary-soft" style="background: rgba(78, 115, 223, 0.1); color: var(--premium-blue);">
-                  <i class="fas fa-id-card"></i>
-              </div>
-              <h5 class="mb-0 fw-bold">Configuración de Cuenta</h5>
+      <!-- Columna Izquierda: Unified Switch (Cuenta y Seguridad) -->
+      <div class="col-lg-6">
+        <div class="card premium-card mb-4 overflow-hidden border-0 shadow-sm h-100">
+          <div class="card-header bg-white pb-3 border-bottom-0 pt-4 px-4 text-center">
+            <div class="premium-tabs-wrapper d-inline-block w-100 shadow-sm border">
+              <ul class="nav nav-pills nav-fill border-0" id="profileTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link active" id="account-tab" data-bs-toggle="pill" data-toggle="pill" data-bs-target="#account-pane" data-target="#account-pane" type="button" role="tab" aria-controls="account-pane" aria-selected="true">
+                    <i class="fas fa-id-card me-2"></i>Cuenta
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link" id="security-tab" data-bs-toggle="pill" data-toggle="pill" data-bs-target="#security-pane" data-target="#security-pane" type="button" role="tab" aria-controls="security-pane" aria-selected="false">
+                    <i class="fas fa-shield-alt me-2"></i>Seguridad
+                  </button>
+                </li>
+              </ul>
+            </div>
           </div>
-          <button type="button" class="btn btn-sm btn-light rounded-pill px-3 border" onclick="toggleProfileEdit()" id="btn-edit-profile">
-              <i class="fas fa-edit me-1"></i>Editar
-          </button>
-        </div>
-        <div class="card-body p-4">
-          <form id="profile-form" action="{% url 'update_profile' %}" method="POST">
-            {% csrf_token %}
-            <div class="row g-3">
-                <div class="col-md-6">
+        
+        <div class="tab-content" id="profileTabsContent">
+          <!-- Tab 1: Configuración de Cuenta -->
+          <div class="tab-pane fade show active" id="account-pane" role="tabpanel" aria-labelledby="account-tab">
+            <div class="card-body p-4 pt-3">
+              <div class="d-flex align-items-center justify-content-between mb-4 mt-2">
+                <h6 class="mb-0 fw-bold text-muted text-uppercase small" style="letter-spacing: 1px;">Información Personal</h6>
+                <button type="button" class="btn btn-sm btn-light rounded-pill px-3 border" onclick="toggleProfileEdit()" id="btn-edit-profile">
+                  <i class="fas fa-edit me-1"></i>Editar
+                </button>
+              </div>
+              
+              <form id="profile-form" action="{% url 'update_profile' %}" method="POST">
+                {% csrf_token %}
+                <div class="row g-3">
+                  <div class="col-md-6">
                     <label class="form-label fw-semibold text-muted small text-uppercase" style="font-size: 0.7rem;">Nombre de Usuario</label>
                     <div class="premium-form-control bg-light text-muted fw-bold" style="opacity: 0.8;">{{ user.username }}</div>
-                    <small class="text-muted" style="font-size: 0.65rem; font-style: italic;">Identificador único del sistema.</small>
-                </div>
-                <div class="col-md-6">
+                    <small class="text-muted" style="font-size: 0.65rem; font-style: italic;">Identificador único.</small>
+                  </div>
+                  <div class="col-md-6">
                     <label for="email" class="form-label fw-semibold text-muted small text-uppercase" style="font-size: 0.7rem;">Correo Electrónico</label>
                     <input type="email" name="email" id="email" class="form-control premium-form-control profile-input" value="{{ user.email }}" readonly required>
-                </div>
-                <div class="col-md-12">
+                  </div>
+                  <div class="col-md-12">
                     <label for="full_name" class="form-label fw-semibold text-muted small text-uppercase" style="font-size: 0.7rem;">Nombre completo y Apellidos</label>
                     <input type="text" name="full_name" id="full_name" class="form-control premium-form-control profile-input" value="{{ profile.nombre|default:user.get_full_name }}" readonly required>
-                </div>
-                <div id="profile-actions" class="col-12 mt-4 d-none">
+                  </div>
+                  <div id="profile-actions" class="col-12 mt-4 d-none">
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary flex-grow-1 fw-bold rounded-pill">
-                            <i class="fas fa-check-circle me-1"></i> Guardar Cambios
-                        </button>
-                        <button type="button" class="btn btn-light rounded-pill px-4" onclick="toggleProfileEdit()">Cancelar</button>
+                      <button type="submit" class="btn btn-primary flex-grow-1 fw-bold rounded-pill py-2 shadow-sm">
+                        <i class="fas fa-check-circle me-1"></i> Guardar Cambios
+                      </button>
+                      <button type="button" class="btn btn-light rounded-pill px-4" onclick="toggleProfileEdit()">Cancelar</button>
                     </div>
+                  </div>
                 </div>
+              </form>
             </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- Cambio de contraseña -->
-      <div class="card premium-card shadow-sm border-0">
-        <div class="card-header d-flex align-items-center" style="border-top: 4px solid #f6c23e;">
-          <div class="card-icon-container" style="background: rgba(246, 194, 62, 0.1); color: #f6c23e;">
-              <i class="fas fa-shield-alt"></i>
           </div>
-          <h5 class="mb-0 fw-bold">Seguridad</h5>
-        </div>
-        <div class="card-body p-4">
-          <form method="POST" action="{% url 'change_password' %}" id="password-form">
-            {% csrf_token %}
-            <div class="mb-3">
-              <label for="old_password" class="form-label small fw-bold">Contraseña actual</label>
-              <div class="input-group">
-                  <span class="input-group-text bg-light border-end-0"><i class="fas fa-lock text-muted opacity-50"></i></span>
-                  <input type="password" class="form-control premium-form-control border-start-0" id="old_password" name="old_password" placeholder="••••••••" required />
-              </div>
-            </div>
-            <div class="row g-3 mb-4">
-                <div class="col-md-6">
+          
+          <!-- Tab 2: Seguridad -->
+          <div class="tab-pane fade" id="security-pane" role="tabpanel" aria-labelledby="security-tab">
+            <div class="card-body p-4 pt-3">
+              <h6 class="mb-0 fw-bold text-muted text-uppercase small mb-4 mt-2" style="letter-spacing: 1px;">Cambiar Contraseña</h6>
+              <form method="POST" action="{% url 'change_password' %}" id="password-form">
+                {% csrf_token %}
+                <div class="mb-3">
+                  <label for="old_password" class="form-label small fw-bold">Contraseña actual</label>
+                  <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="fas fa-lock text-muted opacity-50"></i></span>
+                    <input type="password" class="form-control premium-form-control border-start-0" id="old_password" name="old_password" placeholder="••••••••" required />
+                  </div>
+                </div>
+                <div class="row g-3 mb-4">
+                  <div class="col-md-6">
                     <label for="new_password1" class="form-label small fw-bold">Nueva contraseña</label>
                     <input type="password" class="form-control premium-form-control" id="new_password1" name="new_password1" placeholder="Mín. 8 caracteres" required onkeyup="checkPasswords()" />
-                </div>
-                <div class="col-md-6">
+                  </div>
+                  <div class="col-md-6">
                     <label for="new_password2" class="form-label small fw-bold">Confirmar</label>
                     <input type="password" class="form-control premium-form-control" id="new_password2" name="new_password2" placeholder="Repite password" required onkeyup="checkPasswords()" />
+                  </div>
+                  <div id="password-feedback" class="col-12 mt-1 display-none small text-center fw-bold"></div>
                 </div>
-                <div id="password-feedback" class="col-12 mt-1 display-none small text-center fw-bold"></div>
-            </div>
-            <button type="submit" class="btn btn-warning w-100 fw-bold py-2 shadow-sm rounded-pill" id="btn-update-password" disabled>
-              <i class="fas fa-key me-2"></i> Actualizar Contraseña
-            </button>
-          </form>
-        </div>
-      </div>
+                <button type="submit" class="btn btn-warning w-100 fw-bold py-2 shadow-sm rounded-pill" id="btn-update-password" disabled>
+                  <i class="fas fa-key me-2"></i> Actualizar Contraseña
+                </button>
+              </form>
+            </div> <!-- card-body security -->
+          </div> <!-- tab-pane security -->
+        </div> <!-- tab-content -->
+      </div> <!-- card left -->
+    </div> <!-- col-lg-6 left -->
 
-      <!-- Asignaturas (Movido bajo Seguridad) -->
-      {% if subjects_as_student or subjects_as_teacher %}
-      <div class="card premium-card border-0 mt-4">
-        <div class="card-header d-flex align-items-center" style="border-top: 4px solid #6c757d;">
-          <div class="card-icon-container" style="background: rgba(108, 117, 125, 0.1); color: #6c757d;">
-              <i class="fas fa-graduation-cap"></i>
-          </div>
-          <h5 class="mb-0 fw-bold">{% if is_student %}Mis Estudios{% else %}Cursos Impartidos{% endif %}</h5>
-        </div>
-        <div class="card-body p-0">
-          <div class="list-group list-group-flush">
-            {% if subjects_as_student %}
-              {% for subject in subjects_as_student %}
-              <div class="list-group-item d-flex justify-content-between align-items-center p-3 border-0">
-                <div class="d-flex align-items-center">
-                    <div class="p-2 bg-light rounded-circle me-3" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-book text-muted"></i>
-                    </div>
-                    <span class="fw-bold">{{ subject.name }}</span>
-                </div>
-                <span class="year-badge">{{ subject.genero }}</span>
-              </div>
-              {% endfor %}
-            {% endif %} 
-            
-            {% if subjects_as_teacher %}
-              {% for subject in subjects_as_teacher %}
-              <div class="list-group-item d-flex justify-content-between align-items-center p-3 border-0">
-                <div class="d-flex align-items-center">
-                    <div class="p-2 bg-light rounded-circle me-3" style="width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
-                        <i class="fas fa-users text-muted"></i>
-                    </div>
-                    <span class="fw-bold">{{ subject.name }}</span>
-                </div>
-                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3">
-                  {{ subject.students.count }} alumnos
-                </span>
-              </div>
-              {% endfor %}
-            {% endif %}
-          </div>
-        </div>
-      </div>
-      {% endif %}
-    </div>
-
-    <!-- Columna derecha: Token API y asignaturas -->
+    <!-- Columna derecha: Token API -->
     <div class="col-lg-6">
-      <!-- Token API -->
       {% if profile %}
-      <div class="card premium-card mb-4 border-0">
+      <div class="card premium-card border-0 shadow-sm h-100">
         <div class="card-header d-flex align-items-center bg-dark text-white">
           <div class="card-icon-container" style="background: rgba(255, 255, 255, 0.1);">
               <i class="fas fa-terminal"></i>
@@ -524,13 +522,81 @@
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
+        </div> <!-- card-body -->
+      </div> <!-- card -->
       {% endif %}
+    </div> <!-- col-lg-6 right -->
+  </div> <!-- row top -->
+</div> <!-- container top -->
+
+  <!-- Nueva Sección: Mis Estudios en formato cuadrícula (Grid) -->
+  {% if subjects_as_student or subjects_as_teacher %}
+  <div class="container mt-5 pb-5">
+    <div class="col-12">
+      <div class="d-flex align-items-center mb-4">
+        <div class="card-icon-container" style="background: rgba(108, 117, 125, 0.1); color: #6c757d;">
+          <i class="fas fa-book-reader fa-lg"></i>
+        </div>
+        <h3 class="mb-0 fw-bold text-dark">{% if is_student %}Mis Estudios{% else %}Cursos Impartidos{% endif %}</h3>
+      </div>
+      
+      <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+        {% if subjects_as_student %}
+          {% for subject in subjects_as_student %}
+          <div class="col">
+            <div class="premium-card p-4 h-100 d-flex flex-column justify-content-between border-0 shadow-sm bg-white" 
+                 style="border-top: 4px solid var(--premium-blue) !important;">
+              <div class="d-flex align-items-start justify-content-between mb-3">
+                <div class="d-flex align-items-center">
+                  <div class="p-3 bg-light rounded-4 me-3 text-primary">
+                    <i class="fas fa-university fa-lg"></i>
+                  </div>
+                  <div>
+                    <h5 class="fw-bold mb-1 text-dark">{{ subject.name }}</h5>
+                    <span class="text-muted small">ID Matrícula: #{{ subject.id }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="d-flex align-items-center justify-content-between mt-auto pt-3 border-top">
+                <span class="text-muted small fw-medium">Generación / Curso</span>
+                <span class="year-badge shadow-sm">{{ subject.genero|default:"2026" }}</span>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        {% endif %}
+
+        {% if subjects_as_teacher %}
+          {% for subject in subjects_as_teacher %}
+          <div class="col">
+            <div class="premium-card p-4 h-100 d-flex flex-column justify-content-between border-0 shadow-sm bg-white" 
+                 style="border-top: 4px solid var(--premium-blue) !important;">
+              <div class="d-flex align-items-start justify-content-between mb-3">
+                <div class="d-flex align-items-center">
+                  <div class="p-3 bg-light rounded-4 me-3 text-primary">
+                    <i class="fas fa-chalkboard-teacher fa-lg"></i>
+                  </div>
+                  <div>
+                    <h5 class="fw-bold mb-1 text-dark">{{ subject.name }}</h5>
+                    <span class="text-muted small">Código Curso: {{ subject.id }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="d-flex align-items-center justify-content-between mt-auto pt-3 border-top">
+                <span class="text-muted small fw-medium">Estadísticas</span>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-2">
+                  <i class="fas fa-users me-1"></i> {{ subject.students.count }} alumnos
+                </span>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        {% endif %}
+      </div>
     </div>
-  </div>
-</div>
+  </div> <!-- container studies -->
+  {% endif %}
+</div> <!-- Main profile-container (started at line 174 or close) -->
 
 <!-- Modal de Token Regenerado (Premium) -->
   <div class="modal fade" id="tokenModal" tabindex="-1" aria-hidden="true">

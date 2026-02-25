@@ -64,7 +64,6 @@ INSTALLED_APPS = [
     # Terceros
     'colorfield',
     'rest_framework',
-    'rest_framework_simplejwt',
     # 'rest_framework.authtoken',  # DESHABILITADO: Ahora usamos ExpiringToken (paasify.models.TokenModel)
     'drf_spectacular',
     'channels',
@@ -213,7 +212,6 @@ REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.SessionAuthentication',
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
 }
 
