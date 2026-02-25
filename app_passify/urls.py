@@ -30,9 +30,8 @@ handler404 = 'paasify.views.ErrorViews.handler404'
 handler500 = 'paasify.views.ErrorViews.handler500'
 handler403 = 'paasify.views.ErrorViews.handler403'
 
-# Django REST framework & JWT
+# Django REST framework
 from rest_framework import routers
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 # Router de la API REST
@@ -73,8 +72,6 @@ urlpatterns = [
 
     # API REST
     path('api/', include(router.urls)),
-    path('api/token/',         TokenObtainPairView.as_view(), name='token_obtain'),
-    path('api/token/refresh/', TokenRefreshView.as_view(),   name='token_refresh'),
     
     # Silenciar peticiones de navegador (Chrome DevTools / SourceMaps)
     path('.well-known/appspecific/com.chrome.devtools.json', lambda r: HttpResponse(status=204)),
