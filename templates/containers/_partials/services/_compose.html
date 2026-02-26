@@ -16,6 +16,13 @@
             <i class="fas fa-stop"></i>
         </button>
 
+        <button class="btn btn-info" {% if service.status != 'running' %}disabled{% endif %}
+            hx-post="{% url 'service-restart' service.id %}" hx-swap="none"
+            hx-on::after-request="htmx.trigger('body', 'service:table-refresh')"
+            title="Reiniciar todo el Stack (Restart)">
+            <i class="fas fa-sync-alt"></i>
+        </button>
+
         {% if not is_supervisor or service.owner == request.user %}
         <button class="btn btn-danger" 
             hx-post="{% url 'service-remove' service.id %}"
