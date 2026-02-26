@@ -1085,6 +1085,8 @@ def service_table(request):
         sync_service_status(s)
 
     host = request.get_host().split(":")[0]
+    # En desarrollo con túneles de VS Code, el puerto externo no se mapea igual.
+    # El host obtenido aquí se usará para construir el enlace a la app.
     
     # Evaluar si algún servicio está en estado transitorio para forzar polling en el cliente
     transient_states = ["pending", "starting", "stopping", "building", "pulling", "deleting", "creating"]
@@ -1897,17 +1899,42 @@ def api_documentation_view(request, section_slug="introduccion"):
     from django.shortcuts import redirect
     from django.http import Http404
 
-    # Definicion del orden fijo de secciones
+    # Definicion del orden fijo de secciones (Jerarquia completa)
     SECTIONS = [
-        {"slug": "introduccion",    "title": "Introducción",          "file": "01_introduction.md"},
-        {"slug": "autenticacion",   "title": "Autenticación",          "file": "02_authentication.md"},
-        {"slug": "gets",            "title": "Consultas (GETs)",      "file": "03_gets.md"},
-        {"slug": "crear",           "title": "Crear Servicio",        "file": "04_create.md"},
-        {"slug": "modificar",       "title": "Modificar Servicio",    "file": "05_modify.md"},
-        {"slug": "acciones",        "title": "Acciones del Servicio", "file": "06_actions.md"},
-        {"slug": "logs",            "title": "Logs del Servicio",     "file": "07_logs.md"},
-        {"slug": "ci-cd",           "title": "Integración CI/CD",     "file": "08_cicd.md"},
-        {"slug": "errores",         "title": "Códigos de Error",      "file": "09_errors.md"},
+        {"slug": "introduccion",    "title": "1. Introducción",          "file": "01_intro/intro.md"},
+        {"slug": "bienvenida",      "title": "1.1 Bienvenida",           "file": "01_intro/01_bienvenida.md", "parent_slug": "introduccion", "icon": "👋"},
+        
+        {"slug": "autenticacion",   "title": "2. Autenticación",          "file": "02_auth/intro.md"},
+        {"slug": "token-access",    "title": "2.1 Token API",            "file": "02_auth/01_token.md", "parent_slug": "autenticacion", "icon": "🔑"},
+        
+        {"slug": "gets",            "title": "3. Consultas (GETs)",      "file": "03_gets/main.md"},
+        {"slug": "proyectos",       "title": "3.1 Proyectos",            "file": "03_gets/01_projects.md", "parent_slug": "gets", "icon": "📂"},
+        {"slug": "subjects_get",    "title": "3.2 Asignaturas",         "file": "03_gets/02_subjects.md", "parent_slug": "gets", "icon": "📚"},
+        {"slug": "containers_get",  "title": "3.3 Servicios",           "file": "03_gets/03_containers.md", "parent_slug": "gets", "icon": "🐳"},
+        
+        {"slug": "crear",           "title": "4. Crear Servicio",        "file": "04_create/00_intro.md"},
+        {"slug": "catalog",         "title": "4.1 Modo Catálogo",        "file": "04_create/01_catalog.md", "parent_slug": "crear", "icon": "🍱"},
+        {"slug": "dockerhub",       "title": "4.2 Modo DockerHub",       "file": "04_create/02_dockerhub.md", "parent_slug": "crear", "icon": "🐳"},
+        {"slug": "custom-df",       "title": "4.3 Dockerfile",           "file": "04_create/03_custom_dockerfile.md", "parent_slug": "crear", "icon": "🛠️"},
+        {"slug": "custom-comp",     "title": "4.4 Docker Compose",       "file": "04_create/04_custom_compose.md", "parent_slug": "crear", "icon": "🐙"},
+        
+        {"slug": "modificar",       "title": "5. Modificar Servicio",    "file": "05_modify/intro.md"},
+        {"slug": "config-mod",      "title": "5.1 Configuración",        "file": "05_modify/01_config.md", "parent_slug": "modificar", "icon": "⚙️"},
+        {"slug": "re-deploy",       "title": "5.2 Re-despliegue",        "file": "05_modify/02_redeploy.md", "parent_slug": "modificar", "icon": "🔄"},
+        {"slug": "mod-examples",    "title": "5.3 Ejemplos",             "file": "05_modify/03_examples.md", "parent_slug": "modificar", "icon": "📝"},
+        
+        {"slug": "acciones-parent", "title": "6. Acciones del Servicio", "file": "06_actions/intro.md"},
+        {"slug": "acciones",        "title": "6.1 Acciones",             "file": "06_actions/01_acciones.md", "parent_slug": "acciones-parent", "icon": "⚙️"},
+        
+        {"slug": "logs-parent",     "title": "7. Logs del Servicio",     "file": "07_logs/intro.md"},
+        {"slug": "logs",            "title": "7.1 Logs",                 "file": "07_logs/01_logs.md", "parent_slug": "logs-parent", "icon": "📄"},
+        
+        {"slug": "ci-cd",           "title": "8. Integración CI/CD",     "file": "08_cicd/01_intro.md"},
+        {"slug": "github",          "title": "8.1 GitHub Actions",       "file": "08_cicd/02_github.md", "parent_slug": "ci-cd", "icon": "fab fa-github"},
+        {"slug": "gitlab",          "title": "8.2 GitLab CI",            "file": "08_cicd/03_gitlab.md", "parent_slug": "ci-cd", "icon": "fab fa-gitlab"},
+        
+        {"slug": "errores-parent",  "title": "9. Códigos de Error",      "file": "09_errors/intro.md"},
+        {"slug": "errores",         "title": "9.1 Errores",              "file": "09_errors/01_errores.md", "parent_slug": "errores-parent", "icon": "🛑"},
     ]
 
     # Buscar la seccion actual
@@ -1923,9 +1950,18 @@ def api_documentation_view(request, section_slug="introduccion"):
     # Leer el archivo Markdown de la seccion actual y extraer H3 de todas
     partials_dir = os.path.join(settings.BASE_DIR, "templates", "api_docs", "partials")
     
+    # Identificar qué secciones actúan como padres para evitar ruido en el menú lateral
+    parent_slugs = {s["parent_slug"] for s in SECTIONS if "parent_slug" in s}
+
     # Enriquecer SECTIONS con sus sub-encabezados (H3)
     for section in SECTIONS:
         section["subsections"] = []
+        
+        # Saltamos la extracción de H3 para secciones que son Padres (ej: 4, 8)
+        # ya que sus hijos (4.1, 8.1) ya ocupan ese espacio en el menú lateral
+        if section["slug"] in parent_slugs:
+            continue
+
         path = os.path.join(partials_dir, section["file"])
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
@@ -1936,9 +1972,9 @@ def api_documentation_view(request, section_slug="introduccion"):
                         # Generar slug para el link
                         import unicodedata
                         import re
-                        slug = unicodedata.normalize('NFD', title).encode('ascii', 'ignore').decode('utf-8')
-                        slug = re.sub(r'[^a-z0-9]+', '-', slug.lower()).strip('-')
-                        section["subsections"].append({"title": title, "slug": slug})
+                        slug_text = unicodedata.normalize('NFD', title).encode('ascii', 'ignore').decode('utf-8')
+                        slug_text = re.sub(r'[^a-z0-9]+', '-', slug_text.lower()).strip('-')
+                        section["subsections"].append({"title": title, "slug": slug_text})
 
     current_section = SECTIONS[current_index]
     
@@ -1972,6 +2008,7 @@ def api_documentation_view(request, section_slug="introduccion"):
         'total_sections': len(SECTIONS),
         'prev_section': prev_section,
         'next_section': next_section,
+        'current_section': current_section,
         'images': images,
         'title': f"{current_section['title']} - API Docs",
     }
