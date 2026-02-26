@@ -432,10 +432,16 @@ class ServiceViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def restart(self, request, pk=None):
         service = self.get_object()
+        service.status = "restarting"
+        service.save(update_fields=["status"])
         try:
             from .services import run_container
-            run_container(service)
+            import time
+            # Delay para que el auto-refresh de HTMX (cada 3s) capture el estado 'restarting'
+            time.sleep(1.5)
+            run_container(service, force_restart=True)
         except Exception as exc:
+            # Si falla, el sync_service_status lo pondrá en error o stopped después
             if self._is_htmx(request):
                 return self._htmx_response(request, status=500, message=str(exc), level="text-bg-danger")
             return DRF_Response({"status": "error", "message": str(exc)}, status=500)
@@ -443,7 +449,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if self._is_htmx(request):
             return self._htmx_response(
                 request,
-                message="El servicio está siendo enviado a reiniciar...",
+                message="El servicio está siendo reiniciado...",
                 level="text-bg-warning",
             )
         return DRF_Response({"status": "restarting", "message": "Servicio reiniciando."})
