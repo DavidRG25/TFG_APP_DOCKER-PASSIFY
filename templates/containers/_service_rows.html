@@ -1,132 +1,207 @@
-﻿{# Template refactorizado: Filas de servicios #}
-{% for s in services %}
-<tr id="service-{{ s.id }}">
-  {% if not hide_redundant and not hide_subject_column %}
-  <td class="ps-4">
-    {% if s.subject %}
-    <div class="fw-bold text-dark">{{ s.subject.name }}</div>
-    {% else %}
-    <span class="text-muted italic">Sin Asignatura</span>
-    {% endif %}
-  </td>
-  {% endif %}
+﻿{# Template refactorizado: Agrupación JERÁRQUICA TOTAL con bloques de proyecto PREMIUM #}
+{% regroup services by subject as subject_list %}
+
+{% for subject_item in subject_list %}
+  {# Color dinámico de la asignatura #}
+  {% with subj=subject_item.grouper %}
+  {% with subject_color=current_subject.color|default:subj.color|default:"#4e73df" %}
   
-  {% if not hide_project_column %}
-  <td class="{% if hide_redundant or hide_subject_column %}ps-4{% endif %}">
-    <div class="fw-bold text-primary">{{ s.project.place|default:"General" }}</div>
-  </td>
-  {% endif %}
-  
-  {% if not hide_redundant and is_supervisor %}
-  <td>
-    <div class="fw-semibold text-dark">{{ s.owner.get_full_name|default:s.owner.username }}</div>
-    <small class="text-muted">@{{ s.owner.username }}</small>
-  </td>
-  {% endif %}
-
-  <td {% if hide_redundant or hide_project_column %}class="ps-4"{% endif %}>
-    <div class="fw-bold text-dark mb-1">{{ s.name }}</div>
-    <small class="text-muted d-block mb-1" style="font-size: 0.7rem;">ID: #{{ s.id }}</small>
-    <div>
-      {% if not s.has_compose %}
-        {% if s.container_type == 'web' %}
-          <span class="badge bg-info-soft text-info border border-info px-2 py-1" style="font-size: 0.65rem;" title="Web Service">
-            <i class="fas fa-globe me-1"></i>WEB
-          </span>
-        {% elif s.container_type == 'api' %}
-          <span class="badge bg-primary-soft text-primary border border-primary px-2 py-1" style="font-size: 0.65rem;" title="API Service">
-            <i class="fas fa-server me-1"></i>API
-          </span>
-        {% elif s.container_type == 'database' %}
-          <span class="badge bg-success-soft text-success border border-success px-2 py-1" style="font-size: 0.65rem;" title="Database">
-            <i class="fas fa-database me-1"></i>DB
-          </span>
-        {% else %}
-          <span class="badge bg-secondary-soft text-secondary border border-secondary px-2 py-1" style="font-size: 0.65rem;" title="Misc/Other">
-            <i class="fas fa-cube me-1"></i>MISC
-          </span>
-        {% endif %}
-      {% else %}
-        <span class="badge bg-purple-soft text-purple border border-purple px-2 py-1" style="font-size: 0.65rem;" title="Docker Compose Stack">
-          <i class="fas fa-layer-group me-1"></i>STACK
-        </span>
-      {% endif %}
-    </div>
-    <div class="mt-1" style="line-height: 1;">
-      {% if s.mode == 'dockerhub' %}
-        <small class="text-secondary" style="font-size: 0.65rem; font-weight: 600;"><i class="fab fa-docker me-1"></i>DockerHub</small>
-      {% elif s.mode == 'custom' %}
-         {% if s.has_compose %}
-            <small class="text-primary" style="font-size: 0.65rem; font-weight: 600;"><i class="fas fa-network-wired me-1"></i>Compose</small>
-         {% else %}
-            <small class="text-info" style="font-size: 0.65rem; font-weight: 600;"><i class="fas fa-file-code me-1"></i>Dockerfile</small>
-         {% endif %}
-      {% endif %}
-    </div>
-  </td>
-
-  <td><code class="small text-primary">{{ s.image|truncatechars:30 }}</code></td>
-
-  <td>
-    {% if s.has_compose %}
-    {# Modo compose: mostrar puertos de cada contenedor #}
-    {% for c in s.containers.all %}
-    {% if c.name != "principal" %}
-    <div class="small mb-2">
-      <div class="d-flex align-items-center mb-1">
-        <strong class="me-2">{{ c.name }}:</strong>
+  <div class="subject-block mb-5 card border-0 shadow-lg overflow-hidden" 
+       style="--subj-color: {{ subject_color }}; border-radius: 24px; background: #fff;">
+    
+    {# 1. CABECERA DE LA ASIGNATURA (Compacta y sin franjas extra) #}
+    {% if not hide_subject_header %}
+    <div class="card-header border-0 px-5 py-4" 
+         style="background: linear-gradient(135deg, var(--subj-color) 0%, rgba(0,0,0,0.7) 200%);">
+      <div class="d-flex align-items-center">
+        {# Logo separado con más margen a la derecha (me-5) #}
+        <div class="bg-white rounded-3 d-flex align-items-center justify-content-center shadow-lg" 
+             style="width: 50px; height: 50px; color: var(--subj-color); border: 2.5px solid rgba(255,255,255,0.2); flex-shrink: 0; margin-right: 3rem !important;">
+          {% if subj.logo %}
+              <img src="{{ subj.logo.url }}" class="w-75 h-75 object-fit-contain">
+          {% else %}
+              <i class="fas fa-university fa-lg"></i>
+          {% endif %}
+        </div>
+        <div>
+          <h2 class="h4 mb-0 fw-bold text-white text-uppercase" style="letter-spacing: 0.5px; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">{{ subj.name|default:"Sin Asignatura" }}</h2>
+          <div class="d-flex align-items-center gap-2 mt-1">
+              <span class="text-white-50 fw-bold small text-uppercase" style="font-size: 0.65rem;">ID: #{{ subj.id }}</span>
+              <span class="text-white-50 small mx-1">•</span>
+              <span class="text-white-50 fw-bold small text-uppercase" style="font-size: 0.65rem;">{{ subj.teacher_user.get_full_name|default:subj.teacher_user.username|upper }}</span>
+          </div>
+        </div>
       </div>
-      <div class="ps-3 border-start ms-1">
-        {% if c.assigned_ports %}
-        {% for p in c.assigned_ports %}
-        <div class="text-dark font-monospace" style="font-size: 0.75rem;">
-          {{ p.external|default:"-" }} <i class="fas fa-arrow-right mx-1 text-muted" style="font-size: 0.6rem;"></i> {{ p.internal|default:"-" }}
+    </div>
+    {% endif %}
+
+    <div class="card-body p-4 pt-4" style="background: rgba(0,0,0,0.01); border-top: 1px solid rgba(0,0,0,0.05);">
+        
+        {# 2. CABECERA DE COLUMNAS (Solo si no se pasa hide_table_header) #}
+        {% if not hide_table_header %}
+        <div class="columns-header py-3 px-4 mb-3 bg-white shadow-sm rounded-pill border mx-3">
+            <div class="row align-items-center text-uppercase text-muted fw-bold" style="font-size: 0.65rem; letter-spacing: 1.5px;">
+                <div class="col-3 ps-4" onclick="toggleServiceOrdering('name')" style="cursor:pointer;">
+                    Nombre <i class="fas fa-sort ms-1 opacity-50 sort-icon-name"></i>
+                </div>
+                <div class="col-3 text-center" onclick="toggleServiceOrdering('image')" style="cursor:pointer;">
+                    Origen / Imagen <i class="fas fa-sort ms-1 opacity-50 sort-icon-image"></i>
+                </div>
+                <div class="col-1 text-center">Puerto</div>
+                <div class="col-2 text-center" onclick="toggleServiceOrdering('status')" style="cursor:pointer;">
+                    Estado <i class="fas fa-sort ms-1 opacity-50 sort-icon-status"></i>
+                </div>
+                <div class="col-3 text-center">Acciones</div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# 3. BLOQUES DE PROYECTOS #}
+        {% regroup subject_item.list by project as project_list %}
+        {% for project_item in project_list %}
+        <div class="project-inner-card bg-white shadow-sm mb-4 overflow-hidden border-0" 
+             style="border-radius: 20px; border-left: 8px solid var(--subj-color) !important; position: relative;">
+            
+            {# Decoración de Marca de Agua (DETRÁS DE TODO) #}
+            <div class="position-absolute" style="right: 8%; top: -6px; opacity: 0.22; pointer-events: none; z-index: 0;">
+                <i class="fas fa-folder-open" style="font-size: 4rem; color: var(--subj-color); transform: rotate(-10deg);"></i>
+            </div>
+
+            {# Banner de Proyecto con borde más grueso y posición relativa #}
+            {% if not hide_project_header %}
+            <div class="px-5 py-3 d-flex align-items-center justify-content-between position-relative" 
+                 style="background: linear-gradient(90deg, rgba(0,0,0,0.01) 0%, transparent 100%); z-index: 1; border-bottom: 2.5px solid rgba(0,0,0,0.06);">
+                
+                <div class="d-flex align-items-center">
+                    <div class="rounded-pill d-flex align-items-center justify-content-center me-3 border" 
+                         style="width: 28px; height: 28px; background: rgba(0,0,0,0.02); color: var(--subj-color);">
+                        <i class="fas fa-folder-open" style="font-size: 0.65rem;"></i>
+                    </div>
+                    <div>
+                        <h5 class="mb-0 fw-bold text-dark" style="letter-spacing: -0.3px; font-size: 1rem;">{{ project_item.grouper.place|default:"Proyecto Principal" }}</h5>
+                        <p class="text-muted mb-0 small text-uppercase fw-bold" style="font-size: 0.55rem; letter-spacing: 0.5px;">ENTORNO ASOCIADO</p>
+                    </div>
+                </div>
+                
+                <span class="badge bg-white text-muted border fw-bold px-3 py-2 shadow-sm" 
+                      style="font-size: 0.6rem; border-radius: 8px;">ID PROYECTO: #{{ project_item.grouper.id|default:"1" }}</span>
+            </div>
+            {% endif %}
+
+            <div class="table-responsive position-relative" style="z-index: 2;">
+                <table class="table align-middle mb-0" style="table-layout: fixed;">
+                    <tbody>
+                        {% for s in project_item.list %}
+                        <tr id="service-{{ s.id }}" class="service-row bg-white">
+                            <td class="ps-5 py-4" style="width: 25%;">
+                                <div class="d-flex flex-column">
+                                    <span class="fw-bold text-dark h6 mb-1">{{ s.name }}</span>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="badge bg-light text-muted border text-uppercase" style="font-size: 0.55rem; padding: 0.4em 0.7em;">REF: #{{ s.id }}</span>
+                                        {% if s.has_compose %}
+                                          <span class="badge bg-primary text-white shadow-sm" style="font-size: 0.55rem; padding: 0.4em 0.82em;"><i class="fas fa-layer-group me-1"></i>STACK</span>
+                                        {% elif s.mode == 'dockerfile' %}
+                                          <span class="badge bg-info text-white shadow-sm" style="font-size: 0.55rem; padding: 0.4em 0.82em;"><i class="fas fa-file-code me-1"></i>FILE</span>
+                                        {% else %}
+                                          <span class="badge bg-secondary text-white shadow-sm" style="font-size: 0.55rem; padding: 0.4em 0.82em;"><i class="fab fa-docker me-1"></i>HUB</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td class="text-center py-4" style="width: 25%;">
+                                <div class="d-flex justify-content-center">
+                                    <span class="image-premium-badge badge py-2 px-4 shadow-sm" 
+                                          style="font-size: 0.7rem; border: 2px solid var(--subj-color); color: var(--subj-color); background: #fff; border-radius: 12px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700;">
+                                        {% if s.has_compose %}
+                                            <i class="fas fa-cubes me-2"></i>DOCKER COMPOSE STACK
+                                        {% elif s.mode == 'dockerfile' %}
+                                            <i class="fas fa-file-code me-2"></i>DOCKERFILE BUILD
+                                        {% else %}
+                                            <i class="fab fa-docker me-2"></i>{{ s.image|default:"Sin imagen" }}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </td>
+
+                            <td class="text-center py-4" style="width: 10%;">
+                                {% if s.has_compose %}
+                                    <span class="text-muted fw-bold" style="font-size: 0.65rem;">MULTIPLE</span>
+                                {% elif s.assigned_port %}
+                                    <div class="d-flex flex-column align-items-center">
+                                        <span class="text-primary fw-bold" style="font-size: 1.15rem;">{{ s.assigned_port }}</span>
+                                        <span class="text-muted fw-bold opacity-50" style="font-size: 0.6rem;">&rarr;{{ s.internal_port|default:80 }}</span>
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted opacity-25">-</span>
+                                {% endif %}
+                            </td>
+
+                            <td class="text-center py-4" style="width: 15%;">
+                                {% include "containers/_partials/services/_status.html" with service=s %}
+                            </td>
+
+                            <td class="text-center py-4 pe-4" style="width: 25%;">
+                                {% include "containers/_partials/services/_actions_menu.html" with service=s %}
+                            </td>
+                        </tr>
+
+                        {# Detalle de Compose (Stacks) #}
+                        {% if s.has_compose %}
+                        <tr id="compose-detail-{{ s.id }}">
+                            <td colspan="5" class="p-0 border-0">
+                                <div class="px-5 py-4" style="background: #fbfcfe; box-shadow: inset 0 2px 10px rgba(0,0,0,0.02); border-top: 1px solid #f8fafc;">
+                                    <div class="row g-3">
+                                        {% for container in s.containers.all %}
+                                        {% if container.name != "principal" %}
+                                        <div class="col-md-6">
+                                            {% include "containers/_partials/services/_container_card.html" with container=container service=s host=host %}
+                                        </div>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
         {% endfor %}
-        {% else %}
-        <span class="text-muted italic smaller">No asignado</span>
-        {% endif %}
-      </div>
     </div>
-    {% endif %}
-    {% empty %}
-    <small class="text-muted">No asignado</small>
-    {% endfor %}
-    {% else %}
-    {# Modo simple: mostrar puerto único #}
-    <div>{{ s.assigned_port|default:"No asignado" }}</div>
-    {% if s.assigned_port %}
-    <small class="text-muted d-block">Interno: {{ s.internal_port|default:80 }}</small>
-    {% endif %}
-    {% endif %}
-  </td>
-
-  <td>
-    {% include "containers/_partials/services/_status.html" with service=s %}
-  </td>
-
-  <td>
-    {% if s.has_compose %}
-    {% include "containers/_partials/services/_compose.html" with service=s host=host %}
-    {% else %}
-    {% include "containers/_partials/services/_simple.html" with service=s host=host %}
-    {% endif %}
-  </td>
-</tr>
+  </div>
+  {% endwith %}
+  {% endwith %}
 {% empty %}
-<tr>
-  <td colspan="7" class="text-center text-muted py-4">
-    Aun no tienes servicios.
-  </td>
-</tr>
+  <div class="card border-0 shadow-lg py-5 text-center" style="border-radius: 28px;">
+    <div class="mb-3"><i class="fas fa-search fa-4x opacity-10"></i></div>
+    <h5 class="text-muted fw-bold">Sin resultados</h5>
+    <p class="text-muted small">No hay servicios que coincidan con los filtros.</p>
+  </div>
 {% endfor %}
 
-{# Autorefresco inteligente si hay estados transitorios #}
+{# Refresco para estados transitorios #}
 {% if has_transient %}
-<tr style="display:none;" 
-    hx-get="{% url 'containers:service_table' %}?subject={{ subject_id|default:'' }}&project={{ project_id|default:'' }}{% if hide_subject_column %}&hide_subject=1{% endif %}" 
-    hx-trigger="load delay:2s" 
-    hx-target="#service-table" 
-    hx-swap="innerHTML">
-</tr>
+<div hx-get="{% url 'containers:service_table' %}?{% if subject_id %}subject={{ subject_id }}{% endif %}{% if project_id %}&project={{ project_id }}{% endif %}&group_by=project{% if hide_subject_header %}&hide_subject=1{% endif %}{% if hide_project_header %}&hide_project=1{% endif %}&hide_table_header=1" 
+     hx-trigger="load delay:3s" 
+     hx-target="#service-table" 
+     hx-swap="innerHTML"
+     style="display:none;">
+</div>
 {% endif %}
+
+<style>
+    .service-row:hover {
+        background-color: #f8fafc !important;
+    }
+    .image-premium-badge {
+        transition: all 0.25s ease;
+    }
+    .service-row:hover .image-premium-badge {
+        background: var(--subj-color) !important;
+        color: white !important;
+        transform: translateY(-1px);
+    }
+</style>

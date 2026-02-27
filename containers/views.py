@@ -982,10 +982,10 @@ def student_services_in_subject(request, subject_id):
     if not (user_is_admin(request.user) or subject.students.filter(pk=request.user.pk).exists()):
         return HttpResponse("No estas matriculado en esta asignatura.", status=403)
 
-    # Mostrar SOLO servicios del alumno para esa asignatura
     services = (
         Service.objects
         .filter(owner=request.user, subject=subject)
+        .filter(models.Q(project__isnull=True) | models.Q(project__subject=subject))
         .exclude(status="removed")
     )
     
@@ -1001,10 +1001,17 @@ def student_services_in_subject(request, subject_id):
     
     # Necesario para el selector de asignaturas en el filtro
     available_subjects = Subject.objects.filter(students=request.user).distinct()
-    user_projects = UserProject.objects.filter(user_profile__user=request.user, subject=subject)
+    # Identificar proyectos de la asignatura actual
+    user_projects = UserProject.objects.filter(subject=subject).order_by('place')
 
     images = AllowedImage.objects.all()
     host = request.get_host().split(":")[0]
+    
+    # Determine if there's a custom sort applied (for the table, not directly here)
+    # This variable is usually set in service_table, but for consistency in context
+    # we'll define it here as False since this view doesn't have custom sorting logic.
+    user_has_custom_sort = False 
+
     return render(
         request,
         "containers/student_panel.html",
@@ -1015,6 +1022,7 @@ def student_services_in_subject(request, subject_id):
             "current_subject": subject, 
             "host": host,
             "available_subjects": available_subjects,
+            "is_sorting": user_has_custom_sort,
             "stats": {
                 "total": total_services,
                 "running": running_count,
@@ -1068,8 +1076,9 @@ def service_table(request):
         qs = qs.filter(Q(name__icontains=q) | Q(image__icontains=q) | Q(owner__username__icontains=q) | Q(owner__first_name__icontains=q) | Q(owner__last_name__icontains=q))
         
     ordering = request.GET.get("ordering")
+    order_field = None
     if ordering:
-        # Mapeo de campos válidos para evitar errores o inyecciones
+        # Mapeo de campos válidos
         sort_map = {
             'name': 'name', '-name': '-name',
             'image': 'image', '-image': '-image',
@@ -1079,10 +1088,23 @@ def service_table(request):
             'owner': 'owner__username', '-owner': '-owner__username',
         }
         order_field = sort_map.get(ordering)
-        if order_field:
-            qs = qs.order_by(order_field)
+    
+    # Si se pide agrupación, aplicar orden según contexto
+    group_by = request.GET.get("group_by", "")
+    user_has_custom_sort = ordering and order_field and order_field != "-id"
+    
+    if user_has_custom_sort:
+        if ordering == 'name':
+            # Orden jerárquico solicitado: Asignatura > Proyecto > Nombre Servicio
+            qs = qs.order_by("subject__name", "project__place", "name")
+        elif ordering == '-name':
+            qs = qs.order_by("-subject__name", "-project__place", "-name")
         else:
-            qs = qs.order_by("-id")
+            qs = qs.order_by(order_field)
+    elif group_by == "project":
+        qs = qs.order_by("subject__name", "project__place", "-id")
+    elif group_by == "student":
+        qs = qs.order_by("owner__first_name", "owner__last_name", "project__place", "-id")
     else:
         qs = qs.order_by("-id")
 
@@ -1091,16 +1113,12 @@ def service_table(request):
         sync_service_status(s)
 
     host = request.get_host().split(":")[0]
-    # En desarrollo con túneles de VS Code, el puerto externo no se mapea igual.
-    # El host obtenido aquí se usará para construir el enlace a la app.
     
     # Evaluar si algún servicio está en estado transitorio para forzar polling en el cliente
     transient_states = ["pending", "starting", "stopping", "building", "pulling", "deleting", "creating"]
     has_transient = qs.filter(status__in=transient_states).exists()
     
     if not has_transient:
-        # Tambien considerar transitorios los contenedores individuales de Compose
-        # (ej: si estan en 'created', 'restarting', 'removing')
         has_transient = ServiceContainer.objects.filter(
             service__in=qs,
             status__in=["created", "restarting", "removing"]
@@ -1113,6 +1131,14 @@ def service_table(request):
         except Exception:
             pass
 
+    # Determinar si debemos ocultar la cabecera de asignatura
+    # Solo la ocultamos si se pide explícitamente (hide_subject=1)
+    hide_header = hide_subject
+
+    # Detectar si debemos ocultar los encabezados de tabla internos
+    # (Para evitar que se dupliquen con el encabezado global del dashboard)
+    hide_table_header = request.GET.get("hide_table_header") == "1"
+
     html = render_to_string("containers/_service_rows.html", {
         "services": qs, 
         "host": host, 
@@ -1123,7 +1149,11 @@ def service_table(request):
         "hide_redundant": hide_owner or hide_subject or hide_project,
         "hide_subject_column": hide_subject,
         "hide_project_column": hide_project,
-        "current_subject": current_sub_obj
+        "current_subject": current_sub_obj,
+        "hide_subject_header": hide_header,
+        "hide_table_header": hide_table_header,
+        "is_sorting": user_has_custom_sort,
+        "group_by": group_by,
     }, request=request)
     return HttpResponse(html)
 
@@ -1437,6 +1467,17 @@ def professor_subject_detail(request, subject_id):
                     messages.success(request, "Proyecto asignado con éxito.")
                 except Exception as e:
                     messages.error(request, f"Error creando el proyecto: {str(e)}")
+        elif action == "edit_project":
+            project_id = request.POST.get("project_id")
+            place = request.POST.get("place")
+            if project_id and place:
+                try:
+                    p = UserProject.objects.get(pk=project_id)
+                    p.place = place
+                    p.save()
+                    messages.success(request, "Nombre del proyecto actualizado.")
+                except Exception as e:
+                    messages.error(request, f"Error editando el proyecto: {str(e)}")
         elif action == "edit_student":
             student_id = request.POST.get("student_id")
             email = request.POST.get("email")
