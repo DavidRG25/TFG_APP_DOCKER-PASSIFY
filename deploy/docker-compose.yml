@@ -1,0 +1,84 @@
+version: "3.8"
+
+services:
+  # =========================================================
+  # 1. PAASIFY CORE (Backend Django / ASGI)
+  # =========================================================
+  paasify:
+    image: davidrg25/paasify:latest # Actualizar con el tag deseado al desplegar
+    container_name: paasify_core
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # DooD: Para que PaaSify pueda lanzar contenedores en la máquina anfitriona
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persistencia de archivos estáticos y subidos por usuarios (opcional, recomendado)
+      - paasify_media:/app/media
+      - paasify_static:/app/staticfiles
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # =========================================================
+  # 2. BASE DE DATOS (PostgreSQL)
+  # =========================================================
+  db:
+    image: postgres:15-alpine
+    container_name: paasify_db
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${DB_NAME:-paasify_db}
+      POSTGRES_USER: ${DB_USER:-paasify_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mypassword}
+    volumes:
+      - paasify_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-paasify_admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # =========================================================
+  # 3. PROXY INVERSO Y TLS (Nginx)
+  # =========================================================
+  nginx:
+    image: nginx:alpine
+    container_name: paasify_proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+      - ./nginx/htpasswd:/etc/nginx/htpasswd:ro # Archivo para contraseñas de cAdvisor
+      - paasify_static:/app/staticfiles:ro
+      - paasify_media:/app/media:ro
+    depends_on:
+      - paasify
+      - cadvisor
+
+  # =========================================================
+  # 4. MONITORIZACIÓN (cAdvisor)
+  # =========================================================
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: paasify_cadvisor
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+
+volumes:
+  paasify_db_data:
+  paasify_static:
+  paasify_media:

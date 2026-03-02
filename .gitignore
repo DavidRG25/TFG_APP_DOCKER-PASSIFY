@@ -38,3 +38,7 @@ media/
 prompts/
 user_code/
 ignored_scripts/
+
+# === Credenciales y Despliegue ===
+.docker_credentials
+version.txt
