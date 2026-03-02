@@ -161,7 +161,7 @@ class UserProfile(models.Model):
                 # Esto permite revocación efectiva de tokens
                 try:
                     user_profile = UserProfile.objects.get(user=user)
-                    stored_token = user_profile.bearer_token
+                    stored_token = user_profile.api_token
                     
                     # Comparar token recibido con el almacenado
                     if stored_token != token:
