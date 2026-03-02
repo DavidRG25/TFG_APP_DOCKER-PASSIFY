@@ -432,10 +432,16 @@ class ServiceViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def restart(self, request, pk=None):
         service = self.get_object()
+        service.status = "restarting"
+        service.save(update_fields=["status"])
         try:
             from .services import run_container
-            run_container(service)
+            import time
+            # Delay para que el auto-refresh de HTMX (cada 3s) capture el estado 'restarting'
+            time.sleep(1.5)
+            run_container(service, force_restart=True)
         except Exception as exc:
+            # Si falla, el sync_service_status lo pondrá en error o stopped después
             if self._is_htmx(request):
                 return self._htmx_response(request, status=500, message=str(exc), level="text-bg-danger")
             return DRF_Response({"status": "error", "message": str(exc)}, status=500)
@@ -443,7 +449,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if self._is_htmx(request):
             return self._htmx_response(
                 request,
-                message="El servicio está siendo enviado a reiniciar...",
+                message="El servicio está siendo reiniciado...",
                 level="text-bg-warning",
             )
         return DRF_Response({"status": "restarting", "message": "Servicio reiniciando."})
@@ -976,10 +982,10 @@ def student_services_in_subject(request, subject_id):
     if not (user_is_admin(request.user) or subject.students.filter(pk=request.user.pk).exists()):
         return HttpResponse("No estas matriculado en esta asignatura.", status=403)
 
-    # Mostrar SOLO servicios del alumno para esa asignatura
     services = (
         Service.objects
         .filter(owner=request.user, subject=subject)
+        .filter(models.Q(project__isnull=True) | models.Q(project__subject=subject))
         .exclude(status="removed")
     )
     
@@ -995,10 +1001,17 @@ def student_services_in_subject(request, subject_id):
     
     # Necesario para el selector de asignaturas en el filtro
     available_subjects = Subject.objects.filter(students=request.user).distinct()
-    user_projects = UserProject.objects.filter(user_profile__user=request.user, subject=subject)
+    # Identificar proyectos de la asignatura actual
+    user_projects = UserProject.objects.filter(subject=subject).order_by('place')
 
     images = AllowedImage.objects.all()
     host = request.get_host().split(":")[0]
+    
+    # Determine if there's a custom sort applied (for the table, not directly here)
+    # This variable is usually set in service_table, but for consistency in context
+    # we'll define it here as False since this view doesn't have custom sorting logic.
+    user_has_custom_sort = False 
+
     return render(
         request,
         "containers/student_panel.html",
@@ -1009,6 +1022,7 @@ def student_services_in_subject(request, subject_id):
             "current_subject": subject, 
             "host": host,
             "available_subjects": available_subjects,
+            "is_sorting": user_has_custom_sort,
             "stats": {
                 "total": total_services,
                 "running": running_count,
@@ -1062,8 +1076,9 @@ def service_table(request):
         qs = qs.filter(Q(name__icontains=q) | Q(image__icontains=q) | Q(owner__username__icontains=q) | Q(owner__first_name__icontains=q) | Q(owner__last_name__icontains=q))
         
     ordering = request.GET.get("ordering")
+    order_field = None
     if ordering:
-        # Mapeo de campos válidos para evitar errores o inyecciones
+        # Mapeo de campos válidos
         sort_map = {
             'name': 'name', '-name': '-name',
             'image': 'image', '-image': '-image',
@@ -1073,10 +1088,23 @@ def service_table(request):
             'owner': 'owner__username', '-owner': '-owner__username',
         }
         order_field = sort_map.get(ordering)
-        if order_field:
-            qs = qs.order_by(order_field)
+    
+    # Si se pide agrupación, aplicar orden según contexto
+    group_by = request.GET.get("group_by", "")
+    user_has_custom_sort = ordering and order_field and order_field != "-id"
+    
+    if user_has_custom_sort:
+        if ordering == 'name':
+            # Orden jerárquico solicitado: Asignatura > Proyecto > Nombre Servicio
+            qs = qs.order_by("subject__name", "project__place", "name")
+        elif ordering == '-name':
+            qs = qs.order_by("-subject__name", "-project__place", "-name")
         else:
-            qs = qs.order_by("-id")
+            qs = qs.order_by(order_field)
+    elif group_by == "project":
+        qs = qs.order_by("subject__name", "project__place", "-id")
+    elif group_by == "student":
+        qs = qs.order_by("owner__first_name", "owner__last_name", "project__place", "-id")
     else:
         qs = qs.order_by("-id")
 
@@ -1091,8 +1119,6 @@ def service_table(request):
     has_transient = qs.filter(status__in=transient_states).exists()
     
     if not has_transient:
-        # Tambien considerar transitorios los contenedores individuales de Compose
-        # (ej: si estan en 'created', 'restarting', 'removing')
         has_transient = ServiceContainer.objects.filter(
             service__in=qs,
             status__in=["created", "restarting", "removing"]
@@ -1105,6 +1131,14 @@ def service_table(request):
         except Exception:
             pass
 
+    # Determinar si debemos ocultar la cabecera de asignatura
+    # Solo la ocultamos si se pide explícitamente (hide_subject=1)
+    hide_header = hide_subject
+
+    # Detectar si debemos ocultar los encabezados de tabla internos
+    # (Para evitar que se dupliquen con el encabezado global del dashboard)
+    hide_table_header = request.GET.get("hide_table_header") == "1"
+
     html = render_to_string("containers/_service_rows.html", {
         "services": qs, 
         "host": host, 
@@ -1115,7 +1149,11 @@ def service_table(request):
         "hide_redundant": hide_owner or hide_subject or hide_project,
         "hide_subject_column": hide_subject,
         "hide_project_column": hide_project,
-        "current_subject": current_sub_obj
+        "current_subject": current_sub_obj,
+        "hide_subject_header": hide_header,
+        "hide_table_header": hide_table_header,
+        "is_sorting": user_has_custom_sort,
+        "group_by": group_by,
     }, request=request)
     return HttpResponse(html)
 
@@ -1429,6 +1467,17 @@ def professor_subject_detail(request, subject_id):
                     messages.success(request, "Proyecto asignado con éxito.")
                 except Exception as e:
                     messages.error(request, f"Error creando el proyecto: {str(e)}")
+        elif action == "edit_project":
+            project_id = request.POST.get("project_id")
+            place = request.POST.get("place")
+            if project_id and place:
+                try:
+                    p = UserProject.objects.get(pk=project_id)
+                    p.place = place
+                    p.save()
+                    messages.success(request, "Nombre del proyecto actualizado.")
+                except Exception as e:
+                    messages.error(request, f"Error editando el proyecto: {str(e)}")
         elif action == "edit_student":
             student_id = request.POST.get("student_id")
             email = request.POST.get("email")
@@ -1897,17 +1946,42 @@ def api_documentation_view(request, section_slug="introduccion"):
     from django.shortcuts import redirect
     from django.http import Http404
 
-    # Definicion del orden fijo de secciones
+    # Definicion del orden fijo de secciones (Jerarquia completa)
     SECTIONS = [
-        {"slug": "introduccion",    "title": "Introducción",          "file": "01_introduction.md"},
-        {"slug": "autenticacion",   "title": "Autenticación",          "file": "02_authentication.md"},
-        {"slug": "gets",            "title": "Consultas (GETs)",      "file": "03_gets.md"},
-        {"slug": "crear",           "title": "Crear Servicio",        "file": "04_create.md"},
-        {"slug": "modificar",       "title": "Modificar Servicio",    "file": "05_modify.md"},
-        {"slug": "acciones",        "title": "Acciones del Servicio", "file": "06_actions.md"},
-        {"slug": "logs",            "title": "Logs del Servicio",     "file": "07_logs.md"},
-        {"slug": "ci-cd",           "title": "Integración CI/CD",     "file": "08_cicd.md"},
-        {"slug": "errores",         "title": "Códigos de Error",      "file": "09_errors.md"},
+        {"slug": "introduccion",    "title": "1. Introducción",          "file": "01_intro/intro.md"},
+        {"slug": "bienvenida",      "title": "1.1 Bienvenida",           "file": "01_intro/01_bienvenida.md", "parent_slug": "introduccion", "icon": "👋"},
+        
+        {"slug": "autenticacion",   "title": "2. Autenticación",          "file": "02_auth/intro.md"},
+        {"slug": "token-access",    "title": "2.1 Token API",            "file": "02_auth/01_token.md", "parent_slug": "autenticacion", "icon": "🔑"},
+        
+        {"slug": "gets",            "title": "3. Consultas (GETs)",      "file": "03_gets/main.md"},
+        {"slug": "proyectos",       "title": "3.1 Proyectos",            "file": "03_gets/01_projects.md", "parent_slug": "gets", "icon": "📂"},
+        {"slug": "subjects_get",    "title": "3.2 Asignaturas",         "file": "03_gets/02_subjects.md", "parent_slug": "gets", "icon": "📚"},
+        {"slug": "containers_get",  "title": "3.3 Servicios",           "file": "03_gets/03_containers.md", "parent_slug": "gets", "icon": "🐳"},
+        
+        {"slug": "crear",           "title": "4. Crear Servicio",        "file": "04_create/00_intro.md"},
+        {"slug": "catalog",         "title": "4.1 Modo Catálogo",        "file": "04_create/01_catalog.md", "parent_slug": "crear", "icon": "🍱"},
+        {"slug": "dockerhub",       "title": "4.2 Modo DockerHub",       "file": "04_create/02_dockerhub.md", "parent_slug": "crear", "icon": "🐳"},
+        {"slug": "custom-df",       "title": "4.3 Dockerfile",           "file": "04_create/03_custom_dockerfile.md", "parent_slug": "crear", "icon": "🛠️"},
+        {"slug": "custom-comp",     "title": "4.4 Docker Compose",       "file": "04_create/04_custom_compose.md", "parent_slug": "crear", "icon": "🐙"},
+        
+        {"slug": "modificar",       "title": "5. Modificar Servicio",    "file": "05_modify/intro.md"},
+        {"slug": "config-mod",      "title": "5.1 Configuración",        "file": "05_modify/01_config.md", "parent_slug": "modificar", "icon": "⚙️"},
+        {"slug": "re-deploy",       "title": "5.2 Re-despliegue",        "file": "05_modify/02_redeploy.md", "parent_slug": "modificar", "icon": "🔄"},
+        {"slug": "mod-examples",    "title": "5.3 Ejemplos",             "file": "05_modify/03_examples.md", "parent_slug": "modificar", "icon": "📝"},
+        
+        {"slug": "acciones-parent", "title": "6. Acciones del Servicio", "file": "06_actions/intro.md"},
+        {"slug": "acciones",        "title": "6.1 Acciones",             "file": "06_actions/01_acciones.md", "parent_slug": "acciones-parent", "icon": "⚙️"},
+        
+        {"slug": "logs-parent",     "title": "7. Logs del Servicio",     "file": "07_logs/intro.md"},
+        {"slug": "logs",            "title": "7.1 Logs",                 "file": "07_logs/01_logs.md", "parent_slug": "logs-parent", "icon": "📄"},
+        
+        {"slug": "ci-cd",           "title": "8. Integración CI/CD",     "file": "08_cicd/01_intro.md"},
+        {"slug": "github",          "title": "8.1 GitHub Actions",       "file": "08_cicd/02_github.md", "parent_slug": "ci-cd", "icon": "fab fa-github"},
+        {"slug": "gitlab",          "title": "8.2 GitLab CI",            "file": "08_cicd/03_gitlab.md", "parent_slug": "ci-cd", "icon": "fab fa-gitlab"},
+        
+        {"slug": "errores-parent",  "title": "9. Códigos de Error",      "file": "09_errors/intro.md"},
+        {"slug": "errores",         "title": "9.1 Errores",              "file": "09_errors/01_errores.md", "parent_slug": "errores-parent", "icon": "🛑"},
     ]
 
     # Buscar la seccion actual
@@ -1923,9 +1997,18 @@ def api_documentation_view(request, section_slug="introduccion"):
     # Leer el archivo Markdown de la seccion actual y extraer H3 de todas
     partials_dir = os.path.join(settings.BASE_DIR, "templates", "api_docs", "partials")
     
+    # Identificar qué secciones actúan como padres para evitar ruido en el menú lateral
+    parent_slugs = {s["parent_slug"] for s in SECTIONS if "parent_slug" in s}
+
     # Enriquecer SECTIONS con sus sub-encabezados (H3)
     for section in SECTIONS:
         section["subsections"] = []
+        
+        # Saltamos la extracción de H3 para secciones que son Padres (ej: 4, 8)
+        # ya que sus hijos (4.1, 8.1) ya ocupan ese espacio en el menú lateral
+        if section["slug"] in parent_slugs:
+            continue
+
         path = os.path.join(partials_dir, section["file"])
         if os.path.exists(path):
             with open(path, "r", encoding="utf-8") as f:
@@ -1936,9 +2019,9 @@ def api_documentation_view(request, section_slug="introduccion"):
                         # Generar slug para el link
                         import unicodedata
                         import re
-                        slug = unicodedata.normalize('NFD', title).encode('ascii', 'ignore').decode('utf-8')
-                        slug = re.sub(r'[^a-z0-9]+', '-', slug.lower()).strip('-')
-                        section["subsections"].append({"title": title, "slug": slug})
+                        slug_text = unicodedata.normalize('NFD', title).encode('ascii', 'ignore').decode('utf-8')
+                        slug_text = re.sub(r'[^a-z0-9]+', '-', slug_text.lower()).strip('-')
+                        section["subsections"].append({"title": title, "slug": slug_text})
 
     current_section = SECTIONS[current_index]
     
@@ -1972,6 +2055,7 @@ def api_documentation_view(request, section_slug="introduccion"):
         'total_sections': len(SECTIONS),
         'prev_section': prev_section,
         'next_section': next_section,
+        'current_section': current_section,
         'images': images,
         'title': f"{current_section['title']} - API Docs",
     }

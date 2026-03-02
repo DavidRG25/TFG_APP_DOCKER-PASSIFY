@@ -28,15 +28,20 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800  # 50 MB
 
 ALLOWED_HOSTS = [
     host.strip()
-    for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,*").split(",")
     if host.strip()
 ]
+
+# Si estamos en debug, permitimos todo para facilitar túneles y desarrollo local
+if DEBUG:
+    if '*' not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append('*')
 
 CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in os.environ.get(
         "DJANGO_CSRF_TRUSTED_ORIGINS",
-        "http://127.0.0.1,http://127.0.0.1:8000,http://localhost,http://localhost:8000",
+        "http://127.0.0.1,http://127.0.0.1:8000,http://localhost,http://localhost:8000,https://*.devtunnels.ms,https://plhj16bc-8000.uks1.devtunnels.ms",
     ).split(",")
     if origin.strip()
 ]
@@ -166,6 +171,10 @@ USE_TZ = True
 # Permite fijar el dominio/IP de la plataforma (ej: https://passify-urjc.es)
 # Si se deja vacÃ­o, se detectarÃ¡ dinÃ¡micamente desde la peticiÃ³n.
 PAASIFY_BASE_URL = os.environ.get("PAASIFY_BASE_URL", "").rstrip("/")
+
+# Configuraciones para proxies (ej: dev tunnels, nginx, traefik)
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 
 # ---------------------------------------------------------------------

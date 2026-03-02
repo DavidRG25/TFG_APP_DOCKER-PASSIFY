@@ -1,15 +1,14 @@
-{# Partial: Tarjeta de contenedor individual #}
-<div class="border rounded-3 p-2 bg-light">
+{# Partial: Tarjeta de contenedor individual (dentro de compose) #}
+<div class="border rounded-3 p-3 bg-white shadow-sm">
     <div class="d-flex justify-content-between align-items-center mb-2">
-        <div>
-            {# Icono según tipo de servicio (prioriza tipo explícito) #}
+        <div class="d-flex align-items-center">
+            {# Icono según tipo #}
             {% if container.container_type == 'database' %}
             <i class="fas fa-database text-primary me-2" title="Base de Datos"></i>
             {% elif container.container_type == 'api' %}
             <i class="fas fa-microchip text-warning me-2" title="API / Backend"></i>
             {% elif container.container_type == 'web' %}
             <i class="fas fa-globe text-info me-2" title="Web / Frontend"></i>
-            {# Fallback histórico por nombre #}
             {% elif 'redis' in container.name|lower or 'cache' in container.name|lower %}
             <i class="fas fa-memory text-danger me-2" title="Cache"></i>
             {% elif 'postgres' in container.name|lower or 'mysql' in container.name|lower or 'mariadb' in container.name|lower or 'db' in container.name|lower %}
@@ -23,67 +22,113 @@
             {% else %}
             <i class="fas fa-cube text-muted me-2"></i>
             {% endif %}
-            <strong class="text-primary">{{ container.name }}</strong>
+            <strong class="text-dark">{{ container.name }}</strong>
         </div>
-        <span class="badge
-      {% if container.status == 'running' %} bg-success
-      {% elif container.status == 'stopped' %} bg-secondary
-      {% elif container.status == 'error' %} bg-danger
-      {% else %} bg-warning
-      {% endif %}">
-            {{ container.status|default:'unknown'|title }}
-        </span>
+
+        {# Badge de estado traducido #}
+        {# Badge de estado traducido - Más grande y con contraste #}
+        {% if container.status == 'running' %}
+        <div class="d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill shadow-sm"
+             style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border: 1px solid rgba(255,255,255,0.2);">
+            <span class="position-relative d-flex" style="width: 6px; height: 6px;">
+                <span class="animate-ping position-absolute w-100 h-100 rounded-circle opacity-75" style="background: #6ee7b7; animation: ping 1.5s cubic-bezier(0,0,0.2,1) infinite;"></span>
+                <span class="position-relative d-inline-block w-100 h-100 rounded-circle" style="background: white;"></span>
+            </span>
+            <span class="fw-bold text-uppercase" style="font-size: 0.62rem; letter-spacing: 0.3px;">Ejecutando</span>
+        </div>
+        {% elif container.status == 'stopped' %}
+        <div class="d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill"
+             style="background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0;">
+            <span class="d-inline-block rounded-circle" style="width: 6px; height: 6px; background: #94a3b8;"></span>
+            <span class="fw-bold text-uppercase" style="font-size: 0.62rem; letter-spacing: 0.3px;">Detenido</span>
+        </div>
+        {% elif container.status == 'error' %}
+        <div class="d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill shadow-sm"
+             style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white;">
+            <i class="fas fa-exclamation-triangle" style="font-size: 0.6rem;"></i>
+            <span class="fw-bold text-uppercase" style="font-size: 0.62rem; letter-spacing: 0.3px;">Error</span>
+        </div>
+        {% else %}
+        <div class="d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill"
+             style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a;">
+            <span class="fw-bold text-uppercase" style="font-size: 0.62rem; letter-spacing: 0.3px;">{{ container.status|default:'Desconocido' }}</span>
+        </div>
+        {% endif %}
     </div>
 
-    <div class="d-flex flex-wrap gap-1 align-items-center">
-        <div class="btn-group shadow-sm">
-            <button class="btn btn-success" {% if container.status == 'running' %}disabled{% endif %}
-                hx-post="{% url 'service-start-container' pk=service.id container_pk=container.id %}"
-                hx-swap="none" title="Iniciar {{ container.name }}">
-                <i class="fas fa-play"></i>
-            </button>
-
-            <button class="btn btn-warning" {% if container.status != 'running' %}disabled{% endif %}
-                hx-post="{% url 'service-stop-container-action' pk=service.id container_pk=container.id %}"
-                hx-swap="none" title="Detener {{ container.name }}">
-                <i class="fas fa-stop"></i>
-            </button>
-
-            {# Botón de logs deshabilitado por redundancia (se accede desde el principal) #}
+    {# Puertos del contenedor - Nueva sección #}
+    {% if container.assigned_ports %}
+    <div class="mb-3 p-2 rounded bg-light border-start border-primary border-3">
+        <div class="small fw-bold text-muted text-uppercase mb-1" style="font-size: 0.55rem;">Puertos Asignados</div>
+        <div class="d-flex flex-wrap gap-2">
+            {% for p in container.assigned_ports %}
+            <div class="d-flex align-items-center">
+                <span class="fw-bold text-primary" style="font-size: 0.85rem;">{{ p.external }}</span>
+                <span class="text-muted mx-1" style="font-size: 0.7rem;">&rarr;</span>
+                <span class="text-secondary" style="font-size: 0.75rem;">{{ p.internal }}</span>
+            </div>
+            {% endfor %}
         </div>
+    </div>
+    {% else %}
+    <div class="mb-3 p-2 rounded bg-light border-start border-secondary border-3 op-75">
+        <div class="small fw-bold text-muted text-uppercase mb-1" style="font-size: 0.55rem;">Conectividad</div>
+        <span class="text-muted italic" style="font-size: 0.75rem;">Sin puertos asignados</span>
+    </div>
+    {% endif %}
 
-        <div class="btn-group shadow-sm ms-2">
-            {% if container.status == 'running' and container.container_id %}
-            <a href="{% url 'containers:terminal_v2' service.id %}?container={{ container.id }}"
-                class="btn btn-dark" title="Terminal de {{ container.name }}">
-                <i class="fas fa-terminal"></i>
-            </a>
-            {% else %}
-            <button class="btn btn-dark" disabled title="Terminal requiere que el contenedor esté en ejecución">
-                <i class="fas fa-terminal"></i>
-            </button>
-            {% endif %}
+    {# Botones de contenedor con estilo consistente #}
+    <div class="d-flex gap-1 flex-wrap">
+        <button class="btn btn-success svc-action-btn"
+            {% if container.status == 'running' %}disabled{% endif %}
+            hx-post="{% url 'service-start-container' pk=service.id container_pk=container.id %}"
+            hx-swap="none"
+            hx-on::after-request="htmx.trigger('body', 'service:table-refresh')"
+            title="Iniciar {{ container.name }}">
+            <i class="fas fa-play"></i>
+        </button>
 
-            {# Botón Acceder si tiene puertos y es un servicio web #}
-            {% if container.assigned_ports and host and container.is_web %}
-                {% with first_port_obj=container.assigned_ports.0 %}
-                    {% with p_ext=first_port_obj.external p_int=first_port_obj.internal|default:80 %}
-                        {# Solo mostrar si no es un puerto tipico de DB/Worker y no tiene nombre de DB/Worker #}
-                        {% if p_int != 6379 and p_int != 5432 and p_int != 3306 and p_int != 27017 and 'redis' not in container.name|lower and 'worker' not in container.name|lower and 'db' not in container.name|lower %}
-                            {% if container.status == 'running' and container.container_id %}
-                            <a href="http://{{ host }}:{{ p_ext }}" class="btn btn-primary" target="_blank"
-                                rel="noopener" title="Acceder a {{ container.name }}">
-                                <i class="fas fa-external-link-alt"></i>
-                            </a>
-                            {% else %}
-                            <button class="btn btn-primary" disabled title="Acceso Web disponible solo cuando el contenedor esta en ejecucion">
-                                <i class="fas fa-external-link-alt"></i>
-                            </button>
-                            {% endif %}
-                        {% endif %}
-                    {% endwith %}
+        <button class="btn btn-warning svc-action-btn"
+            {% if container.status != 'running' %}disabled{% endif %}
+            hx-post="{% url 'service-stop-container-action' pk=service.id container_pk=container.id %}"
+            hx-swap="none"
+            hx-on::after-request="htmx.trigger('body', 'service:table-refresh')"
+            title="Detener {{ container.name }}">
+            <i class="fas fa-stop"></i>
+        </button>
+
+        {# Terminal por contenedor #}
+        {% if container.status == 'running' and container.container_id %}
+        <a href="{% url 'containers:terminal_v2' service.id %}?container={{ container.id }}"
+            class="btn svc-action-btn text-white" style="background-color: #374151;"
+            title="Terminal de {{ container.name }}">
+            <i class="fas fa-terminal"></i>
+        </a>
+        {% else %}
+        <button class="btn svc-action-btn text-white" style="background-color: #374151;" disabled
+            title="Terminal requiere que el contenedor esté en ejecución">
+            <i class="fas fa-terminal"></i>
+        </button>
+        {% endif %}
+
+        {# Web por contenedor #}
+        {% if container.assigned_ports and host and container.is_web %}
+            {% with first_port_obj=container.assigned_ports.0 %}
+                {% with p_ext=first_port_obj.external %}
+                    {% if container.status == 'running' and container.container_id %}
+                    <a href="http://{{ host }}:{{ p_ext }}" class="btn svc-action-btn text-white"
+                        style="background-color: #3b82f6;"
+                        target="_blank" rel="noopener" title="Acceder a {{ container.name }}">
+                        <i class="fas fa-external-link-alt"></i>
+                    </a>
+                    {% else %}
+                    <button class="btn svc-action-btn text-white" style="background-color: #3b82f6;" disabled
+                        title="Acceso Web disponible solo cuando el contenedor está en ejecución">
+                        <i class="fas fa-external-link-alt"></i>
+                    </button>
+                    {% endif %}
                 {% endwith %}
-            {% endif %}
-        </div>
+            {% endwith %}
+        {% endif %}
     </div>
 </div>

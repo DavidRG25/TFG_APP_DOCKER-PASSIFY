@@ -132,6 +132,11 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True) -> 
             dest_archive = workspace / archive_name
             
             # Copiar archivo zip/rar al workspace con nombre estándar
+            if not os.path.exists(service.code.path):
+                print(f"[ERROR] El archivo de código no existe en disco: {service.code.path}")
+                # No podemos continuar con el unpack si no hay archivo, pero no queremos que explote
+                return workspace
+
             with open(service.code.path, "rb") as f_in:
                 content = f_in.read()
                 with open(dest_archive, "wb") as f_out:
@@ -417,9 +422,9 @@ def sync_service_status(service: Service):
     if service.status == "removed":
         return
         
-    # Ignorar servicios en estados transitorios críticos (stopping, deleting)
+    # Ignorar servicios en estados transitorios críticos
     # para evitar sobrescribirlos con el estado actual de Docker durante la operación asíncrona
-    if service.status in ["stopping", "deleting"]:
+    if service.status in ["stopping", "deleting", "restarting", "pending"]:
         return
 
     docker_client = get_docker_client()
@@ -930,7 +935,8 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool, c
     Ejecuta un servicio docker-compose.
     Crea ServiceContainer records para cada contenedor.
     """
-    service.status = "starting"
+    if service.status != "restarting":
+        service.status = "starting"
     _append_log(service, "--- Iniciando proceso de despliegue Compose ---")
     service.save(update_fields=["status", "logs"])
 
@@ -1315,7 +1321,10 @@ def run_container(
         )
         return
 
-    service.status = "pending"
+    # Si ya lo hemos marcado como 'restarting' desde la vista, no lo movemos a 'pending'
+    if service.status != "restarting":
+        service.status = "pending"
+    
     _append_log(service, "Ejecucion encolada.")
     service.save(update_fields=["status", "logs", "updated_at"])
     EXECUTOR.submit(_run_container_worker, service.pk, force_restart, custom_port, command, container_configs)

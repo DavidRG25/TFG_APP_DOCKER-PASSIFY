@@ -113,7 +113,10 @@
               </div>
             </div>
 
-            <h4 class="h5 fw-bold text-dark mb-2">{{ s.name }}</h4>
+            <h4 class="h5 fw-bold text-dark mb-2 d-flex align-items-center justify-content-between">
+                {{ s.name }}
+                <span class="badge bg-light text-muted border fw-normal" style="font-size: 0.65rem;">ID: #{{ s.id }}</span>
+            </h4>
             <p class="text-muted small mb-4 flex-grow-1">
                 Explora los proyectos vinculados y despliega tus contenedores para las prácticas de este curso.
             </p>

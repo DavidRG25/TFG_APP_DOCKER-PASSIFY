@@ -56,16 +56,25 @@
 
           {# Textos #}
           <div class="text-container text-white ms-3">
-            <h1 class="h1 mb-1 text-white fw-bold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15); line-height: 1.2; font-size: 2.5rem;">{{ current_subject.name }}</h1>
-            <p class="text-white-50 mb-0 opacity-90 fw-semibold fs-5">
-              <i class="fas fa-user-tie me-2"></i>Prof. {{ current_subject.teacher_user.get_full_name|default:current_subject.teacher_user.username }}
-            </p>
+            <h1 class="h1 mb-1 text-white fw-bold d-flex align-items-center" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15); line-height: 1.2; font-size: 2.5rem;">
+              {{ current_subject.name }}
+            </h1>
+            <div class="d-flex align-items-center mt-2">
+              <p class="text-white-50 mb-0 opacity-90 fw-semibold fs-5 d-flex align-items-center">
+                <i class="fas fa-user-tie me-2"></i>Prof. {{ current_subject.teacher_user.get_full_name|default:current_subject.teacher_user.username }}
+                <span class="mx-4 opacity-25" style="border-left: 2px solid white; height: 20px; display: inline-block;"></span>
+                <span class="badge bg-white shadow-sm fw-bold px-3 py-2" 
+                      style="font-size: 0.75rem; border-radius: 6px; color: var(--subject-primary, #4e73df);">
+                  ID: #{{ current_subject.id }}
+                </span>
+              </p>
+            </div>
           </div>
         </div>
         {% else %}
         <div class="d-flex align-items-center position-relative" style="z-index: 2;">
           <div class="d-flex align-items-center justify-content-center me-5 shadow-sm" 
-               style="width: 70px; height: 70px; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(12px); border-radius: 20px; border: 1px solid rgba(255,255,255,0.2);">
+               style="width: 70px; height: 70px; background: rgba(255, 255, 255, 0.15); backdrop-filter: blur(12px); border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); margin-right: 3rem !important;">
             <i class="fas fa-cubes fa-2x text-white"></i>
           </div>
           <div>
@@ -119,6 +128,37 @@
             font-size: 1rem;
             opacity: 0.9;
         }
+        /* Custom Select Styling */
+        .project-filter-card {
+            border: 1px solid rgba(0,0,0,0.05);
+            background: #fff;
+            border-radius: 14px;
+        }
+        .custom-select-wrapper {
+            position: relative;
+        }
+        .custom-select-wrapper i {
+            position: absolute;
+            left: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 10;
+            color: var(--subject-primary);
+        }
+        .project-select-custom {
+            padding-left: 45px !important;
+            height: 48px;
+            border: 1px solid #edf2f7 !important;
+            background-color: #f8fafc !important;
+            font-weight: 600;
+            color: #2d3748;
+            transition: all 0.2s;
+        }
+        .project-select-custom:focus {
+            background-color: #fff !important;
+            border-color: var(--subject-primary) !important;
+            box-shadow: 0 0 0 3px rgba(78, 115, 223, 0.1) !important;
+        }
       </style>
 
       <div class="d-flex deploy-group align-items-center">
@@ -149,41 +189,78 @@
   {% if current_subject %}
     <input type="hidden" name="hide_subject" value="1" id="hide-subject-input">
   {% endif %}
-  <div class="card border-0 shadow-sm">
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0 overflow-hidden" style="border-radius: 12px 12px 0 0; table-layout: fixed;">
-          <thead style="background: var(--subject-primary, #4e73df); border-radius: 12px 12px 0 0;">
-            <tr class="text-white small text-uppercase fw-bold" style="letter-spacing: 0.8px; font-size: 0.75rem;">
-              {% if not current_subject %}
-              <th class="py-3 ps-4 border-0" style="cursor: pointer; width: 15%;" onclick="toggleServiceOrdering('subject')">
-                Asignatura <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-subject"></i>
-              </th>
-              {% endif %}
-              <th class="py-3 {% if current_subject %}ps-4{% endif %} border-0" style="cursor: pointer; width: 15%;" onclick="toggleServiceOrdering('project')">
-                Proyecto <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-project"></i>
-              </th>
-              <th class="py-3 border-0" style="cursor: pointer; width: 20%;" onclick="toggleServiceOrdering('name')">
-                Nombre <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-name"></i>
-              </th>
-              <th class="py-3 border-0" style="cursor: pointer; width: 15%;" onclick="toggleServiceOrdering('image')">
-                Imagen <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-image"></i>
-              </th>
-              <th class="py-3 border-0" style="width: 10%;">Puerto</th>
-              <th class="py-3 border-0 text-center" style="cursor: pointer; width: 10%;" onclick="toggleServiceOrdering('status')">
-                Estado <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-status"></i>
-              </th>
-              <th class="py-3 pe-4 text-end border-0" style="width: 15%;">Acciones</th>
-            </tr>
-          </thead>
-          <tbody id="service-table" class="bg-white" 
-                 hx-get="{% url 'containers:service_table' %}{% if current_subject %}?subject={{ current_subject.id }}{% endif %}"
-                 hx-include="{% if not current_subject %}#service-filters-form, #ordering-input{% else %}#ordering-input, #hide-subject-input{% endif %}"
-                 hx-trigger="load, every 3s, service:table-refresh from:body">
-            {% include "containers/_service_rows.html" %}
-          </tbody>
-        </table>
+  <input type="hidden" name="group_by" value="project" id="group-by-input">
+
+  {% if current_subject %}
+  <div id="subject-filter-card" class="project-filter-card shadow-sm mb-4 bg-white overflow-hidden" style="border-radius: 16px;">
+    <div class="px-4 py-3 row align-items-center bg-white g-3">
+      <div class="col-md-4 d-flex align-items-center">
+        <div class="rounded-circle d-flex align-items-center justify-content-center me-4 shadow-sm" 
+             style="width: 48px; height: 48px; background: white; color: var(--subject-primary, #4e73df); border: 1.5px solid #edf2f7;">
+          <i class="fas fa-project-diagram fa-lg"></i>
+        </div>
+        <div>
+          <h6 class="mb-0 fw-bold text-dark" style="font-size: 1.15rem; letter-spacing: -0.3px;">Proyectos</h6>
+          <p class="text-muted mb-0" style="font-size: 0.8rem;">Estructura de tus entornos</p>
+        </div>
       </div>
+      
+      <div class="col-md-3">
+          <div class="custom-select-wrapper">
+            <i class="fas fa-filter"></i>
+            <select class="form-select project-select-custom shadow-none" 
+                    name="project" id="subject-project-filter"
+                    hx-get="{% url 'containers:service_table' %}?subject={{ current_subject.id }}&group_by=project&hide_subject=1&hide_table_header=1" 
+                    hx-target="#service-table" 
+                    hx-trigger="change"
+                    hx-include="#subject-q-filter, #ordering-input">
+              <option value="">📁 Todos los proyectos ({{ user_projects.count|default:0 }})</option>
+              {% for p in user_projects %}
+              <option value="{{ p.id }}">📦 {{ p.place }}</option>
+              {% endfor %}
+            </select>
+          </div>
+      </div>
+
+      <div class="col-md-5">
+          <div class="position-relative">
+              <input type="text" name="q" id="subject-q-filter" class="form-control project-select-custom shadow-none" 
+                     placeholder="Buscar servicio por nombre..." 
+                     style="padding-left: 45px !important;"
+                     hx-get="{% url 'containers:service_table' %}?subject={{ current_subject.id }}&group_by=project&hide_subject=1&hide_table_header=1"
+                     hx-target="#service-table"
+                     hx-trigger="keyup delay:400ms changed"
+                     hx-include="#subject-project-filter, #ordering-input">
+              <i class="fas fa-search position-absolute text-muted" style="left: 1.25rem; top: 50%; transform: translateY(-50%);"></i>
+          </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <div id="service-table-wrapper" class="mt-4">
+    {# 2.5 CABECERA GLOBAL DE COLUMNAS (Aparece solo una vez para toda la página) #}
+    <div class="global-columns-header py-3 px-4 mb-3 bg-white shadow-sm rounded-pill border mx-3">
+        <div class="row align-items-center text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 1.5px;">
+            <div class="col-3 ps-4" onclick="toggleServiceOrdering('name')" style="cursor:pointer;">
+                Nombre <i class="fas fa-sort ms-1 opacity-50 sort-icon-name"></i>
+            </div>
+            <div class="col-3 text-center" onclick="toggleServiceOrdering('image')" style="cursor:pointer;">
+                Origen / Imagen <i class="fas fa-sort ms-1 opacity-50 sort-icon-image"></i>
+            </div>
+            <div class="col-1 text-center">Puerto</div>
+            <div class="col-2 text-center" onclick="toggleServiceOrdering('status')" style="cursor:pointer;">
+                Estado <i class="fas fa-sort ms-1 opacity-50 sort-icon-status"></i>
+            </div>
+            <div class="col-3 text-center">Acciones</div>
+        </div>
+    </div>
+
+  <div id="service-table" 
+       hx-get="{% url 'containers:service_table' %}?hide_table_header=1{% if current_subject %}&subject={{ current_subject.id }}{% endif %}"
+         hx-include="{% if not current_subject %}#service-filters-form{% else %}#subject-project-filter, #subject-q-filter{% endif %}, #ordering-input, #hide-subject-input, #group-by-input"
+         hx-trigger="load, every 4s, service:table-refresh from:body">
+      {% include "containers/_service_rows.html" with group_by="project" hide_subject_header=current_subject hide_table_header=True %}
     </div>
   </div>
 </div>

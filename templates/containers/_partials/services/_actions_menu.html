@@ -1,0 +1,144 @@
+{# Partial: Acciones del servicio - una fila, botones grandes con fondo #}
+
+<style>
+.svc-action-btn {
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    border: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+.svc-action-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+}
+.svc-actions-row {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+</style>
+
+<div class="svc-actions-row">
+    {# Start #}
+    <button class="btn btn-success svc-action-btn"
+        {% if service.status == 'running' %}disabled{% endif %}
+        hx-post="{% url 'service-start' service.id %}" hx-swap="none"
+        hx-on::after-request="htmx.trigger('body', 'service:table-refresh')"
+        title="Iniciar">
+        <i class="fas fa-play"></i>
+    </button>
+
+    {# Stop #}
+    <button class="btn btn-warning svc-action-btn"
+        {% if service.status != 'running' %}disabled{% endif %}
+        hx-post="{% url 'service-stop' service.id %}" hx-swap="none"
+        hx-on::after-request="htmx.trigger('body', 'service:table-refresh')"
+        title="Detener">
+        <i class="fas fa-stop"></i>
+    </button>
+
+    {# Restart #}
+    <button class="btn svc-action-btn text-white"
+        style="background-color: #06b6d4;"
+        {% if service.status != 'running' %}disabled{% endif %}
+        hx-post="{% url 'service-restart' service.id %}" hx-swap="none"
+        hx-on::after-request="htmx.trigger('body', 'service:table-refresh')"
+        title="Reiniciar">
+        <i class="fas fa-sync-alt"></i>
+    </button>
+
+    {# Delete #}
+    <button class="btn btn-danger svc-action-btn"
+        hx-post="{% url 'service-remove' service.id %}"
+        hx-target="#service-{{ service.id }}"
+        hx-swap="outerHTML"
+        hx-trigger="confirmed"
+        data-service-id="{{ service.id }}"
+        data-service-name="{{ service.name }}"
+        onclick="confirmDelete(this)"
+        title="Eliminar">
+        <i class="fas fa-trash"></i>
+    </button>
+
+    <span class="border-start mx-1" style="height: 28px; align-self: center; opacity: 0.3;"></span>
+
+    {# Logs #}
+    <a href="{% url 'containers:logs_page' service.id %}" class="btn svc-action-btn text-white"
+        style="background-color: #6b7280;"
+        title="Ver Logs">
+        <i class="fas fa-file-alt"></i>
+    </a>
+
+    {# Dockerfile #}
+    {% if service.dockerfile %}
+    <button class="btn svc-action-btn text-white"
+        style="background-color: #0ea5e9;"
+        hx-get="{% url 'service-dockerfile' service.id %}" hx-target="#code-body"
+        hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#codeModal"
+        title="Ver Dockerfile">
+        <i class="fas fa-file-code"></i>
+    </button>
+    {% endif %}
+
+    {# Compose #}
+    {% if service.compose %}
+    <button class="btn svc-action-btn text-white"
+        style="background-color: #8b5cf6;"
+        hx-get="{% url 'service-compose' service.id %}" hx-target="#code-body"
+        hx-swap="innerHTML" data-bs-toggle="modal" data-bs-target="#codeModal"
+        title="Ver docker-compose">
+        <i class="fas fa-layer-group"></i>
+    </button>
+    {% endif %}
+
+    {# Edit #}
+    {% if not is_supervisor or service.owner == request.user %}
+        {% if service.mode != 'default' %}
+    <a href="{% url 'containers:edit_service' service.id %}" class="btn svc-action-btn text-white"
+        style="background-color: #f59e0b;"
+        title="Editar servicio">
+        <i class="fas fa-pen"></i>
+    </a>
+        {% endif %}
+    {% endif %}
+
+    {# Terminal y Web SOLO para servicios simples #}
+    {% if not service.has_compose %}
+        {% if not is_supervisor or service.owner == request.user %}
+            {% if service.container_id and service.status == 'running' %}
+    <a href="{% url 'containers:terminal_v2' service.id %}" class="btn svc-action-btn text-white"
+        style="background-color: #374151;"
+        title="Terminal">
+        <i class="fas fa-terminal"></i>
+    </a>
+            {% else %}
+    <button class="btn svc-action-btn text-white" style="background-color: #374151;" disabled title="Terminal requiere ejecucion">
+        <i class="fas fa-terminal"></i>
+    </button>
+            {% endif %}
+        {% endif %}
+
+        {# Web - respetar is_web sin filtrar por puerto #}
+        {% if host and service.assigned_port and service.is_web %}
+            {% if service.status == 'running' %}
+    <a href="http://{{ host }}:{{ service.assigned_port }}" class="btn svc-action-btn text-white"
+        style="background-color: #3b82f6;"
+        target="_blank" rel="noopener" title="Acceder a la Web">
+        <i class="fas fa-external-link-alt"></i>
+    </a>
+            {% else %}
+    <button class="btn svc-action-btn text-white" style="background-color: #3b82f6;" disabled title="Web requiere ejecucion">
+        <i class="fas fa-external-link-alt"></i>
+    </button>
+            {% endif %}
+        {% endif %}
+    {% endif %}
+</div>
