@@ -18,8 +18,9 @@ class TokenAuthMiddlewareTests(TestCase):
         self.middleware = TokenAuthMiddleware(lambda request: HttpResponse('ok'))
 
     def test_sets_user_when_token_is_valid(self):
-        token = self.profile.generate_token()
-        request = self.factory.get('/api/containers/', HTTP_AUTHORIZATION=f'Bearer {token}')
+        from paasify.models.TokenModel import ExpiringToken
+        token_obj = ExpiringToken.objects.create(user=self.user)
+        request = self.factory.get('/api/containers/', HTTP_AUTHORIZATION=f'Bearer {token_obj.key}')
 
         response = self.middleware(request)
 
