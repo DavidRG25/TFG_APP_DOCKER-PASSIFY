@@ -37,21 +37,12 @@ fi
 # Cargar variables de forma segura
 source "$CREDS_FILE"
 
-# 3. Comprobar instalación de jq (necesaria para interactuar con la API)
-if ! command -v jq &> /dev/null; then
-    echo "[!] Error: 'jq' no está instalado. Instálalo para continuar (ej: choco install jq o apt-get install jq)."
-    exit 1
-fi
-
 # 4. Comprobar si la versión ya existe en Docker Hub
 echo "[*] Verificando en Docker Hub si la versión $VERSION ya existe..."
-# Obtener token de la API de Docker Hub
-TOKEN=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"username\": \"$DOCKER_USER\", \"password\": \"$DOCKER_PASS\"}" https://hub.docker.com/v2/users/login/ | grep -oP '"token":"\K[^"]+')
 
-if [ -z "$TOKEN" ]; then
-    # Por si usamos Mac/Linux puro sin PCRE
-    TOKEN=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"username\": \"$DOCKER_USER\", \"password\": \"$DOCKER_PASS\"}" https://hub.docker.com/v2/users/login/ | jq -r .token)
-fi
+# Obtener token de la API usando Python (nativo multiplataforma, sin requerir jq)
+JSON_RESP=$(curl -s -X POST -H "Content-Type: application/json" -d "{\"username\": \"$DOCKER_USER\", \"password\": \"$DOCKER_PASS\"}" https://hub.docker.com/v2/users/login/)
+TOKEN=$(echo "$JSON_RESP" | python -c "import sys, json; data=json.load(sys.stdin); print(data.get('token', ''))" 2>/dev/null)
 
 if [ "$TOKEN" == "null" ] || [ -z "$TOKEN" ]; then
     echo "[!] Error: Credenciales de Docker Hub incorrectas en $CREDS_FILE o API inaccesible."
