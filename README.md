@@ -407,15 +407,18 @@ De esta forma, cuando PaaSify da la orden de arrancar un servicio, este nace com
 
 Para desplegar PaaSify en un entorno de producción (como una VM de la universidad o proveedor cloud):
 
-1. **Clonar el repositorio en la VM**:
+1. **Descargar configuración en la VM (Sparse Checkout)**:
+   Para no descargar todo el código fuente del backend (que ya está dentro de la imagen Docker), usaremos un clonado disperso para traer únicamente la carpeta `deploy/`:
 
    ```bash
-   git clone https://github.com/DavidRG25/TFG_APP_DOCKER-PASSIFY.git
-   cd TFG_APP_DOCKER-PASSIFY
+   mkdir Paasify && cd Paasify
+   git clone --no-checkout --sparse https://github.com/DavidRG25/TFG_APP_DOCKER-PASSIFY.git .
+   git sparse-checkout set deploy
+   git checkout main
    ```
 
 2. **Preparar el entorno de despliegue**:
-   Toda la configuración de producción se encuentra encapsulada en la carpeta `deploy/`.
+   Toda la configuración de producción se encuentra encapsulada en la carpeta que acabas de descargar.
 
    ```bash
    cd deploy
