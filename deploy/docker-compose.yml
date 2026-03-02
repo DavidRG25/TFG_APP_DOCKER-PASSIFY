@@ -13,9 +13,9 @@ services:
     volumes:
       # DooD: Para que PaaSify pueda lanzar contenedores en la máquina anfitriona
       - /var/run/docker.sock:/var/run/docker.sock
-      # Persistencia de archivos estáticos y subidos por usuarios (opcional, recomendado)
-      - paasify_media:/app/media
-      - paasify_static:/app/staticfiles
+      # Persistencia de archivos estáticos y subidos por usuarios (local directory para poder ver los archivos)
+      - ./volumes/media:/app/media
+      - ./volumes/staticfiles:/app/staticfiles
     depends_on:
       db:
         condition: service_healthy
@@ -34,9 +34,9 @@ services:
       POSTGRES_USER: ${DB_USER:-paasify_admin}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-mypassword}
     volumes:
-      - paasify_db_data:/var/lib/postgresql/data
+      - ./volumes/db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-paasify_admin}"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-paasify_admin} -d ${DB_NAME:-paasify_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -55,8 +55,8 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/certs:/etc/nginx/certs:ro
       - ./nginx/htpasswd:/etc/nginx/htpasswd:ro # Archivo para contraseñas de cAdvisor
-      - paasify_static:/app/staticfiles:ro
-      - paasify_media:/app/media:ro
+      - ./volumes/staticfiles:/app/staticfiles:ro
+      - ./volumes/media:/app/media:ro
     depends_on:
       - paasify
       - cadvisor
@@ -67,6 +67,7 @@ services:
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.47.2
     container_name: paasify_cadvisor
+    command: -url_base_prefix=/monitorizacion
     restart: unless-stopped
     privileged: true
     devices:
@@ -78,7 +79,4 @@ services:
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
 
-volumes:
-  paasify_db_data:
-  paasify_static:
-  paasify_media:
+

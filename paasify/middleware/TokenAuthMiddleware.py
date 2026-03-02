@@ -23,11 +23,21 @@ class TokenAuthMiddleware:
         if request.path.startswith("/api/") and auth_header.startswith("Bearer "):
             token_key = auth_header.replace("Bearer ", "", 1).strip()
             
-            # Validar token JWT
-            from paasify.models.StudentModel import UserProfile
-            user = UserProfile.get_user_from_token(token_key)
+            # Validar token API (ExpiringToken)
+            from paasify.models.TokenModel import ExpiringToken
             
-            if not user:
+            try:
+                token_obj = ExpiringToken.objects.select_related('user').get(key=token_key)
+                if token_obj.is_expired():
+                    return JsonResponse(
+                        {
+                            "detail": "Token expirado.",
+                            "code": "token_not_valid",
+                        },
+                        status=401,
+                    )
+                user = token_obj.user
+            except ExpiringToken.DoesNotExist:
                 return JsonResponse(
                     {
                         "detail": "Token invalido o expirado.",
