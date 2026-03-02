@@ -393,3 +393,50 @@ env DJANGO_DEBUG=True python manage.py cleanup_media
 > **⚠️ Nota:** El sistema realiza limpieza automática al borrar servicios. Usa este comando solo para mantenimiento general o depuración.
 
 ---
+
+## 🌩️ Despliegue en Producción (Docker-in-Docker)
+
+PaaSify está diseñado para funcionar en entornos de producción orquestando contenedores en la misma máquina anfitriona donde se ejecuta. Esto se logra mediante la arquitectura **Docker-in-Docker (DooD)**.
+
+### **¿Cómo funciona el Docker-in-Docker en PaaSify?**
+
+PaaSify se ejecuta dentro de un contenedor Docker, pero necesita lanzar y gestionar _otros_ contenedores (los proyectos de los alumnos). En lugar de crear contenedores "dentro" del contenedor de PaaSify (lo cual es ineficiente y problemático), se monta el socket de Docker de la máquina anfitriona (`/var/run/docker.sock`) dentro del contenedor de PaaSify.
+De esta forma, cuando PaaSify da la orden de arrancar un servicio, este nace como un "contenedor hermano" directamente en la máquina anfitriona, utilizando la red y los puertos reales del servidor.
+
+### **Pasos para Desplegar en una Máquina Virtual (VM)**
+
+Para desplegar PaaSify en un entorno de producción (como una VM de la universidad o proveedor cloud):
+
+1. **Clonar el repositorio en la VM**:
+
+   ```bash
+   git clone https://github.com/DavidRG25/TFG_APP_DOCKER-PASSIFY.git
+   cd TFG_APP_DOCKER-PASSIFY
+   ```
+
+2. **Preparar el entorno de despliegue**:
+   Toda la configuración de producción se encuentra encapsulada en la carpeta `deploy/`.
+
+   ```bash
+   cd deploy
+   cp .env.example .env
+   # Edita el archivo .env configurando una clave secreta fuerte y contraseñas de BD
+   nano .env
+   ```
+
+3. **Configurar Certificados TLS y Seguridad**:
+   - Copia tus certificados SSL institucionales (`paas.tfg.etsii.urjc.es.crt` y `.key`) en `deploy/nginx/certs/`.
+   - Genera una contraseña para proteger el panel de monitorización de hardware (`cAdvisor`):
+     ```bash
+     cd nginx/htpasswd/
+     htpasswd -c .htpasswd admin
+     cd ../../
+     ```
+
+4. **Levantar la Infraestructura**:
+   El sistema desplegará simultáneamente PaaSify (con ASGI habilitado), PostgreSQL, Proxy Nginx y cAdvisor.
+   ```bash
+   docker compose up -d
+   ```
+
+⭐ **Para más información detallada, consulta la guía completa en [deploy/README.md](deploy/README.md).**
