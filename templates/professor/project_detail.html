@@ -141,35 +141,30 @@
         </div>
       </form>
     </div>
-    <div class="card-body p-0">
+    <div class="card-body p-0" style="background: rgba(0,0,0,0.01);">
       {% if related_services %}
-        <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0" style="table-layout: fixed;">
-            <thead style="background: linear-gradient(135deg, var(--subject-primary, #4e73df) 0%, var(--subject-secondary, #224abe) 100%);">
-              <tr class="text-white small text-uppercase fw-bold" style="letter-spacing: 0.8px; font-size: 0.75rem;">
-                <th class="py-3 ps-4 border-0" style="cursor: pointer; width: 25%;" 
-                    onclick="toggleServiceOrdering('name')">
+        {# Cabecera Global de Columnas (Estilo Unificado) #}
+        <div class="global-columns-header py-3 px-4 mb-3 bg-white shadow-sm rounded-pill border mx-3 mt-4">
+            <div class="row align-items-center text-uppercase text-muted fw-bold" style="font-size: 0.7rem; letter-spacing: 1.5px;">
+                <div class="col-3 ps-4" onclick="toggleServiceOrdering('name')" style="cursor:pointer;">
                     Nombre <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-name"></i>
-                </th>
-                <th class="py-3 border-0" style="cursor: pointer; width: 20%;"
-                    onclick="toggleServiceOrdering('image')">
-                    Imagen <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-image"></i>
-                </th>
-                <th class="py-3 border-0" style="width: 15%;">Puerto</th>
-                <th class="py-3 border-0 text-center" style="cursor: pointer; width: 15%;"
-                    onclick="toggleServiceOrdering('status')">
+                </div>
+                <div class="col-3 text-center" onclick="toggleServiceOrdering('image')" style="cursor:pointer;">
+                    Origen / Imagen <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-image"></i>
+                </div>
+                <div class="col-1 text-center">Puerto</div>
+                <div class="col-2 text-center" onclick="toggleServiceOrdering('status')" style="cursor:pointer;">
                     Estado <i class="fas fa-sort ms-1 opacity-50" id="sort-icon-status"></i>
-                </th>
-                <th class="py-3 pe-4 text-end border-0" style="width: 25%;">Acciones</th>
-              </tr>
-            </thead>
-            <tbody class="bg-white" id="service-table"
-                   hx-get="{% url 'containers:service_table' %}?project={{ project.id }}"
-                   hx-trigger="load, every 3s, service:table-refresh from:body"
-                   hx-include="#filter-form">
-              {% include "containers/_service_rows.html" with services=related_services hide_redundant=True hide_project_column=True hide_owner=True hide_subject_column=True %}
-            </tbody>
-          </table>
+                </div>
+                <div class="col-3 text-center">Acciones</div>
+            </div>
+        </div>
+
+        <div id="service-table"
+             hx-get="{% url 'containers:service_table' %}?project={{ project.id }}&hide_subject=1&hide_project=1&hide_table_header=1"
+             hx-trigger="load, every 3s, service:table-refresh from:body"
+             hx-include="#filter-form">
+          {% include "containers/_service_rows.html" with services=related_services hide_redundant=True hide_project_header=True hide_subject_header=True hide_table_header=True %}
         </div>
       {% else %}
         <div class="p-5 text-center">

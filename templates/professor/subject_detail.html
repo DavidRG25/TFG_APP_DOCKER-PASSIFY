@@ -200,7 +200,7 @@
           <div class="d-flex flex-wrap align-items-center gap-3">
             <div class="input-group input-group-sm shadow-sm" style="max-width: 250px;">
               <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
-              <input type="text" id="search-projects" class="form-control border-start-0" placeholder="Buscar proyecto..." onkeyup="filterList('list-projects', this.value)">
+              <input type="text" id="search-projects" class="form-control border-start-0" placeholder="Buscar proyecto o alumno..." onkeyup="filterList('list-projects', this.value)">
             </div>
             
             <div class="d-inline-flex border rounded-pill p-1 bg-light">
@@ -230,13 +230,18 @@
                     </div>
                     <div>
                       <div class="fw-semibold text-dark">{{ project.place }}</div>
-                      <small class="text-muted">@{{ project.user_profile.user.username }}</small>
+                      <small class="text-muted"><span class="fw-bold">{{ project.user_profile.user.get_full_name|default:project.user_profile.user.username }}</span> (@{{ project.user_profile.user.username }})</small>
                     </div>
                   </div>
                   <div class="d-flex align-items-center gap-2">
                     <a class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm hover-elevate fw-bold" href="{% url 'professor_project_detail' project.id %}">
                       <i class="fas fa-eye me-1"></i>Detalles
                     </a>
+                    <button class="btn btn-sm btn-light rounded-circle me-1 shadow-sm" 
+                            onclick="openEditProjectModal('{{ project.id }}', '{{ project.place|escapejs }}')"
+                            title="Editar Proyecto">
+                      <i class="fas fa-edit text-secondary"></i>
+                    </button>
                     <button class="btn btn-sm btn-outline-danger rounded-circle shadow-sm hover-elevate" 
                             onclick="confirmDeleteProject('{{ project.id }}', '{{ project.place|escapejs }}')"
                             title="Eliminar Proyecto">
@@ -384,9 +389,6 @@
               <p class="text-white-50 small mb-0">Asigna un espacio de trabajo a un alumno matriculado.</p>
             </div>
           </div>
-          <button type="button" class="bg-transparent border-0 text-white shadow-none" data-bs-dismiss="modal" data-dismiss="modal" aria-label="Cerrar" style="position: absolute; top: 1.5rem; right: 1.5rem; z-index: 10; cursor: pointer;">
-            <i class="fas fa-times fa-lg"></i>
-          </button>
         </div>
         <div class="modal-body p-4 bg-light bg-opacity-30">
           <div class="row g-4">
@@ -438,8 +440,7 @@
             </div>
           </div>
         </div>
-        <div class="modal-footer border-0 p-4 bg-white justify-content-between">
-          <button type="button" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm" data-bs-dismiss="modal" data-dismiss="modal">Cerrar</button>
+        <div class="modal-footer border-0 p-4 bg-white justify-content-end">
           <button type="submit" class="btn text-white rounded-pill px-5 py-2 fw-bold shadow-sm" style="background-color: var(--subject-primary);">
             <i class="fas fa-check-circle me-2"></i>Crear Proyecto
           </button>
@@ -763,12 +764,57 @@
   </div>
 </div>
 
+<!-- Modal Editar Proyecto -->
+<div class="modal fade" id="editProjectModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+      <form method="POST" action="{% url 'professor_subject_detail' subject.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="edit_project">
+        <input type="hidden" name="project_id" id="edit_project_id">
+        <div class="modal-header border-0 text-white py-4 px-4 position-relative overflow-hidden" style="background-color: var(--subject-primary);">
+          <div class="d-flex align-items-center position-relative mt-2 ps-2">
+            <div class="rounded-circle p-3 me-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px;">
+              <i class="fas fa-folder-open fa-lg text-white"></i>
+            </div>
+            <div>
+              <h5 class="modal-title fw-bold mb-0">Editar Proyecto</h5>
+              <p class="text-white-50 small mb-0">Modifica el nombre o ubicación del proyecto del alumno.</p>
+            </div>
+          </div>
+        </div>
+        <div class="modal-body p-4 bg-light bg-opacity-30">
+          <div class="bg-white p-4 rounded-4 shadow-sm border border-light">
+            <label class="form-label text-muted small fw-bold text-uppercase mb-2">Nuevo Nombre del Proyecto</label>
+            <div class="input-group">
+              <span class="input-group-text bg-light border-end-0"><i class="fas fa-edit text-muted"></i></span>
+              <input type="text" name="place" id="edit_project_place" class="form-control bg-light border-start-0 ps-0" placeholder="Ej: Práctica Final AWS" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0 p-4 bg-white justify-content-end">
+          <button type="submit" class="btn text-white rounded-pill px-5 py-2 fw-bold shadow-sm" style="background-color: var(--subject-primary);">
+            <i class="fas fa-save me-2"></i>Guardar Cambios
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 {% include "containers/_partials/panels/_modals.html" %}
 {% endblock %}
 
 {% block extrascripts %}
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
+  function openEditProjectModal(projectId, place) {
+    document.getElementById('edit_project_id').value = projectId;
+    document.getElementById('edit_project_place').value = place;
+    const myModal = new bootstrap.Modal(document.getElementById('editProjectModal'));
+    myModal.show();
+  }
+
   function openEditStudentModal(studentId) {
     const modalEl = document.getElementById('editStudentModal' + studentId);
     if (modalEl) {
