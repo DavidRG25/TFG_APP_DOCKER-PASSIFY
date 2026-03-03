@@ -1563,10 +1563,24 @@ def remove_container(service: Service, keep_files: bool = False, keep_volumes: b
 
         # Eliminar TODOS los volúmenes asociados al servicio (paasify_vol_{id}_*)
         if not keep_volumes:
+            import time
+            from docker.errors import APIError
+            
             try:
                 vols = docker_client.volumes.list(filters={"name": f"paasify_vol_{service.id}_"})
                 for v in vols:
-                    v.remove(force=True)
+                    # Bucle corto de reintentos para dar tiempo a que Docker desenganche el volumen
+                    max_retries = 3
+                    for attempt in range(max_retries):
+                        try:
+                            v.remove(force=True)
+                            break
+                        except APIError as e:
+                            # 409 means "volume is in use"
+                            if e.response is not None and e.response.status_code == 409 and attempt < max_retries - 1:
+                                time.sleep(1)
+                            else:
+                                raise
             except Exception as exc:
                 _append_log(service, f"Error al eliminar volúmenes: {exc}")
                 service.save(update_fields=["logs"])
