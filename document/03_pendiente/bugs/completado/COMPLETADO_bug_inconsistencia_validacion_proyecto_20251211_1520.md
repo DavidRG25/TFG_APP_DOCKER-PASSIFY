@@ -3,7 +3,7 @@
 **Fecha:** 11/12/2025 15:20  
 **Tipo:** Bug de Validación / Inconsistencia  
 **Prioridad:** Media  
-**Estado:** Pendiente  
+**Estado:** COMPLETADO  
 **Versión afectada:** v5.0
 
 ---
@@ -167,7 +167,6 @@ class ServiceSerializer(serializers.ModelSerializer):
 ## 🎯 Plan de Acción Sugerido
 
 1. **Corto plazo (Workaround):**
-
    - Actualizar documentación del API indicando que `project` es **recomendado**
    - Añadir nota de advertencia en la guía de API
 

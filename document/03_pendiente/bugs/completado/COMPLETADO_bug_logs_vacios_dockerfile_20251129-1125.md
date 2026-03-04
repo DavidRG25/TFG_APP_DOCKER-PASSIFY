@@ -1,4 +1,5 @@
 # Bug Report - Rama: dev2
+
 > Resumen: Logs vacios en servicios con error de Dockerfile
 
 ## 🐛 Bug detectado durante testing
@@ -25,6 +26,7 @@ Al crear un servicio con un **Dockerfile personalizado** que falla durante el bu
 ### Comportamiento esperado:
 
 El modal de logs deberia mostrar:
+
 - Output del comando `docker build`
 - Mensaje de error especifico
 - Linea del Dockerfile que causo el error
@@ -42,6 +44,7 @@ EXECUTOR.submit(_run_container_worker, service.pk, force_restart, custom_port, c
 ```
 
 **Flujo:**
+
 1. Usuario crea servicio → Estado: `pending`
 2. Tarea se encola en background
 3. Usuario ve servicio en lista (estado aun `pending`)
@@ -97,11 +100,13 @@ except (APIError, DockerException, RuntimeError, ValueError) as exc:
 ```
 
 **Ventajas:**
+
 - ✅ Fix rapido (1 linea)
 - ✅ Mantiene logs del build
 - ✅ No rompe funcionalidad existente
 
 **Desventajas:**
+
 - ⚠️ No resuelve el problema de timing (logs vacios al abrir modal)
 
 ### Opcion B: Polling automatico en el frontend (COMPLETA)
@@ -111,24 +116,26 @@ Agregar JavaScript en el modal de logs para refrescar automaticamente:
 ```javascript
 // En el modal de logs
 function refreshLogs(serviceId) {
-    fetch(`/api/services/${serviceId}/logs/`)
-        .then(r => r.json())
-        .then(data => {
-            document.getElementById('logs-content').textContent = data.logs;
-            // Si el estado es 'pending', seguir refrescando
-            if (data.status === 'pending') {
-                setTimeout(() => refreshLogs(serviceId), 2000);
-            }
-        });
+  fetch(`/api/services/${serviceId}/logs/`)
+    .then((r) => r.json())
+    .then((data) => {
+      document.getElementById("logs-content").textContent = data.logs;
+      // Si el estado es 'pending', seguir refrescando
+      if (data.status === "pending") {
+        setTimeout(() => refreshLogs(serviceId), 2000);
+      }
+    });
 }
 ```
 
 **Ventajas:**
+
 - ✅ Resuelve el problema de timing
 - ✅ UX mejorada (logs en tiempo real)
 - ✅ Usuario ve progreso del build
 
 **Desventajas:**
+
 - ⚠️ Requiere endpoint API nuevo
 - ⚠️ Mas codigo JavaScript
 
@@ -141,20 +148,22 @@ def run_container(service, force_restart=False, custom_port=None, command=None, 
     # Si hay Dockerfile, ejecutar sincronicamente para capturar logs inmediatamente
     if service.dockerfile and enqueue:
         enqueue = False  # Forzar ejecucion sincronica
-    
+
     if not enqueue:
         _run_container_internal(service, force_restart, custom_port, command)
         return
-    
+
     # ... resto del codigo ...
 ```
 
 **Ventajas:**
+
 - ✅ Logs disponibles inmediatamente
 - ✅ No requiere cambios en frontend
 - ✅ Fix simple
 
 **Desventajas:**
+
 - ⚠️ Bloquea el request (puede ser lento)
 - ⚠️ Timeout si el build tarda mucho
 
@@ -186,13 +195,16 @@ def run_container(service, force_restart=False, custom_port=None, command=None, 
 ## 📊 Impacto
 
 ### Usuarios afectados:
+
 - ✅ Alumnos que usan Dockerfile personalizado
 - ✅ Profesores que debugean servicios de alumnos
 
 ### Severidad:
+
 - **Media:** El servicio falla correctamente (estado ERROR), pero sin informacion util para debugging
 
 ### Workaround actual:
+
 - Ver logs desde Docker Desktop
 - Ver logs desde terminal: `docker logs <container_id>`
 - Revisar archivos en `archivos_dockerfile/`
@@ -207,6 +219,6 @@ def run_container(service, force_restart=False, custom_port=None, command=None, 
 
 ---
 
-**Estado:** 🔴 Pendiente de correccion  
+**Estado:** COMPLETADO  
 **Asignado a:** Por definir  
 **Relacionado con:** Plan de Testing Admin - Fase 3

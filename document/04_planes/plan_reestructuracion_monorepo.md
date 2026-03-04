@@ -23,7 +23,7 @@ TFG_APP_DOCKER-PASSIFY/    <-- (Raíz del Repositorio Limpia)
 ├── deploy/                # Producción (VM URJC, docker-compose, nginx)
 ├── docs/                  # (Opcional - Futuro) Documentación oficial del Repo
 ├── .gitignore             # Gitignore global (actualizado)
-├── README.md              # README global (Índice y vitrina del proyecto)
+├── README.md              # README global (Índice y vitrina del proyecto) # Debería de tener un quickstart (Descargar en el ordenador rápidamente.)
 │
 └── paasify_app/           # <-- (NUEVO DIRECTORIO: Aquí va la aplicación actual)
     ├── app_passify/       # Código backend

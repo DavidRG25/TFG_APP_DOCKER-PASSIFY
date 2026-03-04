@@ -1,4 +1,5 @@
 # Bug Report - Rama: dev2
+
 > Resumen: Columna Volumenes muestra "-" aunque Docker Desktop muestra volumenes creados
 
 ## 🐛 Bug detectado durante testing
@@ -16,10 +17,12 @@ La columna **"Volúmenes"** en el admin de servicios muestra **"-"** (guion), au
 ### Evidencia:
 
 **Docker Desktop muestra:**
+
 - ✅ `svc_1_prueba-nginx_data` (creado hace 2 horas)
 - ✅ `svc_6_prueba-dockerfile_data` (creado hace 3 minutos)
 
 **Admin de Django muestra:**
+
 - ❌ Columna "VOLÚMENES": `-` (para ambos servicios)
 
 ### Comportamiento esperado:
@@ -58,6 +61,7 @@ class Service(models.Model):
 ```
 
 **Flujo actual:**
+
 1. Sistema crea volumen automatico → `volume_name = "svc_1_prueba-nginx_data"`
 2. Campo `volumes` queda vacio (usuario no agrego volumenes adicionales)
 3. `get_volume_info` verifica `obj.volumes` → vacio → devuelve "-"
@@ -73,11 +77,11 @@ Modificar `get_volume_info` para contar **ambos tipos de volumenes**:
 def get_volume_info(self, obj):
     """Muestra información resumida de volúmenes"""
     count = 0
-    
+
     # Contar volumen automatico
     if obj.volume_name:
         count += 1
-    
+
     # Contar volumenes adicionales del usuario
     if obj.volumes:
         try:
@@ -87,10 +91,10 @@ def get_volume_info(self, obj):
                 count += len(volumes)
         except:
             pass
-    
+
     if count == 0:
         return "-"
-    
+
     return f"📁 {count} volumen{'es' if count != 1 else ''}"
 ```
 
@@ -103,12 +107,12 @@ def get_volume_info(self, obj):
     """Muestra información resumida de volúmenes"""
     count = 0
     volume_list = []
-    
+
     # Volumen automatico
     if obj.volume_name:
         count += 1
         volume_list.append(f"{obj.volume_name} (automático)")
-    
+
     # Volumenes adicionales
     if obj.volumes:
         try:
@@ -120,10 +124,10 @@ def get_volume_info(self, obj):
                     volume_list.append(f"{host_path} → {container_path}")
         except:
             pass
-    
+
     if count == 0:
         return "-"
-    
+
     tooltip = "\\n".join(volume_list)
     return format_html(
         '<span title="{}">{} {}</span>',
@@ -138,16 +142,19 @@ def get_volume_info(self, obj):
 ## 📊 Impacto
 
 ### Usuarios afectados:
+
 - ✅ Profesores revisando servicios de alumnos
 - ✅ Administradores monitoreando uso de disco
 
 ### Severidad:
+
 - **Media:** Informacion incorrecta puede confundir
 - **Funcionalidad:** Los volumenes existen y funcionan, solo no se muestran
 
 ### Confusion actual:
 
 Usuario ve:
+
 - Admin: "Volúmenes: -"
 - Docker Desktop: Volumen existe
 
@@ -166,6 +173,7 @@ Usuario ve:
 ### Verificacion en Docker Desktop:
 
 Los volumenes mostrados en Docker Desktop confirman que:
+
 1. ✅ Sistema crea volumenes correctamente
 2. ✅ Volumenes tienen el formato esperado: `svc_{id}_{slug}_data`
 3. ❌ Admin no los muestra porque solo verifica `obj.volumes` (campo adicional)
@@ -185,6 +193,6 @@ Los volumenes mostrados en Docker Desktop confirman que:
 
 ---
 
-**Estado:** 🔴 Pendiente de correccion  
+**Estado:** COMPLETADO  
 **Prioridad:** Media  
 **Relacionado con:** Test 3.1 - Service Admin

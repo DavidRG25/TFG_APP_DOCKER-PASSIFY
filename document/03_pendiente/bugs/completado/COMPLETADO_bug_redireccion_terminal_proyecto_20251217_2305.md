@@ -3,7 +3,7 @@
 **Fecha:** 17/12/2025 23:05  
 **Tipo:** Bug de Navegación  
 **Prioridad:** Media  
-**Estado:** Pendiente  
+**Estado:** COMPLETADO  
 **Versión afectada:** v5.0
 
 ---
@@ -183,17 +183,14 @@ def terminal_view(request, pk):
 ## 📝 Archivos a Modificar
 
 1. **`containers/views.py`**:
-
    - Función `terminal_view()`
    - Añadir lógica de `back_url`
 
 2. **`templates/containers/terminal.html`**:
-
    - Botón "Volver"
    - Usar `{{ back_url }}`
 
 3. **`templates/containers/_partials/services/_compose.html`**:
-
    - Botón "Terminal"
    - Añadir `?subject={{ current_subject.id }}`
 

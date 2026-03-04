@@ -1,7 +1,7 @@
 # Bug: Botón "Acceder" en servicios no-HTTP (Redis)
 **Fecha**: 2025-12-09 23:49  
 **Prioridad**: MEDIA  
-**Estado**: PENDIENTE
+**Estado**: COMPLETADO
 
 ---
 
@@ -183,4 +183,4 @@ class ServiceContainer(models.Model):
 ---
 
 **Última actualización**: 2025-12-09 23:49  
-**Estado**: Documentado, pendiente de implementación
+**Estado**: COMPLETADO, pendiente de implementación
