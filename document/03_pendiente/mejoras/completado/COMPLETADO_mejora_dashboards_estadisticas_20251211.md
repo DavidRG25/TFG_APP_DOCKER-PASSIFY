@@ -3,7 +3,7 @@
 **Fecha:** 11/12/2025 14:53  
 **Tipo:** Mejora de UX/UI  
 **Prioridad:** Media  
-**Estado:** Pendiente
+**Estado:** COMPLETADO
 
 ## Descripción
 

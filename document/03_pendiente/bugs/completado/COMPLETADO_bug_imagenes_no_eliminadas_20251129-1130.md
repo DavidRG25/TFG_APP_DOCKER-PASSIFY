@@ -1,4 +1,5 @@
 # Bug Report - Rama: dev2
+
 > Resumen: Imagenes Docker no se eliminan al borrar servicio personalizado
 
 ## 🐛 Bug detectado durante testing
@@ -6,6 +7,7 @@
 **Fase de testing:** Test 3.x - Service Admin  
 **Fecha:** 2025-11-29  
 **Reportado por:** Usuario (testing manual)
+**Estado:** COMPLETADO
 
 ---
 
@@ -29,6 +31,7 @@ Al **eliminar un servicio** creado con **Dockerfile personalizado** o **docker-c
 ### Comportamiento esperado:
 
 Al eliminar un servicio personalizado, deberia eliminarse:
+
 - ✅ Contenedor
 - ✅ Volumen
 - ✅ Puerto reservado
@@ -83,6 +86,7 @@ def remove_container(service: Service):
 ```
 
 **Problema:** No hay logica para:
+
 1. Detectar si el servicio tiene imagen personalizada
 2. Eliminar la imagen Docker construida
 3. Eliminar archivos subidos (Dockerfile, compose, code)
@@ -157,6 +161,7 @@ if service.code:
 ### Problema actual:
 
 Cada servicio personalizado deja una imagen huerfana:
+
 - **Espacio en disco:** 100MB - 1GB por imagen (dependiendo del Dockerfile)
 - **Acumulacion:** Si se crean/eliminan muchos servicios, el disco se llena
 - **Confusion:** `docker images` muestra muchas imagenes sin usar
@@ -220,6 +225,7 @@ svc_3_mi-servidor_image      latest    148MB
 ### Caso especial: docker-compose
 
 Para docker-compose, las imagenes tienen labels del proyecto:
+
 ```
 com.docker.compose.project=svc{id}
 ```
@@ -229,6 +235,7 @@ Se pueden eliminar filtrando por este label.
 ### Workaround actual:
 
 Limpiar manualmente con:
+
 ```bash
 # Eliminar imagenes huerfanas
 docker image prune -a
@@ -239,7 +246,7 @@ docker images | grep "svc_.*_image" | awk '{print $3}' | xargs docker rmi -f
 
 ---
 
-**Estado:** 🔴 Pendiente de correccion  
+**Estado:** COMPLETADO  
 **Asignado a:** Por definir  
 **Relacionado con:** Plan de Testing Admin - Fase 3  
 **Relacionado con:** Bug logs vacios Dockerfile

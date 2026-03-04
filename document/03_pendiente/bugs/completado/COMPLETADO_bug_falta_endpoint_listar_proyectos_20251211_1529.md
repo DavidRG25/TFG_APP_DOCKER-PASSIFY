@@ -3,7 +3,7 @@
 **Fecha:** 11/12/2025 15:29  
 **Tipo:** Feature Faltante / Bug de Usabilidad  
 **Prioridad:** Alta  
-**Estado:** Pendiente  
+**Estado:** COMPLETADO  
 **Versión afectada:** v5.0
 
 ---

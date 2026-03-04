@@ -2,7 +2,7 @@
 
 **Fecha de Análisis:** 24 de Mayo de 2024  
 **Última Actualización:** 13 de Diciembre de 2025  
-**Estado:** PENDIENTE DE REMEDIACIÓN  
+**Estado:** COMPLETADO  
 **Nivel de Riesgo:** CRÍTICO - Compromiso Total del Servidor Host
 
 ---
@@ -16,6 +16,7 @@ Este documento detalla vulnerabilidades que permiten a un atacante autenticado (
 ## 1. Escalada de Privilegios a Root mediante Montaje de Volúmenes
 
 ### Clasificación
+
 - **Severidad:** CRÍTICA (10/10)
 - **CVE Equivalente:** Similar a CVE-2019-5736 (Docker Container Escape)
 - **Archivos Afectados:** `containers/views.py` (línea ~570), `containers/services.py`
@@ -36,6 +37,7 @@ La aplicación permite a los usuarios editar la configuración de sus servicios 
 ### Impacto Real
 
 Un atacante puede:
+
 - **Leer archivos sensibles:** Claves SSH, credenciales de base de datos, secretos de Django, certificados SSL
 - **Modificar el sistema operativo:** Instalar backdoors, crear usuarios root, modificar configuraciones
 - **Borrar el servidor completo:** Ejecutar `rm -rf /` desde dentro del contenedor afectaría al host
@@ -51,6 +53,7 @@ Imagina que un alumno llamado "Juan" tiene un servicio con ID 42. Juan envía un
 ```
 
 Cuando Juan reinicia su contenedor y abre la terminal web, ve el directorio `/host_root` que contiene:
+
 - `/host_root/etc/` - Configuraciones del sistema
 - `/host_root/home/` - Directorios de usuarios
 - `/host_root/var/lib/docker/` - Datos de Docker, incluyendo otros contenedores
@@ -63,6 +66,7 @@ Juan puede ejecutar: `cat /host_root/etc/shadow` y obtener los hashes de contras
 Los usuarios no deberían poder definir volúmenes arbitrarios. La aplicación debe gestionar internamente los volúmenes necesarios, mapeando únicamente directorios seguros y controlados.
 
 **Enfoque 2 - Validación estricta (Si se requiere la funcionalidad):**
+
 - Implementar una whitelist de rutas permitidas
 - Validar que ninguna ruta comience con `/`, `/etc`, `/var`, `/home`, etc.
 - Forzar que todos los volúmenes sean volúmenes Docker nombrados (no bind mounts)
@@ -73,6 +77,7 @@ Los usuarios no deberían poder definir volúmenes arbitrarios. La aplicación d
 ## 2. Inyección de Configuración en Docker Compose
 
 ### Clasificación
+
 - **Severidad:** CRÍTICA (9/10)
 - **Archivos Afectados:** `containers/services.py` (función `_run_compose_service`)
 - **Vector de Ataque:** Subida de archivo malicioso
@@ -92,6 +97,7 @@ La aplicación permite a los usuarios subir un archivo `docker-compose.yml` para
 ### Impacto Real
 
 Un archivo `docker-compose.yml` malicioso puede:
+
 - Ejecutar contenedores con privilegios elevados
 - Acceder a la red interna del servidor
 - Montar el socket de Docker (`/var/run/docker.sock`) y controlar todos los contenedores
@@ -112,6 +118,7 @@ services:
 ```
 
 Este contenedor tiene:
+
 - Acceso completo al daemon de Docker
 - Puede crear/eliminar cualquier contenedor
 - Puede acceder a la red del host sin restricciones
@@ -128,6 +135,7 @@ Este contenedor tiene:
 5. Registrar y alertar sobre intentos de subida de archivos sospechosos
 
 **Configuraciones que deben ser prohibidas:**
+
 - `privileged`
 - `network_mode: host`
 - `pid: host` o `pid: container:...`
@@ -140,6 +148,7 @@ Este contenedor tiene:
 ## 3. Tokens JWT Irrevocables ("Tokens Zombie")
 
 ### Clasificación
+
 - **Severidad:** ALTA (8/10)
 - **Archivos Afectados:** `paasify/middleware/TokenAuthMiddleware.py`, `paasify/models/StudentModel.py`
 - **Vector de Ataque:** Robo de token, compromiso de sesión
@@ -157,12 +166,14 @@ El campo `api_token` en el modelo `UserProfile` se guarda en texto plano en la b
 ### Impacto Real
 
 **Escenario 1 - Token robado:**
+
 - Un alumno pierde su laptop con el token guardado en el navegador
 - El alumno regenera su token desde su perfil
 - El ladrón puede seguir usando el token antiguo durante 365 días
 - No hay forma de invalidar el token comprometido
 
 **Escenario 2 - Compromiso de base de datos:**
+
 - Un atacante explota otra vulnerabilidad y obtiene acceso a la BD
 - Extrae todos los tokens en texto plano
 - Puede autenticarse como cualquier usuario (alumnos, profesores, administradores)
@@ -174,6 +185,7 @@ El campo `api_token` en el modelo `UserProfile` se guarda en texto plano en la b
 Modificar el middleware para que, además de validar la firma, compare el token recibido con el almacenado en la base de datos. Si no coinciden, rechazar la autenticación.
 
 **Para el almacenamiento:**
+
 - Hashear los tokens antes de guardarlos (usando bcrypt o Argon2)
 - Al validar, hashear el token recibido y comparar con el hash almacenado
 - Alternativamente, usar un sistema de tokens de sesión con expiración corta y refresh tokens
@@ -183,6 +195,7 @@ Modificar el middleware para que, además de validar la firma, compare el token 
 ## 4. Ejecución Remota de Código vía Terminal Web
 
 ### Clasificación
+
 - **Severidad:** CRÍTICA (10/10 cuando se combina con vulnerabilidad #1)
 - **Archivos Afectados:** `containers/consumers.py` (clase `TerminalConsumer`)
 - **Vector de Ataque:** WebSocket autenticado

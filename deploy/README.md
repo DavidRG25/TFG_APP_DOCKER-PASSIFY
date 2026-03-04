@@ -92,7 +92,7 @@ _Importante:_ No subas el archivo `.htpasswd` al repositorio de git.
 
 ## 🚀 Paso 4: Levantar la Arquitectura (Arrancar)
 
-Cuando hayas publicado la imagen de PaaSify en Docker Hub (ej: `davidrg25/paasify:v10.1.0`), actualiza la línea `image:` en el `docker-compose.yml` para que apunte a la versión correcta en lugar de `latest`, o asegúrate de haber hecho push del tag `latest`.
+Cuando hayas publicado la imagen de PaaSify en Docker Hub (ej: `davidrg25/paasify:v1.0.0`), actualiza la línea `image:` en el `docker-compose.yml` para que apunte a la versión correcta en lugar de `latest`, o asegúrate de haber hecho push del tag `latest`.
 
 Finalmente dirígete a la carpeta `deploy/` y ejecuta:
 
