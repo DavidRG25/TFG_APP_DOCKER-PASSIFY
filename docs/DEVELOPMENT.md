@@ -7,6 +7,10 @@
 3. [Modelo de Datos](#3-modelo-de-datos)
 4. [Estructura del Código](#4-estructura-del-código)
 5. [Flujo de Despliegue de un Servicio](#5-flujo-de-despliegue-de-un-servicio)
+   - [5.1 Flujo de Roles y Jerarquía Académica](#51-flujo-de-roles-y-jerarquía-académica)
+   - [5.2 Lógica Interna del Motor Docker](#52-lógica-interna-del-motor-docker)
+   - [5.3 Deep Dive: Ciclo de Vida Completo](#53-deep-dive-ciclo-de-vida-completo)
+   - [5.4 Comunicación Interna](#54-comunicación-interna-diagrama-de-secuencia-resumido)
 6. [API REST](#6-api-rest)
 7. [Entorno de Desarrollo Local](#7-entorno-de-desarrollo-local)
 8. [Testing](#8-testing)
@@ -340,6 +344,137 @@ sequenceDiagram
 
     View-->>UI: Redirige al dashboard
     UI-->>Student: Muestra servicio con estado y puertos
+```
+
+### 5.1 Flujo de Roles y Jerarquía Académica
+
+PaaSify organiza los recursos de forma jerárquica para facilitar el entorno docente:
+
+```mermaid
+flowchart LR
+    subgraph Admin ["👨‍💼 Administración"]
+        A1[Crear Asignaturas] --> A2[Asignar Profesores]
+    end
+
+    subgraph Professor ["👨‍🏫 Rol Profesor"]
+        A2 --> P1[Configurar Asignatura]
+        P1 --> P2[Crear Proyectos/Plazas]
+        P2 --> P3[Matricular Alumnos]
+    end
+
+    subgraph Student ["🎓 Rol Alumno"]
+        P3 --> S1[Acceder a Proyecto]
+        S1 --> S2[Configurar Despliegue]
+        S2 --> S3{¿Qué subir?}
+        S3 -- "ZIP/Archivo" --> S4[Subir Código]
+        S3 -- "DockerHub" --> S5[Indicar Imagen]
+        S4 & S5 --> S6[Lanzar Servicio]
+    end
+
+    subgraph Docker ["🐳 Infraestructura"]
+        S6 --> D1[PaaSify Engine]
+        D1 --> D2[Build/Pull Image]
+        D2 --> D3[Levantar Contenedor]
+        D3 --> D4[Asignar Puerto Web]
+    end
+```
+
+### 5.2 Lógica Interna del Motor Docker
+
+Cuando un alumno sube código, PaaSify ejecuta la siguiente lógica interna para garantizar seguridad y aislamiento:
+
+```mermaid
+graph TD
+    subgraph Input ["📥 Entrada de Código"]
+        ZIP[Código .zip]
+        HUB[Imagen DockerHub]
+    end
+
+    subgraph Paasify ["🛠 PaaSify Engine (Django)"]
+        VAL[Validación: Quotas,<br/>Seguridad y Permisos]
+        CLEAN[Cleanup: Nuclear Purge<br/>si no hay persistencia]
+        PREP[Preparar Workspace:<br/>media/services/ID/]
+        PORT[Reserva de Puertos:<br/>Rango 40000-50000]
+    end
+
+    subgraph InternalDocker ["🐳 Motor Docker Interno"]
+        EXTRACT[Extracción de archivos]
+        BUILD{¿Dockerfile?}
+        B_YES[docker build .]
+        B_NO[docker pull image]
+        RUN[docker compose up / run]
+    end
+
+    subgraph Output ["🌐 Servicio Activo"]
+        URL[Generar URL Pública]
+        PROX[Nginx Proxy / Routing]
+        MON[Monitorización cAdvisor]
+    end
+
+    Input --> VAL
+    VAL --> CLEAN
+    CLEAN --> PREP
+    PREP --> PORT
+    PORT --> EXTRACT
+    EXTRACT --> BUILD
+    BUILD -- Sí --> B_YES
+    BUILD -- No --> B_NO
+    B_YES & B_NO --> RUN
+    RUN --> URL
+    URL --> PROX
+    PROX --> MON
+```
+
+### 5.3 Deep Dive: Ciclo de Vida Completo
+
+Este diagrama detalla paso a paso la lógica interna desde que se recibe el código hasta que el servicio está activo, incluyendo la limpieza condicional:
+
+```mermaid
+graph TD
+    A[Alumno pulsa 'Guardar'] --> B{Validar permisos}
+    B -- OK --> C[Reserva de puerto en BD]
+    C --> D[Crear carpeta media/services/ID/]
+    D --> E{¿Modo código?}
+
+    E -- Sí ZIP --> F[Descomprimir código]
+    F --> G{¿Dockerfile?}
+    G -- Sí --> H[docker build -t paasify_ID .]
+    G -- No Compose --> I[Validar Compose YAML]
+    I --> J[Reescribir puertos dinámicos]
+    J --> K[docker compose up -d]
+
+    E -- No DockerHub --> L[docker pull image]
+    L --> M[docker run -d]
+
+    H & K & M --> N[Sincronizar IDs de Docker en DB]
+    N --> O[Activar Proxy / Ingress]
+    O --> P[Servicio ONLINE]
+
+    subgraph Cleanup ["Limpieza si keep_volumes=False"]
+        D -.-> CLEAN[Borrado físico ZIP y archivos viejos]
+        CLEAN -.-> F
+    end
+```
+
+### 5.4 Comunicación Interna (Diagrama de Secuencia Resumido)
+
+```mermaid
+sequenceDiagram
+    participant U as Estudiante / Profesor
+    participant V as Django View (containers)
+    participant S as services.py (Engine)
+    participant D as Docker SDK / Daemon
+
+    U->>V: POST /containers/new (Modo Custom)
+    V->>V: Validar cuotas y permisos
+    V->>S: run_container(service_id)
+    S->>S: prepare_service_workspace()
+    Note over S: Nuclear Cleanup (si persistence=False)
+    S->>D: Build Image / Create Containers
+    D-->>S: Container IDs & Ports
+    S->>V: Sincronizar estado DB
+    V-->>U: Redirección con éxito
+    Note right of U: Terminal Web disponible (WebSocket)
 ```
 
 ---
