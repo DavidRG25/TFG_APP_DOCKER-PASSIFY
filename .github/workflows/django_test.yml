@@ -10,6 +10,10 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        working-directory: ./paasify_app
+
     services:
       postgres:
         image: postgres:15
@@ -59,4 +63,4 @@ jobs:
 
       - name: Verify Dockerfile Compilation
         run: |
-          docker build -t paasify-dry-run .
+          docker build -t paasify-dry-run ./paasify_app

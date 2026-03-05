@@ -15,9 +15,16 @@ db.sqlite3
 
 # === Virtual environment ===
 venv/
-.env/
 .venv/
+
+# === Entorno y credenciales (SEGURIDAD) ===
 .env
+.docker_credentials
+*.pem
+*.key
+*.csr
+*.p12
+*.pfx
 
 # === VSCode / Editor ===
 .vscode/
@@ -39,6 +46,8 @@ prompts/
 user_code/
 ignored_scripts/
 
-# === Credenciales y Despliegue ===
-.docker_credentials
+# === Ficheros de versión y despliegue local ===
 version.txt
+
+# === Carpetas temporales raíz ===
+docker_templates/
