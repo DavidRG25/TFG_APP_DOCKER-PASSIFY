@@ -179,10 +179,10 @@ TFG_APP_DOCKER-PASSIFY/
 - **Tipo:** Trabajo de Fin de Grado (TFG)
 - **Universidad:** Universidad Rey Juan Carlos (URJC)
 - **Autor:** David Rodríguez García
-- **Tutor:** _[Nombre del tutor]_
 
 ---
 
 <p align="center">
   <sub>Hecho con 💙 como Trabajo de Fin de Grado — ETSII, URJC</sub>
 </p>
+
