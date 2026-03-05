@@ -22,6 +22,8 @@
 
 ## Resumen de la Arquitectura
 
+### 🏗 Estructura del Proyecto
+
 ```mermaid
 graph TB
     subgraph "Repositorio"
@@ -45,6 +47,29 @@ graph TB
         COMPOSE --> PG["PostgreSQL"]
         COMPOSE --> CADV["cAdvisor"]
     end
+```
+
+### 📲 Flujo de Comunicación (Lógica Interna)
+
+Este diagrama detalla cómo se procesa una petición de despliegue desde la interfaz hasta el motor de Docker:
+
+```mermaid
+sequenceDiagram
+    participant U as Estudiante / Profesor
+    participant V as Django View (containers)
+    participant S as services.py (Engine)
+    participant D as Docker SDK / Daemon
+
+    U->>V: POST /containers/new (Modo Custom)
+    V->>V: Validar cuotas y permisos
+    V->>S: run_container(service_id)
+    S->>S: prepare_service_workspace()
+    Note over S: Nuclear Cleanup (si persistence=False)
+    S->>D: Build Image / Create Containers
+    D-->>S: Container IDs & Ports
+    S->>V: Sincronizar estado DB
+    V-->>U: Redirección con éxito
+    Note right of U: Terminal Web disponible (WebSocket)
 ```
 
 ---

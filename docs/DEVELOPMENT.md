@@ -64,6 +64,53 @@
 
 ## 2. Arquitectura de la Aplicación
 
+### 🌐 Funcionamiento Global y Tecnologías Docker
+
+Este diagrama detalla cómo se integra el ecosistema PaaSify con el motor de Docker y cómo fluye la información:
+
+```mermaid
+flowchart TB
+    User((Usuario)) -- "HTTP/WS" --> Proxy[Nginx Proxy]
+
+    subgraph PaaSifyServer ["🖥 Servidor PaaSify (Django/Daphne)"]
+        Proxy -- "Redirección 8000" --> Django[Django Core]
+        Django -- "Gestión Académica" --> DB[(SQLite/PostgreSQL)]
+        Django -- "Lógica de Contenedores" --> Engine[services.py]
+
+        subgraph DockerSDK ["🔌 Integración Docker"]
+            Engine -- "Docker SDK for Python" --> Socket[unix:///var/run/docker.sock]
+        end
+
+        subgraph Workspace ["📁 Gestión de Archivos"]
+            Engine -- "Preparación" --> Media["media/services/ID/"]
+            Media -- "Mount Build Context" --> Build[Docker Build]
+        end
+    end
+
+    subgraph DockerEngine ["🐳 Motor Docker (Host)"]
+        Socket --> Runtime[Docker Runtime]
+
+        subgraph Networking ["🌐 Redes Aisladas"]
+            Runtime --> Net[paasify_network]
+            Net --> Containers[Contenedores Alumnos]
+        end
+
+        subgraph Volumes ["💾 Persistencia"]
+            Runtime --> Vols[Docker Volumes]
+            Containers -.-> Vols
+        end
+
+        subgraph Monitoring ["📊 Supervisión"]
+            Runtime --> CADV[cAdvisor]
+            CADV -- "Stats API" --> Django
+        end
+    end
+
+    Containers -- "Redirección Puertos" --> Proxy
+```
+
+### Lógica de Componentes
+
 PaaSify sigue una arquitectura **monolítica modular Django** con dos apps principales:
 
 ```mermaid
@@ -85,13 +132,8 @@ graph LR
         SETTINGS["app_passify/<br/>Settings, URLs, ASGI"]
     end
 
-    subgraph "Externo"
-        DOCKER["🐳 Docker Engine"]
-        DB["🗄️ SQLite / PostgreSQL"]
-    end
-
     V2 --> S2
-    S2 --> DOCKER
+    S2 --> Socket
     M1 --> DB
     M2 --> DB
     V1 --> T1
