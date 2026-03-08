@@ -12,7 +12,7 @@
     <ol class="breadcrumb mb-0">
       <li class="breadcrumb-item">
         <a href="{% url 'index' %}" class="text-decoration-none text-muted">
-          <i class="fas fa-home me-1"></i>Inicio
+          <i class="fas fa-home me-2"></i> Inicio
         </a>
       </li>
       <li class="breadcrumb-item active text-primary fw-bold" aria-current="page">Panel Profesor</li>
@@ -87,15 +87,15 @@
         <button class="btn btn-customize d-flex align-items-center" 
                 data-bs-toggle="modal" data-toggle="modal" 
                 data-bs-target="#createSubjectModal" data-target="#createSubjectModal">
-          <i class="fas fa-plus-circle me-2"></i> Nueva Asignatura
+          <i class="fas fa-plus-circle" style="margin-right: 8px !important;"></i> <span>Nueva Asignatura</span>
         </button>
         {% if request.user.is_superuser or request.user.is_staff %}
           <a class="btn btn-customize d-flex align-items-center" href="/admin/">
-            <i class="fas fa-user-shield me-2"></i> Admin Global
+            <i class="fas fa-user-shield" style="margin-right: 8px !important;"></i> <span>Admin Global</span>
           </a>
         {% endif %}
-        <a href="{% url 'professor_dashboard' %}" class="btn btn-panel d-flex align-items-center ms-1">
-          <i class="fas fa-sync-alt me-2"></i> Sincronizar
+        <a href="{% url 'professor_dashboard' %}" class="btn btn-panel d-flex align-items-center ms-2">
+          <i class="fas fa-sync-alt" style="margin-right: 8px !important;"></i> <span>Sincronizar</span>
         </a>
       </div>
     </div>
@@ -106,7 +106,7 @@
     <div class="col">
       <div class="card border-0 shadow-sm border-start border-4 border-primary h-100">
         <div class="card-body bg-white py-3">
-          <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-book me-1"></i> Asignaturas</h6>
+          <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-book" style="margin-right: 6px !important;"></i> Asignaturas</h6>
           <h3 class="mb-0 text-primary fw-bold">{{ stats.subjects }}</h3>
         </div>
       </div>
@@ -114,7 +114,7 @@
     <div class="col">
       <div class="card border-0 shadow-sm border-start border-4 border-info h-100">
         <div class="card-body bg-white py-3">
-          <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-users me-1"></i> Alumnos</h6>
+          <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-users" style="margin-right: 6px !important;"></i> Alumnos</h6>
           <h3 class="mb-0 text-info fw-bold">{{ stats.students }}</h3>
         </div>
       </div>
@@ -122,7 +122,7 @@
     <div class="col">
       <div class="card border-0 shadow-sm border-start border-4 border-dark h-100">
         <div class="card-body bg-white py-3">
-          <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-project-diagram me-1"></i> Proyectos</h6>
+          <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-project-diagram" style="margin-right: 6px !important;"></i> Proyectos</h6>
           <h3 class="mb-0 text-dark fw-bold">{{ stats.projects }}</h3>
         </div>
       </div>
@@ -130,7 +130,7 @@
     <div class="col">
       <div class="card border-0 shadow-sm border-start border-4 border-secondary h-100">
         <div class="card-body bg-white py-3">
-          <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-layer-group me-1"></i> Serv. Totales</h6>
+          <h6 class="text-uppercase text-muted small fw-bold mb-1"><i class="fas fa-layer-group" style="margin-right: 6px !important;"></i> Serv. Totales</h6>
           <h3 class="mb-0 text-secondary fw-bold">{{ stats.total_services }}</h3>
         </div>
       </div>
@@ -140,7 +140,7 @@
   <div class="row g-4">
     {# Columna Izquierda: Mis Asignaturas #}
     <div class="col-lg-12">
-      <h5 class="fw-bold mb-3"><i class="fas fa-graduation-cap text-primary me-2"></i>Mis Asignaturas</h5>
+      <h5 class="fw-bold mb-3"><i class="fas fa-graduation-cap text-primary me-2"></i> Mis Asignaturas</h5>
       {% if subjects %}
         <div class="row row-cols-1 row-cols-md-3 g-3 mb-4">
           {% for s in subjects %}
@@ -149,9 +149,9 @@
               <div class="card-body">
                 <div class="d-flex align-items-center mb-3">
                   {% if s.logo %}
-                  <div class="rounded-circle me-3 dynamic-bg-logo" data-logo="{{ s.logo.url }}" style="width: 48px; height: 48px;"></div>
+                  <div class="rounded-circle flex-shrink-0 dynamic-bg-logo" data-logo="{{ s.logo.url }}" style="width: 48px; height: 48px; min-width: 48px; margin-right: 16px !important;"></div>
                   {% else %}
-                  <div class="rounded-circle p-3 me-3 d-flex align-items-center justify-content-center dynamic-bg-color" data-color="{{ s.color|default:'#4e73df' }}" style="width: 48px; height: 48px;">
+                  <div class="rounded-circle p-3 flex-shrink-0 d-flex align-items-center justify-content-center dynamic-bg-color" data-color="{{ s.color|default:'#4e73df' }}" style="width: 48px; height: 48px; min-width: 48px; margin-right: 16px !important;">
                     <i class="fas fa-university fa-lg"></i>
                   </div>
                   {% endif %}
@@ -161,8 +161,8 @@
                   </div>
                 </div>
                 <div class="d-flex justify-content-between small text-muted mb-3 border-bottom pb-2">
-                  <span><i class="fas fa-users me-1"></i>{{ s.students.count }} Estudiantes</span>
-                  <span><i class="fas fa-calendar-alt me-1"></i>{{ s.genero|default:'2026' }}</span>
+                  <span><i class="fas fa-users me-2"></i> {{ s.students.count }} Estudiantes</span>
+                  <span><i class="fas fa-calendar-alt me-2"></i> {{ s.genero|default:'2026' }}</span>
                 </div>
                 <a href="{% url 'professor_subject_detail' s.id %}" class="btn btn-sm w-100 rounded-pill shadow-sm text-white dynamic-subject-btn" data-color="{{ s.color|default:'#4e73df' }}">
                   Gestionar Asignatura <i class="fas fa-arrow-right ms-1"></i>
@@ -183,14 +183,14 @@
     <div class="col-lg-12">
       <div class="card border-0 shadow-sm overflow-hidden">
         <div class="card-header bg-white py-3 border-0 d-flex justify-content-between align-items-center">
-          <h5 class="mb-0 fw-bold"><i class="fas fa-tasks text-primary me-2"></i>Proyectos Desarrollados</h5>
+          <h5 class="mb-0 fw-bold"><i class="fas fa-tasks text-primary me-2"></i> Proyectos Desarrollados</h5>
           <span class="badge bg-light text-primary rounded-pill px-3">{{ projects.count }} Proyectos</span>
         </div>
         <div class="card-body p-3 border-bottom bg-light bg-opacity-10">
           <form method="GET" action="{% url 'professor_dashboard' %}" class="row g-3 align-items-end" id="project-filter-form">
             <input type="hidden" name="sort" value="{{ request.GET.sort|default:'-date' }}">
             <div class="col-md-5">
-              <label class="form-label small fw-bold text-muted mb-1"><i class="fas fa-search me-1"></i>Buscar Proyecto o Alumno</label>
+              <label class="form-label small fw-bold text-muted mb-1"><i class="fas fa-search me-1"></i> Buscar Proyecto o Alumno</label>
               <div class="input-group shadow-sm">
                 <span class="input-group-text bg-white border-end-0 text-primary"><i class="fas fa-filter"></i></span>
                 <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control border-start-0" 
@@ -203,7 +203,7 @@
               </div>
             </div>
             <div class="col-md-4">
-              <label class="form-label small fw-bold text-muted mb-1"><i class="fas fa-university me-1"></i>Filtrar por Asignatura</label>
+              <label class="form-label small fw-bold text-muted mb-1"><i class="fas fa-university me-1"></i> Filtrar por Asignatura</label>
               <div class="input-group shadow-sm">
                 <span class="input-group-text bg-white border-end-0 text-primary"><i class="fas fa-layer-group"></i></span>
                 <select name="subject" class="form-select border-start-0"
@@ -221,9 +221,10 @@
             </div>
             <div class="col-md-auto ms-xl-auto">
               <div class="d-flex gap-2">
-                <a href="{% url 'professor_dashboard' %}" class="btn btn-outline-secondary px-4 shadow-sm fw-semibold" style="border-radius: 10px; transition: all 0.2s;">
-                  <i class="fas fa-sync-alt me-2"></i>Limpiar
-                </a>
+                <button type="button" class="btn btn-outline-secondary px-4 shadow-sm fw-semibold" style="border-radius: 10px; transition: all 0.2s;"
+                        onclick="document.querySelector('#project-filter-form [name=q]').value=''; document.querySelector('#project-filter-form [name=subject]').value=''; htmx.ajax('GET', `{% url 'professor_dashboard' %}`, {target: '#project-table-container'});">
+                  <i class="fas fa-sync-alt me-2"></i> Limpiar
+                </button>
               </div>
             </div>
           </form>
@@ -258,12 +259,14 @@
               el.style.backgroundColor = color;
           }
       });
-      // Clear all modal forms when they are closed
-      document.querySelectorAll('.modal').forEach(modal => {
-          modal.addEventListener('hidden.bs.modal', function() {
-              const form = this.querySelector('form');
-              if (form) form.reset();
-          });
+      // Clear all modal forms when they are closed (usando jQuery para capturar el evento de Bootstrap con seguridad)
+      $('.modal').on('hidden.bs.modal', function() {
+          const form = $(this).find('form')[0];
+          if (form) form.reset();
+          // Resetear visualmente la imagen si existe la funcion
+          if (typeof clearNewSubjectLogo === 'function') {
+              clearNewSubjectLogo();
+          }
       });
   });
 </script>
@@ -276,12 +279,12 @@
         <input type="hidden" name="action" value="create_subject">
         <div class="modal-header border-0 bg-primary text-white py-4 px-4 position-relative overflow-hidden">
           <div class="d-flex align-items-center position-relative mt-2 ps-2">
-            <div class="rounded-circle p-3 me-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px;">
+            <div class="rounded-circle p-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px; margin-right: 16px !important;">
               <i class="fas fa-graduation-cap fa-lg text-white"></i>
             </div>
             <div>
-              <h5 class="modal-title fw-bold mb-0">Nueva Asignatura</h5>
-              <p class="text-white-50 small mb-0">Configura un nuevo curso docente en la plataforma.</p>
+              <h5 class="modal-title fw-bold mb-0"> Nueva Asignatura</h5>
+              <p class="text-white-50 small mb-0"> Configura un nuevo curso docente en la plataforma.</p>
             </div>
           </div>
           <button type="button" class="bg-transparent border-0 text-white shadow-none" data-bs-dismiss="modal" data-dismiss="modal" aria-label="Cerrar" style="position: absolute; top: 1.5rem; right: 1.5rem; z-index: 10; cursor: pointer;">
@@ -327,17 +330,24 @@
                 <label class="form-label text-muted small fw-bold text-uppercase mb-3">Estilo e Identidad</label>
                 <div class="mb-4">
                   <label class="form-label fw-semibold small">Color Temático</label>
-                  <div class="d-flex align-items-center gap-3">
-                    <input type="color" name="color" class="form-control form-control-color border-0 shadow-sm" value="#4e73df" style="width: 60px; height: 50px; border-radius: 12px; cursor: pointer;">
+                  <div class="d-flex align-items-center">
+                    <input type="color" name="color" class="form-control form-control-color border-0 shadow-sm" value="#4e73df" style="width: 60px; height: 50px; border-radius: 12px; cursor: pointer; margin-right: 16px !important;">
                     <small class="text-muted" style="font-size: 0.75rem;">Color visual de la asignatura.</small>
                   </div>
                 </div>
-                <div class="mb-0">
+                <div class="mb-3 text-center">
+                  <div id="new-sub-display-container" class="rounded-3 shadow-sm mx-auto mb-3 align-items-center justify-content-center overflow-hidden" style="width: 80px; height: 80px; background-color: #f1f5f9; border: 2px dashed #cbd5e1; display: none !important;">
+                    <i class="fas fa-image text-muted opacity-50 fa-2x" id="new-sub-display-icon"></i>
+                    <div id="new-sub-display" class="w-100 h-100 d-none"></div>
+                  </div>
                   <div class="custom-file-premium">
                     <label for="new-subject-logo-input" class="btn btn-outline-primary rounded-pill w-100 shadow-sm py-2 px-3 d-flex align-items-center justify-content-center transition-all mt-2">
-                      <i class="fas fa-image me-2"></i>Elegir logo...
+                      <i class="fas fa-image" style="margin-right: 8px !important;"></i> Elegir logo...
                     </label>
                     <input type="file" name="logo" id="new-subject-logo-input" class="d-none" accept="image/*" onchange="previewNewSubjectLogo(this)">
+                    <button type="button" id="remove-new-subject-logo-btn" class="btn btn-sm btn-outline-danger rounded-pill w-100 mt-2 d-none transition-all" onclick="clearNewSubjectLogo()">
+                      <i class="fas fa-trash-alt" style="margin-right: 8px !important;"></i> Quitar imagen
+                    </button>
                     <div id="new-file-name-display" class="text-center small text-muted mt-2 opacity-75 fw-medium">No se ha seleccionado archivo</div>
                   </div>
                 </div>
@@ -347,7 +357,7 @@
         </div>
         <div class="modal-footer border-0 p-4 bg-white justify-content-end">
           <button type="submit" class="btn btn-primary rounded-pill px-5 py-2 fw-bold shadow-sm">
-            <i class="fas fa-plus-circle me-2"></i>Crear Asignatura
+            <i class="fas fa-plus-circle" style="margin-right: 8px !important;"></i> Crear Asignatura
           </button>
         </div>
       </form>
@@ -356,18 +366,66 @@
 </div>
 
 <script>
+  function clearNewSubjectLogo() {
+      const input = document.getElementById('new-subject-logo-input');
+      if (input) input.value = '';
+      
+      const fileNameDisplay = document.getElementById('new-file-name-display');
+      if (fileNameDisplay) fileNameDisplay.innerText = "No se ha seleccionado archivo";
+      
+      const displayContainer = document.getElementById('new-sub-display-container');
+      if (displayContainer) displayContainer.style.setProperty('display', 'none', 'important');
+      
+      const displayIcon = document.getElementById('new-sub-display-icon');
+      if (displayIcon) displayIcon.classList.remove('d-none');
+      
+      const displayContent = document.getElementById('new-sub-display');
+      if (displayContent) {
+          displayContent.classList.add('d-none');
+          displayContent.innerHTML = '';
+      }
+      
+      const removeBtn = document.getElementById('remove-new-subject-logo-btn');
+      if (removeBtn) removeBtn.classList.add('d-none');
+  }
+
   function previewNewSubjectLogo(input) {
     const fileNameDisplay = document.getElementById('new-file-name-display');
+    const displayContainer = document.getElementById('new-sub-display-container');
+    const displayIcon = document.getElementById('new-sub-display-icon');
+    const displayContent = document.getElementById('new-sub-display');
+    const removeBtn = document.getElementById('remove-new-subject-logo-btn');
+    
     if (input.files && input.files[0]) {
       const fileName = input.files[0].name;
+      
+      // Validación estricta de Django (max_length=100)
+      if (fileName.length > 90) { // Dejamos margen por si añade sufijos
+          if (typeof showToast === 'function') {
+              showToast("El nombre de la imagen es demasiado largo (máximo 90 caracteres). Renómbrala antes de subirla.", "text-bg-warning");
+          } else {
+              alert("El nombre de la imagen es demasiado largo. Renómbrala e intenta de nuevo.");
+          }
+           clearNewSubjectLogo(); // Limpiamos todo si es invalida
+          return;
+      }
+
       if (fileNameDisplay) fileNameDisplay.innerText = fileName;
+      
+      if (displayContainer) displayContainer.style.setProperty('display', 'flex', 'important');
+      if (displayIcon) displayIcon.classList.add('d-none');
+      if (displayContent) displayContent.classList.remove('d-none');
+      if (removeBtn) removeBtn.classList.remove('d-none');
+
       const reader = new FileReader();
       reader.onload = function(e) {
-        document.getElementById('new-sub-display').innerHTML = `<img src="${e.target.result}" class="w-100 h-100 object-fit-cover">`;
+        if (displayContent) {
+            displayContent.innerHTML = `<img src="${e.target.result}" class="w-100 h-100 object-fit-cover">`;
+        }
       };
       reader.readAsDataURL(input.files[0]);
     } else {
-      if (fileNameDisplay) fileNameDisplay.innerText = "No se ha seleccionado archivo";
+       clearNewSubjectLogo();
     }
   }
 </script>

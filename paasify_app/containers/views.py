@@ -1378,7 +1378,11 @@ def professor_dashboard(request):
         '-date': '-date',
     }
     order_field = sort_map.get(sort_by, '-date')
-    projects = projects_qs.select_related("subject", "user_profile").order_by(order_field, "-time")
+    from django.db.models import Count, Q, Max
+    projects = projects_qs.annotate(
+        active_services=Count('services', filter=~Q(services__status="removed")),
+        last_modified=Max('services__updated_at', filter=~Q(services__status="removed"))
+    ).select_related("subject", "user_profile").order_by(order_field, "-time")
 
     # Estadísticas para el profesor
     total_students = subjects.values('students').distinct().count()
@@ -1459,51 +1463,69 @@ def professor_subject_detail(request, subject_id):
                 except Exception as e:
                     messages.error(request, f"Error creando el alumno: {str(e)}|openModal=createStudentModal")
         elif action == "add_existing_student":
-            student_id = request.POST.get("student_id")
-            if student_id:
+            student_ids = request.POST.getlist("student_id")
+            if student_ids:
                 User_cls = get_user_model()
                 try:
-                    student_user = User_cls.objects.get(pk=student_id)
-                    subject.students.add(student_user)
-                    messages.success(request, f"Alumno '{student_user.username}' matriculado con éxito.")
+                    added_count = 0
+                    for sid in student_ids:
+                        student_user = User_cls.objects.get(pk=sid)
+                        subject.students.add(student_user)
+                        added_count += 1
+                    if added_count == 1:
+                        messages.success(request, f"Alumno matriculado con éxito.")
+                    else:
+                        messages.success(request, f"{added_count} alumnos matriculados con éxito.")
                 except Exception as e:
-                    messages.error(request, f"Error matriculando al alumno: {str(e)}")
+                    messages.error(request, f"Error matriculando alumnos: {str(e)}")
         elif action == "remove_project":
-            project_id = request.POST.get("project_id")
-            if project_id:
+            project_ids = request.POST.getlist("project_id")
+            if project_ids:
                 try:
-                    p = UserProject.objects.get(pk=project_id)
-                    p.delete()
-                    messages.success(request, "Proyecto eliminado con éxito.")
+                    deleted_count = 0
+                    for pid in project_ids:
+                        p = UserProject.objects.get(pk=pid)
+                        p.delete()
+                        deleted_count += 1
+                    if deleted_count == 1:
+                        messages.success(request, "Proyecto eliminado con éxito.")
+                    else:
+                        messages.success(request, f"{deleted_count} proyectos eliminados con éxito.")
                 except Exception as e:
-                    messages.error(request, f"Error eliminando el proyecto: {str(e)}")
+                    messages.error(request, f"Error eliminando proyectos: {str(e)}")
         elif action == "remove_student":
-            student_id = request.POST.get("student_id")
-            if student_id:
+            student_ids = request.POST.getlist("student_id")
+            if student_ids:
                 User_cls = get_user_model()
                 try:
-                    student_user = User_cls.objects.get(pk=student_id)
-                    profile = UserProfile.objects.get(user=student_user)
-                    
-                    # 1. Borrar servicios del alumno en esta asignatura
-                    services_to_remove = Service.objects.filter(subject=subject, owner=student_user)
-                    for svc in services_to_remove:
-                        try:
-                            stop_container(svc)
-                            remove_container(svc)
-                        except Exception:
-                            pass
-                        svc.delete()
-                    
-                    # 2. Borrar asignaciones de proyectos
-                    UserProject.objects.filter(subject=subject, user_profile=profile).delete()
-                    
-                    # 3. Desmatricular
-                    subject.students.remove(student_user)
-                    
-                    messages.success(request, f"El alumno '{student_user.username}' ha sido desmatriculado y sus datos locales borrados.")
+                    removed_count = 0
+                    for student_id in student_ids:
+                        student_user = User_cls.objects.get(pk=student_id)
+                        profile = UserProfile.objects.get(user=student_user)
+                        
+                        # 1. Borrar servicios del alumno en esta asignatura
+                        services_to_remove = Service.objects.filter(subject=subject, owner=student_user)
+                        for svc in services_to_remove:
+                            try:
+                                stop_container(svc)
+                                remove_container(svc)
+                            except Exception:
+                                pass
+                            svc.delete()
+                        
+                        # 2. Borrar asignaciones de proyectos
+                        UserProject.objects.filter(subject=subject, user_profile=profile).delete()
+                        
+                        # 3. Desmatricular
+                        subject.students.remove(student_user)
+                        removed_count += 1
+                        
+                    if removed_count == 1:
+                        messages.success(request, f"Un alumno desmatriculado y datos borrados.")
+                    else:
+                        messages.success(request, f"{removed_count} alumnos desmatriculados y datos borrados.")
                 except Exception as e:
-                    messages.error(request, f"Error desmatriculando al alumno: {str(e)}")
+                    messages.error(request, f"Error desmatriculando alumnos: {str(e)}")
         elif action == "create_project":
             place = request.POST.get("place")
             student_id = request.POST.get("student_id")

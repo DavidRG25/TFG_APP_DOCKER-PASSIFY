@@ -210,7 +210,7 @@
     <ol class="breadcrumb mb-0">
       <li class="breadcrumb-item">
         <a href="{% url 'containers:student_panel' %}" class="text-decoration-none text-muted">
-          <i class="fas fa-home me-1"></i>Inicio
+          <i class="fas fa-home" style="margin-right: 8px !important;"></i>Inicio
         </a>
       </li>
       <li class="breadcrumb-item active text-primary fw-bold" aria-current="page">Mi Perfil</li>
@@ -232,24 +232,24 @@
           {# Textos #}
           <h1 class="h1 mb-1 fw-extrabold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15);">{{ profile.nombre|default:user.get_full_name|default:user.username }}</h1>
           <p class="text-white-50 mb-0 opacity-90 fw-medium">
-            <i class="fas fa-at me-1"></i>{{ user.username }} 
+            <i class="fas fa-at" style="margin-right: 8px !important;"></i>{{ user.username }} 
             <span class="mx-2">·</span> 
-            <i class="fas fa-envelope me-1 text-white-50"></i> {{ user.email }}
+            <i class="fas fa-envelope text-white-50" style="margin-right: 8px !important;"></i> {{ user.email }}
           </p>
           <div class="mt-2 text-center text-md-start">
               {% if is_student %}
               <span class="badge rounded-pill px-3 py-1 small shadow-sm me-1" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); backdrop-filter: blur(4px);">
-                  <i class="fas fa-graduation-cap me-1"></i>Alumno
+                  <i class="fas fa-graduation-cap" style="margin-right: 8px !important;"></i>Alumno
               </span>
               {% endif %}
               {% if is_teacher %}
               <span class="badge rounded-pill px-3 py-1 small shadow-sm me-1" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); backdrop-filter: blur(4px);">
-                  <i class="fas fa-chalkboard-teacher me-1"></i>Profesor
+                  <i class="fas fa-chalkboard-teacher" style="margin-right: 8px !important;"></i>Profesor
               </span>
               {% endif %}
               {% if user.is_superuser or is_admin %}
               <span class="badge rounded-pill px-3 py-1 small shadow-sm me-1" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); backdrop-filter: blur(4px);">
-                  <i class="fas fa-user-shield me-1"></i>Admin
+                  <i class="fas fa-user-shield" style="margin-right: 8px !important;"></i>Admin
               </span>
               {% endif %}
           </div>
@@ -332,12 +332,12 @@
               <ul class="nav nav-pills nav-fill border-0" id="profileTabs" role="tablist">
                 <li class="nav-item" role="presentation">
                   <button class="nav-link active" id="account-tab" data-bs-toggle="pill" data-toggle="pill" data-bs-target="#account-pane" data-target="#account-pane" type="button" role="tab" aria-controls="account-pane" aria-selected="true">
-                    <i class="fas fa-id-card me-2"></i>Cuenta
+                    <i class="fas fa-id-card" style="margin-right: 8px !important;"></i>Cuenta
                   </button>
                 </li>
                 <li class="nav-item" role="presentation">
                   <button class="nav-link" id="security-tab" data-bs-toggle="pill" data-toggle="pill" data-bs-target="#security-pane" data-target="#security-pane" type="button" role="tab" aria-controls="security-pane" aria-selected="false">
-                    <i class="fas fa-shield-alt me-2"></i>Seguridad
+                    <i class="fas fa-shield-alt" style="margin-right: 8px !important;"></i>Seguridad
                   </button>
                 </li>
               </ul>
@@ -351,7 +351,7 @@
               <div class="d-flex align-items-center justify-content-between mb-4 mt-2">
                 <h6 class="mb-0 fw-bold text-muted text-uppercase small" style="letter-spacing: 1px;">Información Personal</h6>
                 <button type="button" class="btn btn-sm btn-light rounded-pill px-3 border" onclick="toggleProfileEdit()" id="btn-edit-profile">
-                  <i class="fas fa-edit me-1"></i>Editar
+                  <i class="fas fa-edit" style="margin-right: 8px !important;"></i>Editar
                 </button>
               </div>
               
@@ -374,7 +374,7 @@
                   <div id="profile-actions" class="col-12 mt-4 d-none">
                     <div class="d-flex gap-2">
                       <button type="submit" class="btn btn-primary flex-grow-1 fw-bold rounded-pill py-2 shadow-sm">
-                        <i class="fas fa-check-circle me-1"></i> Guardar Cambios
+                        <i class="fas fa-check-circle" style="margin-right: 8px !important;"></i> Guardar Cambios
                       </button>
                       <button type="button" class="btn btn-light rounded-pill px-4" onclick="toggleProfileEdit()">Cancelar</button>
                     </div>
@@ -409,7 +409,7 @@
                   <div id="password-feedback" class="col-12 mt-1 display-none small text-center fw-bold"></div>
                 </div>
                 <button type="submit" class="btn btn-warning w-100 fw-bold py-2 shadow-sm rounded-pill" id="btn-update-password" disabled>
-                  <i class="fas fa-key me-2"></i> Actualizar Contraseña
+                  <i class="fas fa-key" style="margin-right: 8px !important;"></i> Actualizar Contraseña
                 </button>
               </form>
             </div> <!-- card-body security -->
@@ -440,7 +440,7 @@
             <div class="token-box d-flex justify-content-between align-items-center">
               <span id="masked-token-display" class="text-primary fw-bold" style="letter-spacing: 2px;">{{ api_token.masked }}</span>
               <button class="btn btn-sm btn-primary rounded-pill px-3" type="button" onclick="copyFullToken()">
-                <i class="fas fa-copy me-1"></i> Copiar
+                <i class="fas fa-copy" style="margin-right: 8px !important;"></i> Copiar
               </button>
             </div>
           </div>
@@ -465,7 +465,7 @@
           {% if api_token.is_expired %}
           <div class="alert premium-alert alert-danger bg-danger-subtle mb-4" style="border-left-color: #ef4444;">
             <div class="d-flex align-items-center">
-                <i class="fas fa-times-circle fa-lg me-3"></i>
+                <i class="fas fa-times-circle fa-lg" style="margin-right: 16px !important;"></i>
                 <div>
                     <strong>Token expirado</strong><br>Regenera uno nuevo para seguir usando la API.
                 </div>
@@ -474,7 +474,7 @@
           {% else %}
           <div class="alert premium-alert alert-success bg-success-subtle mb-4" style="border-left-color: #10b981;">
              <div class="d-flex align-items-center">
-                  <i class="fas fa-check-circle fa-lg me-3"></i>
+                  <i class="fas fa-check-circle fa-lg" style="margin-right: 16px !important;"></i>
                   <div>
                       <strong>Token activo</strong><br>Te quedan <strong>{{ api_token.days_remaining }} días</strong> de acceso.
                   </div>
@@ -484,11 +484,11 @@
 
           <div class="d-flex gap-2">
               <button class="btn btn-primary flex-grow-1 fw-bold py-2 shadow-sm" onclick="actionRefreshToken()">
-                <i class="fas fa-sync-alt me-2"></i> Regenerar Token
+                <i class="fas fa-sync-alt" style="margin-right: 8px !important;"></i> Regenerar Token
               </button>
           </div>
           <div class="text-center mt-3">
-              <small class="text-muted"><i class="fas fa-exclamation-triangle me-1"></i> Cambiar el token invalidará el anterior inmediatamente.</small>
+              <small class="text-muted"><i class="fas fa-exclamation-triangle" style="margin-right: 8px !important;"></i> Cambiar el token invalidará el anterior inmediatamente.</small>
           </div>
 
           {% else %}
@@ -498,7 +498,7 @@
             No tienes un token API habilitado.
           </div>
           <button class="btn btn-success w-100 fw-bold py-2 shadow-sm" onclick="generateToken()">
-            <i class="fas fa-plus-circle me-2"></i> Activar acceso API
+            <i class="fas fa-plus-circle" style="margin-right: 8px !important;"></i> Activar acceso API
           </button>
           {% endif %}
 
@@ -510,7 +510,7 @@
                data-toggle="collapse" 
                data-target="#tokenInstructions" 
                style="cursor: pointer;">
-              <span class="fw-bold text-dark"><i class="fas fa-lightbulb me-2 text-warning"></i> Guía rápida de uso</span>
+              <span class="fw-bold text-dark"><i class="fas fa-lightbulb text-warning" style="margin-right: 8px !important;"></i> Guía rápida de uso</span>
               <i class="fas fa-chevron-down small text-muted"></i>
             </div>
             <div class="collapse mt-3" id="tokenInstructions">
@@ -548,7 +548,7 @@
                  style="border-top: 4px solid var(--premium-blue) !important;">
               <div class="d-flex align-items-start justify-content-between mb-3">
                 <div class="d-flex align-items-center">
-                  <div class="p-3 bg-light rounded-4 me-3 text-primary">
+                  <div class="p-3 bg-light rounded-4 text-primary" style="margin-right: 16px !important;">
                     <i class="fas fa-university fa-lg"></i>
                   </div>
                   <div>
@@ -573,7 +573,7 @@
                  style="border-top: 4px solid var(--premium-blue) !important;">
               <div class="d-flex align-items-start justify-content-between mb-3">
                 <div class="d-flex align-items-center">
-                  <div class="p-3 bg-light rounded-4 me-3 text-primary">
+                  <div class="p-3 bg-light rounded-4 text-primary" style="margin-right: 16px !important;">
                     <i class="fas fa-chalkboard-teacher fa-lg"></i>
                   </div>
                   <div>
@@ -585,7 +585,7 @@
               <div class="d-flex align-items-center justify-content-between mt-auto pt-3 border-top">
                 <span class="text-muted small fw-medium">Estadísticas</span>
                 <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-2">
-                  <i class="fas fa-users me-1"></i> {{ subject.students.count }} alumnos
+                  <i class="fas fa-users" style="margin-right: 8px !important;"></i> {{ subject.students.count }} alumnos
                 </span>
               </div>
             </div>
@@ -617,7 +617,7 @@
 
           <div class="d-grid gap-2">
             <button type="button" class="btn btn-primary btn-lg rounded-pill py-2 fw-bold" id="btnCopyModal" onclick="copyFromModal()">
-              <i class="fas fa-copy me-2"></i>Copiar al portapapeles
+              <i class="fas fa-copy" style="margin-right: 8px !important;"></i>Copiar al portapapeles
             </button>
             <button type="button" class="btn btn-link text-muted text-decoration-none fw-semibold mt-1" 
                     data-bs-dismiss="modal" data-dismiss="modal" onclick="closeTokenModal()">
@@ -626,7 +626,7 @@
           </div>
         </div>
         <div class="modal-footer border-0 bg-light py-2 justify-content-center">
-            <small class="text-muted"><i class="fas fa-clock me-1"></i> Expira el <span id="token-expiry-modal" class="fw-bold">...</span></small>
+            <small class="text-muted"><i class="fas fa-clock" style="margin-right: 8px !important;"></i> Expira el <span id="token-expiry-modal" class="fw-bold">...</span></small>
         </div>
       </div>
     </div>
@@ -692,7 +692,7 @@
         html: '<p class="text-muted mt-2 mb-0">Esta acción invalidará tu token actual inmediatamente.</p>',
         icon: 'warning',
         showCancelButton: true,
-        confirmButtonText: '<i class="fas fa-sync-alt me-2"></i>Sí, regenerar',
+        confirmButtonText: '<i class="fas fa-sync-alt" style="margin-right: 8px !important;"></i>Sí, regenerar',
         cancelButtonText: 'Cancelar',
         reverseButtons: true,
         confirmButtonColor: '#4e73df',
@@ -878,12 +878,12 @@
           actions.classList.remove('d-none');
           btnEdit.classList.add('btn-primary');
           btnEdit.classList.remove('btn-light');
-          btnEdit.innerHTML = '<i class="fas fa-times me-1"></i>Dejar de Editar';
+          btnEdit.innerHTML = '<i class="fas fa-times" style="margin-right: 8px !important;"></i>Dejar de Editar';
       } else {
           actions.classList.add('d-none');
           btnEdit.classList.remove('btn-primary');
           btnEdit.classList.add('btn-light');
-          btnEdit.innerHTML = '<i class="fas fa-edit me-1"></i>Editar';
+          btnEdit.innerHTML = '<i class="fas fa-edit" style="margin-right: 8px !important;"></i>Editar';
       }
   }
 

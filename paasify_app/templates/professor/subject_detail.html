@@ -55,7 +55,7 @@
         <div class="text-container text-white">
           <h1 class="h1 mb-1 fw-bold" style="text-shadow: 0 4px 8px rgba(0,0,0,0.15); line-height: 1.2; font-size: 2.5rem;">{{ subject.name }}</h1>
           <p class="text-white-50 mb-0 opacity-90 fw-semibold fs-5">
-            <i class="fas fa-info-circle me-2"></i>Curso {{ subject.genero }} · {{ subject.get_category_display|default:subject.category }}
+            <i class="fas fa-info-circle" style="margin-right: 8px !important;"></i>Curso {{ subject.genero }} · {{ subject.get_category_display|default:subject.category }}
           </p>
         </div>
       </div>
@@ -107,7 +107,7 @@
         <button class="btn btn-customize d-flex align-items-center" 
                 data-bs-toggle="modal" data-toggle="modal" 
                 data-bs-target="#editSubjectModal" data-target="#editSubjectModal">
-          <i class="fas fa-palette"></i> Personalizar
+          <i class="fas fa-palette" style="margin-right: 8px !important;"></i> Personalizar
         </button>
       </div>
     </div>
@@ -120,11 +120,11 @@
         <div class="card-header bg-white pt-3 pb-2 border-0">
           <div class="d-flex justify-content-between align-items-center mb-3">
             <h6 class="mb-0 fw-bold text-dark">
-              <i class="fas fa-user-graduate text-primary me-2"></i>Alumnos Matriculados
+              <i class="fas fa-user-graduate text-primary" style="margin-right: 8px !important;"></i>Alumnos Matriculados
               <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill ms-2">{{ students.count }}</span>
             </h6>
           </div>
-          <div class="d-flex flex-wrap align-items-center gap-3">
+          <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
             <div class="input-group input-group-sm shadow-sm" style="max-width: 250px;">
               <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
               <input type="text" id="search-students" class="form-control border-start-0" placeholder="Buscar alumno..." onkeyup="filterList('list-students', this.value)">
@@ -138,24 +138,30 @@
                     <i class="fas fa-sort-alpha-up"></i>
                 </a>
             </div>
-
-            <div class="ms-auto d-flex align-items-center gap-2">
-              <button class="btn btn-sm btn-outline-success rounded-pill px-3 shadow-sm hover-elevate" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#addExistingStudentModal" data-target="#addExistingStudentModal" title="Matricular Alumno Existente">
-                <i class="fas fa-link me-1"></i>Existente
+          </div>
+          <div class="d-flex align-items-center gap-2">
+              <button class="btn btn-sm btn-outline-success rounded-pill px-3 shadow-sm hover-elevate" id="student-btn-existente" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#addExistingStudentModal" data-target="#addExistingStudentModal" title="Matricular Alumno Existente">
+                <i class="fas fa-link" style="margin-right: 8px !important;"></i>Existente
               </button>
-              <button class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm hover-elevate" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createStudentModal" data-target="#createStudentModal">
-                <i class="fas fa-plus me-1"></i>Nuevo
+              <button class="btn btn-sm rounded-pill px-3 shadow-sm hover-elevate" style="background-color: var(--subject-primary); color: white;" id="student-btn-nuevo" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createStudentModal" data-target="#createStudentModal">
+                <i class="fas fa-plus" style="margin-right: 8px !important;"></i>Nuevo Alumno
               </button>
-            </div>
+              <div class="vr mx-1"></div>
+              <span class="small fw-bold text-muted me-1" id="student-actions-counter" style="display: none;"><span id="selected-student-count">0</span> seleccionados</span>
+              <button class="btn btn-sm btn-light rounded-pill px-3 shadow-sm hover-elevate" id="btn-deselect-students" onclick="deselectAllStudents()" disabled>Deseleccionar</button>
+              <button class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm hover-elevate" id="btn-delete-students" onclick="confirmRemoveMultipleStudents()" disabled>
+                <i class="fas fa-trash-alt" style="margin-right: 8px !important;"></i>Eliminar
+              </button>
           </div>
         </div>
         <div class="card-body p-0 scroll-area" style="max-height: 600px; overflow-y: auto;">
 {% if students %}
             <div class="list-group list-group-flush" id="list-students">
               {% for student in students %}
-                <div class="list-group-item border-0 py-3 px-4 d-flex align-items-center justify-content-between hover-light">
+                <div class="list-group-item border-0 py-3 px-4 d-flex align-items-center justify-content-between hover-light" style="cursor: pointer;" onclick="toggleRowSelection(this, event, 'student')">
                   <div class="d-flex align-items-center">
-                    <div class="avatar-sm me-3 bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                    <input type="checkbox" class="student-select-checkbox shadow-sm rounded" style="position: relative !important; margin-left: 0 !important; margin-top: 0 !important; width: 1.25rem; height: 1.25rem; border-color: #d1d3e2; cursor: pointer; border-width: 2px; margin-right: 16px !important;" value="{{ student.id }}" data-username="{{ student.username }}" onchange="handleStudentSelection()">
+                    <div class="avatar-sm bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; margin-right: 16px !important;">
                       <i class="fas fa-user text-muted"></i>
                     </div>
                     <div>
@@ -163,16 +169,10 @@
                     </div>
                   </div>
                   <div>
-                    <button class="btn btn-sm btn-light rounded-circle me-1" 
+                    <button class="btn btn-sm btn-light rounded-circle me-1 btn-edit-student" 
                             onclick="openEditStudentModal('{{ student.id }}')"
                             title="Editar Alumno">
                       <i class="fas fa-edit text-secondary"></i>
-                    </button>
-                    <!-- Eliminación radical de la asignatura -->
-                    <button class="btn btn-sm btn-danger rounded-circle text-white shadow-sm hover-elevate" 
-                            onclick="confirmRemoveStudent('{{ student.id }}', '{{ student.username }}')"
-                            title="Desmatricular y eliminar datos">
-                      <i class="fas fa-trash-alt"></i>
                     </button>
                   </div>
                 </div>
@@ -193,11 +193,11 @@
         <div class="card-header bg-white pt-3 pb-2 border-0">
           <div class="d-flex justify-content-between align-items-center mb-3">
             <h6 class="mb-0 fw-bold text-dark">
-              <i class="fas fa-folder-open text-primary me-2"></i>Proyectos de la Asignatura
+              <i class="fas fa-folder-open text-primary" style="margin-right: 8px !important;"></i>Proyectos de la Asignatura
               <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill ms-2">{{ projects.count }}</span>
             </h6>
           </div>
-          <div class="d-flex flex-wrap align-items-center gap-3">
+          <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
             <div class="input-group input-group-sm shadow-sm" style="max-width: 250px;">
               <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
               <input type="text" id="search-projects" class="form-control border-start-0" placeholder="Buscar proyecto o alumno..." onkeyup="filterList('list-projects', this.value)">
@@ -211,21 +211,27 @@
                     <i class="fas fa-sort-alpha-up"></i>
                 </a>
             </div>
-
-            <div class="ms-auto d-flex align-items-center gap-2">
-              <button class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm hover-elevate" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createProjectModal" data-target="#createProjectModal">
-                <i class="fas fa-plus me-1"></i>Nuevo Proyecto
+          </div>
+          <div class="d-flex align-items-center gap-2">
+              <button class="btn btn-sm rounded-pill px-3 shadow-sm hover-elevate" style="background-color: var(--subject-primary); color: white;" id="project-btn-nuevo" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createProjectModal" data-target="#createProjectModal">
+                <i class="fas fa-plus" style="margin-right: 8px !important;"></i>Nuevo Proyecto
               </button>
-            </div>
+              <div class="vr mx-1"></div>
+              <span class="small fw-bold text-muted me-1" id="project-actions-counter" style="display: none;"><span id="selected-project-count">0</span> seleccionados</span>
+              <button class="btn btn-sm btn-light rounded-pill px-3 shadow-sm hover-elevate" id="btn-deselect-projects" onclick="deselectAllProjects()" disabled>Deseleccionar</button>
+              <button class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm hover-elevate" id="btn-delete-projects" onclick="confirmRemoveMultipleProjects()" disabled>
+                <i class="fas fa-trash-alt" style="margin-right: 8px !important;"></i>Eliminar
+              </button>
           </div>
         </div>
         <div class="card-body p-0 scroll-area" style="max-height: 500px; overflow-y: auto;">
           {% if projects %}
             <div class="list-group list-group-flush" id="list-projects">
               {% for project in projects %}
-                <div class="list-group-item border-0 py-3 px-4 d-flex justify-content-between align-items-center hover-light">
+                <div class="list-group-item border-0 py-3 px-4 d-flex justify-content-between align-items-center hover-light" style="cursor: pointer;" onclick="toggleRowSelection(this, event, 'project')">
                   <div class="d-flex align-items-center">
-                    <div class="me-4 text-center d-flex align-items-center justify-content-center" style="width: 45px; height: 45px; min-width: 45px; border-radius: 12px; background: rgba(0,0,0,0.03); color: var(--subject-primary);">
+                    <input type="checkbox" class="project-select-checkbox shadow-sm rounded" style="position: relative !important; margin-left: 0 !important; margin-top: 0 !important; width: 1.25rem; height: 1.25rem; border-color: #d1d3e2; cursor: pointer; border-width: 2px; margin-right: 16px !important;" value="{{ project.id }}" data-placename="{{ project.place|escapejs }}" onchange="handleProjectSelection()">
+                    <div class="text-center d-flex align-items-center justify-content-center" style="width: 45px; height: 45px; min-width: 45px; border-radius: 12px; background: rgba(0,0,0,0.03); color: var(--subject-primary); margin-right: 24px !important;">
                       <i class="fas fa-layer-group fa-lg"></i>
                     </div>
                     <div>
@@ -234,18 +240,13 @@
                     </div>
                   </div>
                   <div class="d-flex align-items-center gap-2">
-                    <a class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm hover-elevate fw-bold" href="{% url 'professor_project_detail' project.id %}">
-                      <i class="fas fa-eye me-1"></i>Detalles
+                    <a class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm hover-elevate fw-bold btn-detail-project" href="{% url 'professor_project_detail' project.id %}">
+                      <i class="fas fa-eye" style="margin-right: 8px !important;"></i>Detalles
                     </a>
-                    <button class="btn btn-sm btn-light rounded-circle me-1 shadow-sm" 
+                    <button class="btn btn-sm btn-light rounded-circle me-1 shadow-sm btn-edit-project" 
                             onclick="openEditProjectModal('{{ project.id }}', '{{ project.place|escapejs }}')"
                             title="Editar Proyecto">
                       <i class="fas fa-edit text-secondary"></i>
-                    </button>
-                    <button class="btn btn-sm btn-outline-danger rounded-circle shadow-sm hover-elevate" 
-                            onclick="confirmDeleteProject('{{ project.id }}', '{{ project.place|escapejs }}')"
-                            title="Eliminar Proyecto">
-                      <i class="fas fa-trash-alt"></i>
                     </button>
                   </div>
                 </div>
@@ -271,7 +272,7 @@
         <input type="hidden" name="action" value="create_student">
         <div class="modal-header border-0 text-white py-4 px-4 position-relative overflow-hidden" style="background-color: var(--subject-primary);">
           <div class="d-flex align-items-center position-relative mt-2 ps-2">
-            <div class="rounded-circle p-3 me-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px;">
+            <div class="rounded-circle p-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px; margin-right: 16px !important;">
               <i class="fas fa-user-plus fa-lg text-white"></i>
             </div>
             <div>
@@ -333,22 +334,19 @@
                   <div id="password-error" class="col-12 text-danger small d-none"><i class="fas fa-exclamation-circle me-1"></i> Las contraseñas no coinciden.</div>
                   
                   <div class="col-12 mt-3">
-                    <div class="form-check form-switch p-3 bg-light rounded-3 border">
-                      <input class="form-check-input ms-0 me-3" type="checkbox" name="must_change_password" value="1" id="mustChangeCheck" checked>
-                      <label class="form-check-label fw-bold small text-dark" for="mustChangeCheck">
-                        <i class="fas fa-key me-1 text-primary"></i> Obligar a cambiar contraseña al inicio
-                      </label>
-                    </div>
+                    <label id="lbl-must-change-new" class="btn w-100 rounded-pill py-2 fw-bold shadow-sm d-flex align-items-center justify-content-center" style="cursor: pointer; transition: all 0.2s; background-color: var(--subject-primary); color: white; border: 2px solid var(--subject-primary);">
+                      <input type="checkbox" name="must_change_password" value="1" id="mustChangeCheck" checked autocomplete="off" style="width: 1.25rem; height: 1.25rem; cursor: pointer; margin-right: 12px;" onchange="this.parentElement.style.backgroundColor = this.checked ? 'var(--subject-primary)' : 'transparent'; this.parentElement.style.color = this.checked ? 'white' : 'var(--subject-primary)';">
+                      <i class="fas fa-key" style="margin-right: 8px !important;"></i> Obligar a cambiar contraseña al inicio
+                    </label>
                   </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-        <div class="modal-footer border-0 p-4 bg-white justify-content-between">
-          <button type="button" class="btn btn-light rounded-pill px-4 fw-bold shadow-sm" data-bs-dismiss="modal">Cancelar</button>
+        <div class="modal-footer border-0 p-4 bg-white justify-content-end">
           <button type="submit" id="btn-submit-student" class="btn text-white rounded-pill px-5 py-2 fw-bold shadow-sm" style="background-color: var(--subject-primary);">
-            <i class="fas fa-save me-2"></i>Crear y Matricular
+            <i class="fas fa-save" style="margin-right: 8px !important;"></i>Crear y Matricular
           </button>
         </div>
       </form>
@@ -561,13 +559,11 @@
                     {% endif %}
                   </div>
                   
-                  {% if subject.logo %}
-                  <div class="mt-3" id="remove-logo-btn-wrapper">
+                  <div class="mt-3 {% if not subject.logo %}d-none{% endif %}" id="remove-logo-btn-wrapper">
                     <button type="button" onclick="markLogoForRemoval()" class="btn btn-outline-danger btn-sm rounded-pill px-3 fw-bold">
-                      <i class="fas fa-trash-alt me-1"></i> Quitar Logo actual
+                      <i class="fas fa-trash-alt me-1"></i> Quitar Logo
                     </button>
                   </div>
-                  {% endif %}
                   <input type="hidden" name="remove_logo" id="remove-logo-input-new" value="false">
                 </div>
 
@@ -602,6 +598,18 @@
     const fileNameDisplay = document.getElementById('file-name-display');
     if (input.files && input.files[0]) {
       const fileName = input.files[0].name;
+
+      if (fileName.length > 90) {
+          if (typeof showToast === 'function') {
+              showToast("El nombre de la imagen es demasiado largo (máximo 90 caracteres). Renómbrala antes de subirla.", "text-bg-warning");
+          } else {
+              alert("El nombre de la imagen es demasiado largo. Renómbrala e intenta de nuevo.");
+          }
+          input.value = ""; 
+          if (fileNameDisplay) fileNameDisplay.innerText = "No se ha seleccionado archivo";
+          return;
+      }
+
       if (fileNameDisplay) fileNameDisplay.innerText = fileName;
       
       const reader = new FileReader();
@@ -610,7 +618,7 @@
         display.innerHTML = `<img src="${e.target.result}" class="w-100 h-100 object-fit-cover">`;
         document.getElementById('remove-logo-input-new').value = 'false';
         const wrapper = document.getElementById('remove-logo-btn-wrapper');
-        if (wrapper) wrapper.classList.add('d-none');
+        if (wrapper) wrapper.classList.remove('d-none');
       };
       reader.readAsDataURL(input.files[0]);
     } else {
@@ -638,7 +646,7 @@
         <input type="hidden" name="student_id" value="{{ student.id }}">
         <div class="modal-header border-0 text-white py-4 px-4 position-relative overflow-hidden" style="background-color: var(--subject-primary);">
           <div class="d-flex align-items-center position-relative mt-2 ps-2">
-            <div class="rounded-circle p-3 me-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px;">
+            <div class="rounded-circle p-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px; margin-right: 16px !important;">
               <i class="fas fa-user-edit fa-lg text-white"></i>
             </div>
             <div>
@@ -676,19 +684,17 @@
                 </div>
               </div>
             </div>
-            <div class="col-12 mt-2">
-              <div class="form-check form-switch p-3 bg-light rounded-3 border">
-                <input class="form-check-input ms-0 me-3" type="checkbox" name="must_change_password" value="1" id="mustChangePwd{{ student.id }}" {% if student.user_profile.must_change_password %}checked{% endif %}>
-                <label class="form-check-label fw-bold small text-dark" for="mustChangePwd{{ student.id }}">
-                  <i class="fas fa-key me-1 text-primary"></i> Obligar a cambiar contraseña al inicio
-                </label>
-              </div>
+            <div class="col-12 mt-3">
+              <label id="lbl-must-change-edit-{{ student.id }}" class="btn w-100 rounded-pill py-2 fw-bold shadow-sm d-flex align-items-center justify-content-center" {% if student.user_profile.must_change_password %}style="cursor: pointer; transition: all 0.2s; background-color: var(--subject-primary); color: white; border: 2px solid var(--subject-primary);"{% else %}style="cursor: pointer; transition: all 0.2s; background-color: transparent; color: var(--subject-primary); border: 2px solid var(--subject-primary);"{% endif %}>
+                <input type="checkbox" name="must_change_password" value="1" id="mustChangePwd{{ student.id }}" {% if student.user_profile.must_change_password %}checked{% endif %} autocomplete="off" style="width: 1.25rem; height: 1.25rem; cursor: pointer; margin-right: 12px;" onchange="this.parentElement.style.backgroundColor = this.checked ? 'var(--subject-primary)' : 'transparent'; this.parentElement.style.color = this.checked ? 'white' : 'var(--subject-primary)';">
+                <i class="fas fa-key" style="margin-right: 8px !important;"></i> Obligar a cambiar contraseña al inicio
+              </label>
             </div>
           </div>
         </div>
         <div class="modal-footer border-0 p-4 bg-white justify-content-center">
           <button type="button" class="btn text-white rounded-pill px-5 py-2 fw-bold shadow-sm w-100" style="background-color: var(--subject-primary);" onclick="confirmEditStudent('{{ student.id }}', '{{ student.username }}')">
-            <i class="fas fa-save me-2"></i>Actualizar Datos
+            <i class="fas fa-save" style="margin-right: 8px !important;"></i>Actualizar Datos
           </button>
         </div>
       </form>
@@ -706,7 +712,7 @@
         <input type="hidden" name="action" value="add_existing_student">
         <div class="modal-header border-0 text-white py-4 px-4 position-relative overflow-hidden" style="background-color: var(--subject-primary);">
           <div class="d-flex align-items-center position-relative mt-2 ps-2">
-            <div class="rounded-circle p-3 me-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px;">
+            <div class="rounded-circle p-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px; margin-right: 16px !important;">
               <i class="fas fa-link fa-lg text-white"></i>
             </div>
             <div>
@@ -728,7 +734,7 @@
                   <input type="text" id="search-available-input" class="form-control border-0 ps-0 py-2" placeholder="Nombre, @usuario o correo..." onkeyup="filterAvailableStudents(this.value)">
                 </div>
                 <div class="mt-4 p-3 rounded-3 bg-light border border-light">
-                    <p class="small text-muted mb-0"><i class="fas fa-info-circle text-info me-2"></i>Escribe cualquier dato del alumno para filtrar instantáneamente la lista de la derecha y seleccionarlo.</p>
+                    <p class="small text-muted mb-0"><i class="fas fa-info-circle text-info" style="margin-right: 8px !important;"></i>Escribe cualquier dato del alumno para filtrar instantáneamente la lista de la derecha y seleccionarlo.</p>
                 </div>
               </div>
             </div>
@@ -736,7 +742,7 @@
             <div class="col-md-7">
               <div class="p-3 bg-white rounded-4 shadow-sm border">
                 <label class="form-label text-muted small fw-bold text-uppercase mb-3" style="letter-spacing: 0.5px;">2. Seleccionar Alumno</label>
-                <select name="student_id" id="available-students-select" class="form-select form-select-lg rounded-3 border bg-light bg-opacity-50" required size="8" style="font-size: 0.95rem; cursor: pointer;">
+                <select name="student_id" id="available-students-select" class="form-select form-select-lg rounded-3 border bg-light bg-opacity-50" required multiple size="8" style="font-size: 0.95rem; cursor: pointer;">
                   <option value="" disabled>Seleccione un alumno disponible...</option>
                   {% for available in available_students %}
                     <option value="{{ available.id }}" class="py-2 px-3 border-bottom-1" data-search="{{ available.get_full_name|lower }} {{ available.username|lower }} {{ available.email|lower }}">
@@ -753,10 +759,9 @@
             </div>
           </div>
         </div>
-        <div class="modal-footer border-0 p-4 bg-white justify-content-between">
-          <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" data-bs-dismiss="modal">Cancelar</button>
+        <div class="modal-footer border-0 p-4 bg-white justify-content-end">
           <button type="submit" class="btn text-white rounded-pill px-5 py-2 fw-bold shadow-sm hover-elevate" style="background-color: var(--subject-primary);" {% if not available_students %}disabled{% endif %}>
-            <i class="fas fa-user-plus me-2"></i>Confirmar Matriculación
+            <i class="fas fa-user-plus" style="margin-right: 8px !important;"></i>Confirmar Matriculación
           </button>
         </div>
       </form>
@@ -774,7 +779,7 @@
         <input type="hidden" name="project_id" id="edit_project_id">
         <div class="modal-header border-0 text-white py-4 px-4 position-relative overflow-hidden" style="background-color: var(--subject-primary);">
           <div class="d-flex align-items-center position-relative mt-2 ps-2">
-            <div class="rounded-circle p-3 me-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px;">
+            <div class="rounded-circle p-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px; margin-right: 16px !important;">
               <i class="fas fa-folder-open fa-lg text-white"></i>
             </div>
             <div>
@@ -782,6 +787,9 @@
               <p class="text-white-50 small mb-0">Modifica el nombre o ubicación del proyecto del alumno.</p>
             </div>
           </div>
+          <button type="button" class="bg-transparent border-0 text-white shadow-none" data-bs-dismiss="modal" data-dismiss="modal" aria-label="Cerrar" style="position: absolute; top: 1.5rem; right: 1.5rem; z-index: 10; cursor: pointer;">
+            <i class="fas fa-times fa-lg"></i>
+          </button>
         </div>
         <div class="modal-body p-4 bg-light bg-opacity-30">
           <div class="bg-white p-4 rounded-4 shadow-sm border border-light">
@@ -794,7 +802,7 @@
         </div>
         <div class="modal-footer border-0 p-4 bg-white justify-content-end">
           <button type="submit" class="btn text-white rounded-pill px-5 py-2 fw-bold shadow-sm" style="background-color: var(--subject-primary);">
-            <i class="fas fa-save me-2"></i>Guardar Cambios
+            <i class="fas fa-save" style="margin-right: 8px !important;"></i>Guardar Cambios
           </button>
         </div>
       </form>
@@ -911,11 +919,65 @@
     }
   }
 
-  function confirmRemoveStudent(studentId, username) {
+  function handleStudentSelection() {
+      const checkboxes = document.querySelectorAll('.student-select-checkbox');
+      let selectedCount = 0;
+      checkboxes.forEach(cb => {
+          const row = cb.closest('.list-group-item');
+          if (cb.checked) {
+              selectedCount++;
+              row.style.backgroundColor = 'rgba(78, 115, 223, 0.08)';
+              row.style.borderLeft = '4px solid #4e73df';
+          } else {
+              row.style.backgroundColor = '';
+              row.style.borderLeft = '';
+          }
+      });
+      const countSpan = document.getElementById('selected-student-count');
+      const editButtons = document.querySelectorAll('.btn-edit-student');
+      
+      const btnDeselect = document.getElementById('btn-deselect-students');
+      const btnDelete = document.getElementById('btn-delete-students');
+      const counterSpan = document.getElementById('student-actions-counter');
+
+      if (selectedCount > 0) {
+          counterSpan.style.display = 'inline';
+          btnDeselect.disabled = false;
+          btnDelete.disabled = false;
+          countSpan.textContent = selectedCount;
+
+          if (selectedCount > 1) {
+              editButtons.forEach(btn => btn.disabled = true);
+          } else {
+              editButtons.forEach(btn => btn.disabled = false);
+          }
+      } else {
+          counterSpan.style.display = 'none';
+          btnDeselect.disabled = true;
+          btnDelete.disabled = true;
+          editButtons.forEach(btn => btn.disabled = false);
+      }
+  }
+
+  function deselectAllStudents() {
+      document.querySelectorAll('.student-select-checkbox').forEach(cb => {
+          cb.checked = false;
+      });
+      handleStudentSelection();
+  }
+
+  function confirmRemoveMultipleStudents() {
+      const checkboxes = document.querySelectorAll('.student-select-checkbox:checked');
+      const count = checkboxes.length;
+      let usernames = [];
+      checkboxes.forEach(cb => usernames.push('@' + cb.getAttribute('data-username')));
+      const usernamesList = usernames.join(', ');
+
       Swal.fire({
-          title: '<h4 class="fw-bold mb-0 text-danger">Eliminación Radical</h4>',
+          title: '<h4 class="fw-bold mb-0 text-danger">Eliminación Radical Múltiple</h4>',
           html: `<div class="text-muted mt-2 mb-0 text-start">
-                  <p>Estás a punto de <strong>desmatricular</strong> al alumno <strong>@${username}</strong> de esta asignatura.</p>
+                  <p>Estás a punto de <strong>desmatricular</strong> a ${count} alumno(s) de esta asignatura:</p>
+                  <p class="small text-muted mb-2"><i>${usernamesList}</i></p>
                   <p class="text-danger fw-bold"><i class="fas fa-exclamation-triangle me-1"></i> ¡ADVERTENCIA!</p>
                   <ul class="small mb-0 pb-0">
                     <li>Se apagarán y borrarán <strong>TODOS</strong> sus servicios.</li>
@@ -925,7 +987,7 @@
                  </div>`,
           icon: 'error',
           showCancelButton: true,
-          confirmButtonText: '<i class="fas fa-trash-alt me-2"></i>Eliminar Todo',
+          confirmButtonText: '<i class="fas fa-trash-alt" style="margin-right: 8px !important;"></i>Eliminar Selección',
           cancelButtonText: 'Cancelar',
           reverseButtons: true,
           confirmButtonColor: '#e74a3b',
@@ -960,14 +1022,17 @@
               actionInput.name = "action";
               actionInput.value = "remove_student";
               
-              const studentIdInput = document.createElement("input");
-              studentIdInput.type = "hidden";
-              studentIdInput.name = "student_id";
-              studentIdInput.value = studentId;
-
               form.appendChild(csrfInput);
               form.appendChild(actionInput);
-              form.appendChild(studentIdInput);
+
+              checkboxes.forEach(cb => {
+                  const studentIdInput = document.createElement("input");
+                  studentIdInput.type = "hidden";
+                  studentIdInput.name = "student_id";
+                  studentIdInput.value = cb.value;
+                  form.appendChild(studentIdInput);
+              });
+
               document.body.appendChild(form);
               
               Swal.fire({
@@ -997,7 +1062,7 @@
                  </div>`,
           icon: 'warning',
           showCancelButton: true,
-          confirmButtonText: '<i class="fas fa-trash-alt me-2"></i>Eliminar Proyecto',
+          confirmButtonText: '<i class="fas fa-trash-alt" style="margin-right: 8px !important;"></i>Eliminar Proyecto',
           cancelButtonText: 'Cancelar',
           reverseButtons: true,
           confirmButtonColor: '#e74a3b',
@@ -1045,6 +1110,155 @@
               Swal.fire({
                   title: 'Eliminando...',
                   text: 'Borrando proyecto y contenedores asociados.',
+                  allowOutsideClick: false,
+                  showConfirmButton: false,
+                  didOpen: () => {
+                      Swal.showLoading();
+                  }
+              });
+              
+              form.submit();
+          }
+      });
+  }
+
+  function handleProjectSelection() {
+      const checkboxes = document.querySelectorAll('.project-select-checkbox');
+      let selectedCount = 0;
+      checkboxes.forEach(cb => {
+          const row = cb.closest('.list-group-item');
+          if (cb.checked) {
+              selectedCount++;
+              row.style.backgroundColor = 'rgba(78, 115, 223, 0.08)';
+              row.style.borderLeft = '4px solid #4e73df';
+          } else {
+              row.style.backgroundColor = '';
+              row.style.borderLeft = '';
+          }
+      });
+      const countSpan = document.getElementById('selected-project-count');
+      const editButtons = document.querySelectorAll('.btn-edit-project');
+      const detailButtons = document.querySelectorAll('.btn-detail-project');
+      
+      const btnDeselect = document.getElementById('btn-deselect-projects');
+      const btnDelete = document.getElementById('btn-delete-projects');
+      const counterSpan = document.getElementById('project-actions-counter');
+
+      if (selectedCount > 0) {
+          counterSpan.style.display = 'inline';
+          btnDeselect.disabled = false;
+          btnDelete.disabled = false;
+          countSpan.textContent = selectedCount;
+
+          if (selectedCount > 1) {
+              editButtons.forEach(btn => btn.disabled = true);
+              detailButtons.forEach(btn => btn.disabled = true);
+          } else {
+              editButtons.forEach(btn => btn.disabled = false);
+              detailButtons.forEach(btn => btn.disabled = false);
+          }
+      } else {
+          counterSpan.style.display = 'none';
+          btnDeselect.disabled = true;
+          btnDelete.disabled = true;
+          editButtons.forEach(btn => btn.disabled = false);
+          detailButtons.forEach(btn => btn.disabled = false);
+      }
+  }
+
+  function deselectAllProjects() {
+      document.querySelectorAll('.project-select-checkbox').forEach(cb => {
+          cb.checked = false;
+      });
+      handleProjectSelection();
+  }
+
+  function toggleRowSelection(row, event, type) {
+      if (event.target.tagName.toLowerCase() === 'input' || event.target.tagName.toLowerCase() === 'button' || event.target.closest('button') || event.target.closest('a')) {
+          return;
+      }
+      const checkbox = row.querySelector('.' + type + '-select-checkbox');
+      if (checkbox) {
+          checkbox.checked = !checkbox.checked;
+          if (type === 'student') {
+              handleStudentSelection();
+          } else if (type === 'project') {
+              handleProjectSelection();
+          }
+      }
+  }
+
+  function confirmRemoveMultipleProjects() {
+      const checkboxes = document.querySelectorAll('.project-select-checkbox:checked');
+      const count = checkboxes.length;
+      let names = [];
+      checkboxes.forEach(cb => names.push(cb.getAttribute('data-placename')));
+      const namesList = names.join(', ');
+
+      Swal.fire({
+          title: '<h4 class="fw-bold mb-0 text-danger">Eliminar Proyectos</h4>',
+          html: `<div class="text-muted mt-2 mb-0 text-start">
+                  <p>Estás a punto de eliminar ${count} proyecto(s):</p>
+                  <p class="small text-muted mb-2"><i>${namesList}</i></p>
+                  <p class="text-danger fw-bold"><i class="fas fa-exclamation-triangle me-1"></i> ¡ADVERTENCIA!</p>
+                  <ul class="small mb-0 pb-0">
+                    <li>Se apagarán y borrarán <strong>TODOS</strong> los servicios asociados a estos proyectos.</li>
+                    <li>Este proceso <strong>NO</strong> se puede deshacer.</li>
+                  </ul>
+                 </div>`,
+          icon: 'warning',
+          showCancelButton: true,
+          confirmButtonText: '<i class="fas fa-trash-alt" style="margin-right: 8px !important;"></i>Eliminar Selección',
+          cancelButtonText: 'Cancelar',
+          reverseButtons: true,
+          confirmButtonColor: '#e74a3b',
+          cancelButtonColor: '#858796',
+          customClass: {
+            confirmButton: 'btn btn-danger px-4 py-2 fw-bold shadow-sm rounded-pill me-2',
+            cancelButton: 'btn btn-light px-4 py-2 fw-bold shadow-sm rounded-pill'
+          },
+          buttonsStyling: false,
+          showLoaderOnConfirm: true,
+          allowOutsideClick: () => !Swal.isLoading(),
+          preConfirm: () => {
+              return new Promise((resolve) => {
+                  setTimeout(() => {
+                      resolve();
+                  }, 800);
+              });
+          }
+      }).then((result) => {
+          if (result.isConfirmed) {
+              const form = document.createElement("form");
+              form.method = "POST";
+              form.action = "{% url 'professor_subject_detail' subject.id %}";
+              
+              const csrfInput = document.createElement("input");
+              csrfInput.type = "hidden";
+              csrfInput.name = "csrfmiddlewaretoken";
+              csrfInput.value = "{{ csrf_token }}";
+              
+              const actionInput = document.createElement("input");
+              actionInput.type = "hidden";
+              actionInput.name = "action";
+              actionInput.value = "remove_project";
+              
+              form.appendChild(csrfInput);
+              form.appendChild(actionInput);
+
+              checkboxes.forEach(cb => {
+                  const projectIdInput = document.createElement("input");
+                  projectIdInput.type = "hidden";
+                  projectIdInput.name = "project_id";
+                  projectIdInput.value = cb.value;
+                  form.appendChild(projectIdInput);
+              });
+
+              document.body.appendChild(form);
+              
+              Swal.fire({
+                  title: 'Eliminando...',
+                  text: 'Borrando proyectos y contenedores asociados.',
                   allowOutsideClick: false,
                   showConfirmButton: false,
                   didOpen: () => {
