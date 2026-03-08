@@ -10,12 +10,13 @@
 
 ### UI / Presentación
 
-- [ ] **Texto y emoticonos separados**: Revisar todos los paneles para asegurar que los emoticonos y los textos no están unidos sin espacios, asegurando una estética limpia.
+- [x] **Texto y emoticonos separados**: Revisar todos los paneles para asegurar que los emoticonos y los textos no están unidos sin espacios, asegurando una estética limpia.
+- [x] **Mejoras Modal Asignatura (Nueva/Editar)**: Implementar previsualización de logo, botón para limpiar logo, reinicio del formulario al cerrar y validación estricta del nombre del archivo (< 90 caracteres).
 - [ ] **Renombrar panel**: Cambiar el nombre del panel superior/lateral de "Proyectos" a "Mis Servicios".
 - [ ] **Panel de personalización más pequeño**: Ajustar el tamaño del panel de diseño/personalización para que no ocupe demasiado espacio en pantalla.
 - [ ] **Panel "No estás matriculado" visual**: Mejorar el diseño del panel vacío que se muestra cuando un alumno no tiene asignaturas, haciéndolo más amigable/visual y validando correctamente el estado de su sesión.
 - [ ] **Visualización de proyectos vacíos**: Permitir que los profesores/alumnos puedan ver y entrar en proyectos que todavía no tienen servicios asociados.
-- [ ] **Cerrar botón cerrar sesión**: Arreglar/Ajustar el comportamiento o estilo del botón de cerrar sesión.
+- [x] **Cerrar botón cerrar sesión**: Arreglar/Ajustar el comportamiento o estilo del botón de cerrar sesión.
 
 ### Funcionalidades de Carga (Excel)
 
@@ -27,7 +28,7 @@
 ### APIs y Documentación
 
 - [ ] **Colección Postman exportable**: A partir de nuestra documentación OAS (Swagger/drf-spectacular), generar un JSON de Postman o un mecanismo que permita descargar un archivo directo para importarlo en Postman.
-- [ ] **Menú Profesor - API Docs**: El enlace a `API-DOCS` debe estar visible también en el panel del profesor, no solo en el del admin o alumno.
+- [x] **Menú Profesor - API Docs**: El enlace a `API-DOCS` debe estar visible también en el panel del profesor, no solo en el del admin o alumno.
 
 ### Seguridad y Sesiones
 
@@ -43,6 +44,17 @@
 ### CI / CD
 
 - [ ] **Montar el modelo GitHub Action**: Establecer y configurar los flujos de GitHub Actions para el empaquetado y subida del contenedor directamente desde el refactor realizado.
+
+---
+
+### Mejoras Extras (Implementadas)
+
+- [x] **Rediseño de Checkboxes y Selección de Filas**: Checkboxes estilizados, con márgenes correctos (evitando pisar íconos), y con selección avanzada mediante clic en toda la fila (alumnos y proyectos).
+- [x] **Gestión Múltiple en Tabla**: Añadida funcionalidad no planificada para seleccionar y desmatricular/eliminar múltiples alumnos y proyectos a la vez, con contadores visuales y botones de acción dinámicos.
+- [x] **UI de Checkbox de Contraseña**: Transformado el checkbox estándar de "Obligar a cambiar contraseña" en los modales de alumno a un gran botón interactivo vinculado lógicamente al color principal de la Asignatura.
+- [x] **Seguimiento de Actividad de Alumnos**: Añadida una nueva columna "Última Actividad" en la tabla de proyectos del panel de profesor que calcula la fecha/hora en la que los servicios de un proyecto fueron editados o iniciados por última vez. Incluye un tooltip de información estilizado para aclarar su funcionamiento.
+- [x] **Ajustes Flexbox en Modal de Asignatura**: Solucionados los problemas de clases CSS de Bootstrap que hacían que determinados iconos (sombrero principal, imágenes de logo y paletas de color) se acoplaran al texto adyacente dentro del formulario "Nueva Asignatura".
+- [x] **Espaciado en Página de Perfil**: Refinamiento por todo el panel de Control de Cuenta, Seguridad y Token API separando exhaustivamente los iconos que se apilaban sobre los textos de los botones tras cargar las hojas de estilos personalizadas.
 
 ---
 

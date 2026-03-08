@@ -306,7 +306,7 @@
         background: #4e73df;
         border: none;
         color: white;
-        padding: 0.6rem 1.4rem;
+        padding: 6px 16px;
         border-radius: 10px;
         font-weight: 700;
         font-size: 0.85rem;
@@ -537,7 +537,18 @@
             </a>
           </li>
 
-          {% if nav_is_admin or nav_is_student or user.is_superuser %}
+          {% if nav_is_admin or nav_is_teacher or user.is_superuser %}
+          <li class="nav-item">
+            <a
+              class="nav-link {% if section == 'professor' %} active {% endif %}"
+              href="{% url 'professor_dashboard' %}"
+            >
+              <i class="fas fa-chalkboard-teacher"></i><span>Panel profesor</span>
+            </a>
+          </li>
+          {% endif %}
+
+          {% if nav_is_admin or nav_is_student or nav_is_teacher or user.is_superuser %}
           {# Si es profesor y NO es admin/superuser, Ocultamos Proyectos y Mis Asignaturas #}
           {% if not nav_is_teacher or user.is_superuser %}
           <li class="nav-item">
@@ -566,18 +577,6 @@
           </li>
           {% endif %}
           
-          {% if nav_is_admin or nav_is_teacher or user.is_superuser %}
-          <li class="nav-item">
-            <a
-              class="nav-link {% if section == 'professor' %} active {% endif %}"
-              href="{% url 'professor_dashboard' %}"
-            >
-              <i class="fas fa-chalkboard-teacher"></i
-              ><span>Panel profesor</span>
-            </a>
-          </li>
-          {% endif %}
-          
           {% if nav_is_admin or user.is_superuser %}
           <li class="nav-item">
             <a class="nav-link" href="/admin/">
@@ -599,7 +598,7 @@
           <form
             method="post"
             action="{% url 'logout' %}"
-            style="display: inline"
+            style="display: inline; margin: 0;"
           >
             {% csrf_token %}
             <button type="submit" class="auth-button">
