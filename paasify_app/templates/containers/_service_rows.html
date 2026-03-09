@@ -26,9 +26,11 @@
         <div>
           <h2 class="h4 mb-0 fw-bold text-white text-uppercase" style="letter-spacing: 0.5px; text-shadow: 0 1px 2px rgba(0,0,0,0.2);">{{ subj.name|default:"Sin Asignatura" }}</h2>
           <div class="d-flex align-items-center gap-2 mt-1">
-              <span class="text-white-50 fw-bold small text-uppercase" style="font-size: 0.65rem;">ID: #{{ subj.id }}</span>
-              <span class="text-white-50 small mx-1">•</span>
-              <span class="text-white-50 fw-bold small text-uppercase" style="font-size: 0.65rem;">{{ subj.teacher_user.get_full_name|default:subj.teacher_user.username|upper }}</span>
+              <span class="badge bg-light text-muted border fw-normal" style="font-size: 0.65rem;">ID: #{{ subj.id }}</span>
+              <span class="text-white opacity-50 small mx-2">•</span>
+              <span class="text-white opacity-75 fw-bold small text-uppercase" style="font-size: 0.65rem;">
+                <i class="fas fa-user-tie" style="margin-right: 4px !important;"></i> {{ subj.teacher_user.get_full_name|default:subj.teacher_user.username|upper }}
+              </span>
           </div>
         </div>
       </div>
@@ -73,8 +75,8 @@
                  style="background: linear-gradient(90deg, rgba(0,0,0,0.01) 0%, transparent 100%); z-index: 1; border-bottom: 2.5px solid rgba(0,0,0,0.06);">
                 
                 <div class="d-flex align-items-center">
-                    <div class="rounded-pill d-flex align-items-center justify-content-center me-3 border" 
-                         style="width: 28px; height: 28px; background: rgba(0,0,0,0.02); color: var(--subj-color);">
+                    <div class="rounded-pill d-flex align-items-center justify-content-center border" 
+                         style="width: 28px; height: 28px; background: rgba(0,0,0,0.02); color: var(--subj-color); margin-right: 12px !important;">
                         <i class="fas fa-folder-open" style="font-size: 0.65rem;"></i>
                     </div>
                     <div>
@@ -99,11 +101,11 @@
                                     <div class="d-flex align-items-center gap-2">
                                         <span class="badge bg-light text-muted border text-uppercase" style="font-size: 0.55rem; padding: 0.4em 0.7em;">REF: #{{ s.id }}</span>
                                         {% if s.has_compose %}
-                                          <span class="badge bg-primary text-white shadow-sm" style="font-size: 0.55rem; padding: 0.4em 0.82em;"><i class="fas fa-layer-group me-1"></i>STACK</span>
+                                          <span class="badge bg-primary text-white shadow-sm" style="font-size: 0.55rem; padding: 0.4em 0.82em;"><i class="fas fa-layer-group" style="margin-right: 4px !important;"></i>STACK</span>
                                         {% elif s.mode == 'dockerfile' %}
-                                          <span class="badge bg-info text-white shadow-sm" style="font-size: 0.55rem; padding: 0.4em 0.82em;"><i class="fas fa-file-code me-1"></i>FILE</span>
+                                          <span class="badge bg-info text-white shadow-sm" style="font-size: 0.55rem; padding: 0.4em 0.82em;"><i class="fas fa-file-code" style="margin-right: 4px !important;"></i>FILE</span>
                                         {% else %}
-                                          <span class="badge bg-secondary text-white shadow-sm" style="font-size: 0.55rem; padding: 0.4em 0.82em;"><i class="fab fa-docker me-1"></i>HUB</span>
+                                          <span class="badge bg-secondary text-white shadow-sm" style="font-size: 0.55rem; padding: 0.4em 0.82em;"><i class="fab fa-docker" style="margin-right: 4px !important;"></i>HUB</span>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -114,11 +116,11 @@
                                     <span class="image-premium-badge badge py-2 px-4 shadow-sm" 
                                           style="font-size: 0.7rem; border: 2px solid var(--subj-color); color: var(--subj-color); background: #fff; border-radius: 12px; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700;">
                                         {% if s.has_compose %}
-                                            <i class="fas fa-cubes me-2"></i>DOCKER COMPOSE STACK
+                                            <i class="fas fa-cubes" style="margin-right: 6px !important;"></i> DOCKER COMPOSE STACK
                                         {% elif s.mode == 'dockerfile' %}
-                                            <i class="fas fa-file-code me-2"></i>DOCKERFILE BUILD
+                                            <i class="fas fa-file-code" style="margin-right: 6px !important;"></i> DOCKERFILE BUILD
                                         {% else %}
-                                            <i class="fab fa-docker me-2"></i>{{ s.image|default:"Sin imagen" }}
+                                            <i class="fab fa-docker" style="margin-right: 6px !important;"></i> {{ s.image|default:"Sin imagen" }}
                                         {% endif %}
                                     </span>
                                 </div>

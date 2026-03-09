@@ -95,6 +95,7 @@ class Command(BaseCommand):
                     roles.TEACHER_GROUP_NAMES,
                     roles.DEFAULT_TEACHER_GROUP,
                 )
+                roles.ensure_user_profile(user)
 
             action = "created" if created else "updated"
             extras: list[str] = []

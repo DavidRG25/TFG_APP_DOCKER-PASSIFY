@@ -112,7 +112,6 @@
 
     {# Terminal y Web SOLO para servicios simples #}
     {% if not service.has_compose %}
-        {% if not is_supervisor or service.owner == request.user %}
             {% if service.container_id and service.status == 'running' %}
     <a href="{% url 'containers:terminal_v2' service.id %}" class="btn svc-action-btn text-white"
         style="background-color: #374151;"
@@ -124,7 +123,6 @@
         <i class="fas fa-terminal"></i>
     </button>
             {% endif %}
-        {% endif %}
 
         {# Web - respetar is_web sin filtrar por puerto #}
         {% if host and service.assigned_port and service.is_web %}

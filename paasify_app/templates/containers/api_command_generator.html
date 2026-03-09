@@ -93,7 +93,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
     <ol class="breadcrumb mb-0">
       <li class="breadcrumb-item">
         <a href="{% url 'containers:student_panel' %}" class="text-decoration-none text-muted">
-          <i class="fas fa-home me-1"></i>Inicio
+          <i class="fas fa-home" style="margin-right: 8px !important;"></i>Inicio
         </a>
       </li>
       {% if current_subject %}
@@ -162,7 +162,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
       <div class="card border-0 shadow-sm mb-4">
         <div class="card-body p-4">
           <h5 class="fw-bold text-primary mb-3">
-            <i class="fas fa-cogs me-2"></i>Tipo de Despliegue
+            <i class="fas fa-cogs" style="margin-right: 8px !important;"></i>Tipo de Despliegue
           </h5>
 
           <div class="row g-3 mb-4" id="modeSelector">
@@ -175,8 +175,8 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
               >
                 <div class="d-flex align-items-center">
                   <i
-                    class="fas fa-box fa-2x text-primary me-3"
-                    style="width: 40px"
+                    class="fas fa-box fa-2x text-primary"
+                    style="width: 40px; margin-right: 16px !important;"
                   ></i>
                   <div>
                     <div class="fw-bold text-dark x-small-text">Catálogo</div>
@@ -195,8 +195,8 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
               >
                 <div class="d-flex align-items-center">
                   <i
-                    class="fab fa-docker fa-2x text-info me-3"
-                    style="width: 40px"
+                    class="fab fa-docker fa-2x text-info"
+                    style="width: 40px; margin-right: 16px !important;"
                   ></i>
                   <div>
                     <div class="fw-bold text-dark x-small-text">DockerHub</div>
@@ -215,8 +215,8 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
               >
                 <div class="d-flex align-items-center">
                   <i
-                    class="fas fa-code fa-2x text-success me-3"
-                    style="width: 40px"
+                    class="fas fa-code fa-2x text-success"
+                    style="width: 40px; margin-right: 16px !important;"
                   ></i>
                   <div>
                     <div class="fw-bold text-dark x-small-text">Custom</div>
@@ -237,7 +237,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
               <div class="row">
                 <div class="col-md-7">
                   <h5 class="fw-bold mb-3">
-                    <i class="fas fa-info-circle text-primary me-2"></i>Reglas
+                    <i class="fas fa-info-circle text-primary" style="margin-right: 8px !important;"></i>Reglas
                     de Despliegue
                   </h5>
                   <p class="text-muted">
@@ -328,7 +328,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
                   <div class="d-flex flex-wrap gap-2">
                     {% for img in images %}
                     <span class="badge bg-white border text-dark p-2 shadow-sm">
-                      <i class="fas fa-check-circle text-success me-1"></i>{{ img.name }}:{{ img.tag }}
+                      <i class="fas fa-check-circle text-success" style="margin-right: 4px !important;"></i>{{ img.name }}:{{ img.tag }}
                     </span>
                     {% empty %}
                     <p class="small text-muted">
@@ -378,7 +378,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
             {# --- TAB DOCKERHUB --- #}
             <div class="tab-pane fade" id="dockerhub" role="tabpanel">
               <h5 class="fw-bold mb-3">
-                <i class="fas fa-cloud-upload-alt text-primary me-2"></i
+                <i class="fas fa-cloud-upload-alt text-primary" style="margin-right: 8px !important;"></i
                 >Despliegue de Imágenes Externas
               </h5>
               <p class="text-muted">
@@ -474,7 +474,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
                       style="border-left: 4px solid #0dcaf0 !important"
                     >
                       <h6 class="fw-bold mb-1">
-                        <i class="fas fa-lightbulb me-2"></i>¿Es necesario
+                        <i class="fas fa-lightbulb" style="margin-right: 8px !important;"></i>¿Es necesario
                         environment?
                       </h6>
                       <p class="mb-0 text-dark opacity-75">
@@ -487,7 +487,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
                       style="border-left: 4px solid #ffc107 !important"
                     >
                       <h6 class="fw-bold mb-1">
-                        <i class="fas fa-exclamation-triangle me-2"></i>Tip de
+                        <i class="fas fa-exclamation-triangle" style="margin-right: 8px !important;"></i>Tip de
                         Puerto
                       </h6>
                       <p class="mb-0 text-dark opacity-75">
@@ -506,7 +506,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
                   data-bs-target="#dh-basic"
                   type="button"
                 >
-                  <i class="fab fa-docker me-2"></i>1. Web (Frontend)
+                  <i class="fab fa-docker" style="margin-right: 8px !important;"></i>1. Web (Frontend)
                 </button>
                 <button
                   class="nav-link me-2"
@@ -514,7 +514,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
                   data-bs-target="#dh-api"
                   type="button"
                 >
-                  <i class="fas fa-server me-2"></i>2. API (Backend)
+                  <i class="fas fa-server" style="margin-right: 8px !important;"></i>2. API (Backend)
                 </button>
                 <button
                   class="nav-link me-2"
@@ -522,7 +522,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
                   data-bs-target="#dh-db"
                   type="button"
                 >
-                  <i class="fas fa-database me-2"></i>3. Base de Datos
+                  <i class="fas fa-database" style="margin-right: 8px !important;"></i>3. Base de Datos
                 </button>
                 <button
                   class="nav-link"
@@ -530,7 +530,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
                   data-bs-target="#dh-env"
                   type="button"
                 >
-                  <i class="fas fa-list-ul me-2"></i>4. Con Variables (Env)
+                  <i class="fas fa-list-ul" style="margin-right: 8px !important;"></i>4. Con Variables (Env)
                 </button>
               </div>
 
@@ -762,7 +762,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
             {# --- TAB CUSTOM --- #}
             <div class="tab-pane fade" id="custom" role="tabpanel">
               <h5 class="fw-bold mb-3">
-                <i class="fas fa-tools text-primary me-2"></i>Modo Personalizado
+                <i class="fas fa-tools text-primary" style="margin-right: 8px !important;"></i>Modo Personalizado
                 (Custom Build)
               </h5>
               <p class="text-muted">
@@ -773,7 +773,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
                 <div class="col-md-7">
                   <div class="card border-0 bg-light p-3 h-100 shadow-sm">
                     <h6 class="fw-bold small mb-2 text-uppercase text-primary">
-                      <i class="fas fa-folder-open me-2"></i>Requisitos del
+                      <i class="fas fa-folder-open" style="margin-right: 8px !important;"></i>Requisitos del
                       Proyecto:
                     </h6>
                     <p class="small mb-3 text-muted">
@@ -865,7 +865,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
                           </tr>
                           <tr class="table-info" style="font-size: 0.8rem">
                             <td colspan="2">
-                              <i class="fas fa-link me-1"></i>
+                              <i class="fas fa-link" style="margin-right: 6px !important;"></i>
                               Enviar <strong>dockerfile</strong> O
                               <strong>compose</strong>
                             </td>
@@ -887,7 +887,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
                   >
                     <div style="font-size: 0.82rem">
                       <h6 class="fw-bold mb-2" style="font-size: 0.9rem">
-                        <i class="fas fa-magic me-2"></i>Detección Automática
+                        <i class="fas fa-magic" style="margin-right: 8px !important;"></i>Detección Automática
                       </h6>
                       <p class="mb-2 text-dark opacity-75">
                         El sistema prioriza los archivos encontrados:
@@ -921,7 +921,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
                   data-bs-target="#tab-df"
                   type="button"
                 >
-                  <i class="fas fa-file-code me-2"></i>1. Caso Dockerfile
+                  <i class="fas fa-file-code" style="margin-right: 8px !important;"></i>1. Caso Dockerfile
                 </button>
                 <button
                   class="nav-link"
@@ -929,7 +929,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
                   data-bs-target="#tab-compose"
                   type="button"
                 >
-                  <i class="fas fa-layer-group me-2"></i>2. Caso Compose
+                  <i class="fas fa-layer-group" style="margin-right: 8px !important;"></i>2. Caso Compose
                 </button>
               </div>
 
@@ -1063,7 +1063,7 @@ API/Terminal | PaaSify{% endblock %} {% block extrahead %}
                 <div
                   class="alert alert-warning border-0 shadow-sm d-flex align-items-center mb-4"
                 >
-                  <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                  <i class="fas fa-exclamation-triangle fa-2x" style="margin-right: 16px !important;"></i>
                   <div>
                     <h6 class="fw-bold mb-1">Nota importante sobre Edición</h6>
                     Al modificar un servicio por API, PaaSify
