@@ -28,7 +28,7 @@
               </td>
               <td>
                 <div class="d-flex align-items-center mb-1">
-                  <div style="width: 28px;" class="text-center me-3">
+                  <div style="width: 28px; margin-right: 16px !important;" class="text-center">
                     <i class="fas fa-box text-muted fs-5"></i>
                   </div>
                   <div class="small text-truncate" style="max-width: 250px;" title="{{ c.image }}">
@@ -49,7 +49,7 @@
                   
                   {% for p in c.assigned_ports %}
                   <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 font-monospace x-small" title="Mapeo Externo">
-                    <i class="fas fa-link me-1"></i>{{ p.external }}
+                    <i class="fas fa-link" style="margin-right: 4px !important;"></i>{{ p.external }}
                   </span>
                   {% endfor %}
                 </div>
@@ -89,7 +89,7 @@
     
     <div class="card-footer bg-light bg-opacity-50 py-3 px-4 border-top-0">
       <div class="d-flex align-items-start">
-        <i class="fas fa-info-circle text-primary mt-1 me-3"></i>
+        <i class="fas fa-info-circle text-primary mt-1" style="margin-right: 16px !important;"></i>
         <p class="mb-0 x-small text-muted" style="line-height: 1.5">
           <strong>Nota sobre puertos:</strong> Los puertos externos para servicios Compose se gestionan automáticamente. 
           Aquí puedes definir qué contenedores son accesibles vía web. Para cambiar los puertos internos, modifica el archivo 

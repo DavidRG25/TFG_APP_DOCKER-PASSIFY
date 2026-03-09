@@ -199,11 +199,11 @@
       <li class="breadcrumb-item">
         {% if user.is_staff or "/professor/" in return_url %}
           <a href="{% url 'professor_dashboard' %}" class="text-decoration-none text-muted">
-            <i class="fas fa-home me-1"></i>Inicio
+            <i class="fas fa-home" style="margin-right: 8px !important;"></i>Inicio
           </a>
         {% else %}
           <a href="{% url 'containers:student_panel' %}" class="text-decoration-none text-muted">
-            <i class="fas fa-home me-1"></i>Inicio
+            <i class="fas fa-home" style="margin-right: 8px !important;"></i>Inicio
           </a>
         {% endif %}
       </li>

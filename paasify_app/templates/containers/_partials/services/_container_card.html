@@ -4,23 +4,23 @@
         <div class="d-flex align-items-center">
             {# Icono según tipo #}
             {% if container.container_type == 'database' %}
-            <i class="fas fa-database text-primary me-2" title="Base de Datos"></i>
+            <i class="fas fa-database text-primary" style="margin-right: 8px !important;" title="Base de Datos"></i>
             {% elif container.container_type == 'api' %}
-            <i class="fas fa-microchip text-warning me-2" title="API / Backend"></i>
+            <i class="fas fa-microchip text-warning" style="margin-right: 8px !important;" title="API / Backend"></i>
             {% elif container.container_type == 'web' %}
-            <i class="fas fa-globe text-info me-2" title="Web / Frontend"></i>
+            <i class="fas fa-globe text-info" style="margin-right: 8px !important;" title="Web / Frontend"></i>
             {% elif 'redis' in container.name|lower or 'cache' in container.name|lower %}
-            <i class="fas fa-memory text-danger me-2" title="Cache"></i>
+            <i class="fas fa-memory text-danger" style="margin-right: 8px !important;" title="Cache"></i>
             {% elif 'postgres' in container.name|lower or 'mysql' in container.name|lower or 'mariadb' in container.name|lower or 'db' in container.name|lower %}
-            <i class="fas fa-database text-primary me-2" title="Base de Datos"></i>
+            <i class="fas fa-database text-primary" style="margin-right: 8px !important;" title="Base de Datos"></i>
             {% elif 'api' in container.name|lower or 'backend' in container.name|lower %}
-            <i class="fas fa-server text-warning me-2" title="API / Backend"></i>
+            <i class="fas fa-server text-warning" style="margin-right: 8px !important;" title="API / Backend"></i>
             {% elif 'gateway' in container.name|lower or 'nginx' in container.name|lower or 'web' in container.name|lower %}
-            <i class="fas fa-network-wired text-info me-2" title="Gateway / Web"></i>
+            <i class="fas fa-network-wired text-info" style="margin-right: 8px !important;" title="Gateway / Web"></i>
             {% elif 'worker' in container.name|lower or 'celery' in container.name|lower %}
-            <i class="fas fa-cogs text-secondary me-2" title="Worker"></i>
+            <i class="fas fa-cogs text-secondary" style="margin-right: 8px !important;" title="Worker"></i>
             {% else %}
-            <i class="fas fa-cube text-muted me-2"></i>
+            <i class="fas fa-cube text-muted" style="margin-right: 8px !important;"></i>
             {% endif %}
             <strong class="text-dark">{{ container.name }}</strong>
         </div>
@@ -34,24 +34,24 @@
                 <span class="animate-ping position-absolute w-100 h-100 rounded-circle opacity-75" style="background: #6ee7b7; animation: ping 1.5s cubic-bezier(0,0,0.2,1) infinite;"></span>
                 <span class="position-relative d-inline-block w-100 h-100 rounded-circle" style="background: white;"></span>
             </span>
-            <span class="fw-bold text-uppercase" style="font-size: 0.62rem; letter-spacing: 0.3px;">Ejecutando</span>
+            <span class="fw-bold text-uppercase" style="margin-left: 6px !important; font-size: 0.62rem; letter-spacing: 0.3px;">Ejecutando</span>
         </div>
         {% elif container.status == 'stopped' %}
         <div class="d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill"
              style="background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0;">
             <span class="d-inline-block rounded-circle" style="width: 6px; height: 6px; background: #94a3b8;"></span>
-            <span class="fw-bold text-uppercase" style="font-size: 0.62rem; letter-spacing: 0.3px;">Detenido</span>
+            <span class="fw-bold text-uppercase" style="margin-left: 6px !important; font-size: 0.62rem; letter-spacing: 0.3px;">Detenido</span>
         </div>
         {% elif container.status == 'error' %}
         <div class="d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill shadow-sm"
              style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white;">
             <i class="fas fa-exclamation-triangle" style="font-size: 0.6rem;"></i>
-            <span class="fw-bold text-uppercase" style="font-size: 0.62rem; letter-spacing: 0.3px;">Error</span>
+            <span class="fw-bold text-uppercase" style="margin-left: 6px !important; font-size: 0.62rem; letter-spacing: 0.3px;">Error</span>
         </div>
         {% else %}
         <div class="d-inline-flex align-items-center gap-1 px-2 py-1 rounded-pill"
              style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a;">
-            <span class="fw-bold text-uppercase" style="font-size: 0.62rem; letter-spacing: 0.3px;">{{ container.status|default:'Desconocido' }}</span>
+            <span class="fw-bold text-uppercase" style="margin-left: 6px !important; font-size: 0.62rem; letter-spacing: 0.3px;">{{ container.status|default:'Desconocido' }}</span>
         </div>
         {% endif %}
     </div>

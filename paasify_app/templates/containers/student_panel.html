@@ -15,7 +15,7 @@
     <ol class="breadcrumb mb-0">
       <li class="breadcrumb-item">
         <a href="{% url 'containers:student_panel' %}" class="text-decoration-none text-muted">
-          <i class="fas fa-home me-1"></i>Inicio
+          <i class="fas fa-home" style="margin-right: 8px !important;"></i>Inicio
         </a>
       </li>
       {% if current_subject %}
@@ -61,7 +61,7 @@
             </h1>
             <div class="d-flex align-items-center mt-2">
               <p class="text-white-50 mb-0 opacity-90 fw-semibold fs-5 d-flex align-items-center">
-                <i class="fas fa-user-tie me-2"></i>Prof. {{ current_subject.teacher_user.get_full_name|default:current_subject.teacher_user.username }}
+                <i class="fas fa-user-tie" style="margin-right: 8px !important;"></i>Prof. {{ current_subject.teacher_user.get_full_name|default:current_subject.teacher_user.username }}
                 <span class="mx-4 opacity-25" style="border-left: 2px solid white; height: 20px; display: inline-block;"></span>
                 <span class="badge bg-white shadow-sm fw-bold px-3 py-2" 
                       style="font-size: 0.75rem; border-radius: 6px; color: var(--subject-primary, #4e73df);">
@@ -195,8 +195,8 @@
   <div id="subject-filter-card" class="project-filter-card shadow-sm mb-4 bg-white overflow-hidden" style="border-radius: 16px;">
     <div class="px-4 py-3 row align-items-center bg-white g-3">
       <div class="col-md-4 d-flex align-items-center">
-        <div class="rounded-circle d-flex align-items-center justify-content-center me-4 shadow-sm" 
-             style="width: 48px; height: 48px; background: white; color: var(--subject-primary, #4e73df); border: 1.5px solid #edf2f7;">
+        <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm" 
+             style="width: 48px; height: 48px; background: white; color: var(--subject-primary, #4e73df); border: 1.5px solid #edf2f7; margin-right: 16px !important;">
           <i class="fas fa-project-diagram fa-lg"></i>
         </div>
         <div>

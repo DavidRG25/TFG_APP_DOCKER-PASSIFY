@@ -12,8 +12,8 @@
 
 - [x] **Texto y emoticonos separados**: Revisar todos los paneles para asegurar que los emoticonos y los textos no están unidos sin espacios, asegurando una estética limpia.
 - [x] **Mejoras Modal Asignatura (Nueva/Editar)**: Implementar previsualización de logo, botón para limpiar logo, reinicio del formulario al cerrar y validación estricta del nombre del archivo (< 90 caracteres).
-- [ ] **Renombrar panel**: Cambiar el nombre del panel superior/lateral de "Proyectos" a "Mis Servicios".
-- [ ] **Panel de personalización más pequeño**: Ajustar el tamaño del panel de diseño/personalización para que no ocupe demasiado espacio en pantalla.
+- [x] **Renombrar panel**: Cambiar el nombre del panel superior/lateral de "Proyectos" a "Mis Servicios".
+- [x] **Panel de personalización más pequeño**: Ajustar el tamaño del panel de diseño/personalización para que no ocupe demasiado espacio en pantalla.
 - [ ] **Panel "No estás matriculado" visual**: Mejorar el diseño del panel vacío que se muestra cuando un alumno no tiene asignaturas, haciéndolo más amigable/visual y validando correctamente el estado de su sesión.
 - [ ] **Visualización de proyectos vacíos**: Permitir que los profesores/alumnos puedan ver y entrar en proyectos que todavía no tienen servicios asociados.
 - [x] **Cerrar botón cerrar sesión**: Arreglar/Ajustar el comportamiento o estilo del botón de cerrar sesión.
@@ -23,7 +23,7 @@
 - [ ] **Carga masiva por Excel**: Implementar/afinar la importación de datos.
 - [ ] **Creación de alumnos por Excel**: Cargar una lista de alumnos a partir de un archivo Excel.
 - [ ] **Generación de proyectos desde Excel**: A partir de la carga de alumnos, auto-generar sus proyectos/espacios de trabajo automáticamente.
-- [ ] **Selección múltiple de alumnos**: Permitir que al vincular alumnos existentes a un proyecto/asignatura se puedan seleccionar múltiples a la vez en lugar de uno por uno.
+- [x] **Selección múltiple de alumnos**: Permitir que al vincular alumnos existentes a un proyecto/asignatura se puedan seleccionar múltiples a la vez en lugar de uno por uno.
 
 ### APIs y Documentación
 
@@ -38,8 +38,8 @@
 ### Bugs / Fixes detectados
 
 - [ ] **Bug ZIP Docker Compose**: Resolver problema de validación frontend donde el formulario exige falsamente subir un archivo ZIP al desplegar una configuración `docker-compose.yml`.
-- [ ] **Admin de profesores**: Resolver el bug en el panel de administrador donde los "Perfiles de profesores" no están cargando correctamente los usuarios asociados.
-- [ ] **Despliegue README hardcodeado**: Revisar `deploy/README.md` (o la conf real) porque actualmente figura un `server_name` quemado ("a cañón") con una URL específica en lugar de una variable.
+- [x] **Admin de profesores**: Resolver el bug en el panel de administrador donde los "Perfiles de profesores" no están cargando correctamente los usuarios asociados.
+- [x] **Despliegue README hardcodeado**: Revisar `deploy/README.md` (o la conf real) porque actualmente figura un `server_name` quemado ("a cañón") con una URL específica en lugar de una variable.
 
 ### CI / CD
 

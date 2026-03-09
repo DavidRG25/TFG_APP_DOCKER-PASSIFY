@@ -16,7 +16,7 @@
     <ol class="breadcrumb mb-0">
       <li class="breadcrumb-item">
         <a href="{% url 'containers:student_panel' %}" class="text-decoration-none text-muted">
-          <i class="fas fa-home me-1"></i>Inicio
+          <i class="fas fa-home" style="margin-right: 8px !important;"></i>Inicio
         </a>
       </li>
       {% if current_subject %}
@@ -97,20 +97,20 @@
                   {% if service.mode == 'dockerhub' %}
                   <div class="col-12 mt-4 mb-0">
                     <label class="form-label fw-bold d-block mb-2 text-dark">
-                      <i class="fab fa-docker me-2 text-primary"></i>Imagen desde DockerHub (pública)
+                      <i class="fab fa-docker text-primary" style="margin-right: 8px !important;"></i>Imagen desde DockerHub (pública)
                     </label>
                     <div class="input-group">
                       <input type="text" name="image" id="service-dockerhub" class="form-control form-control-lg bg-light" value="{{ service.image }}" placeholder="nginx:latest o usuario/imagen:tag" style="border: 2px solid #dee2e6; font-family: monospace" required>
                       <button type="button" class="btn btn-outline-primary" id="verify-dockerhub-btn" onclick="verifyDockerHubImage()">
-                        <i class="fas fa-check-circle me-1" style="margin-right: 0.3rem"></i> Verificiar
+                        <i class="fas fa-check-circle" style="margin-right: 8px !important;"></i> Verificiar
                       </button>
                       <button type="button" class="btn btn-outline-danger" onclick="clearDockerHubField()">
-                        <i class="fas fa-times me-1" style="margin-right: 0.3rem"></i> Limpiar
+                        <i class="fas fa-times" style="margin-right: 8px !important;"></i> Limpiar
                       </button>
                     </div>
                     <div id="dockerhub-feedback" class="mt-2" style="display: none"></div>
                     <div class="alert alert-warning mt-3 mb-0" style="border-left: 4px solid #ffc107">
-                      <i class="fas fa-exclamation-triangle me-2"></i>
+                      <i class="fas fa-exclamation-triangle" style="margin-right: 8px !important;"></i>
                       <strong>Limitacion:</strong> Actualmente solo se pueden usar imagenes <strong>publicas</strong> de DockerHub. Las imagenes privadas requieren autenticacion y no estan soportadas en esta version.
                     </div>
                   </div>
@@ -135,7 +135,7 @@
                           </div>
                         </div>
                         <div id="volumes_warning" class="alert alert-danger mt-3 mb-0 border-0 d-none">
-                          <i class="fas fa-exclamation-triangle me-2"></i><strong>¡Atención!</strong> Se eliminarán permanentemente los volúmenes anclados a este servicio. Se purgarán bases de datos y ficheros expuestos no resguardados en el código.
+                          <i class="fas fa-exclamation-triangle" style="margin-right: 8px !important;"></i><strong>¡Atención!</strong> Se eliminarán permanentemente los volúmenes anclados a este servicio. Se purgarán bases de datos y ficheros expuestos no resguardados en el código.
                         </div>
                       </div>
                     </div>
@@ -163,7 +163,7 @@
                       class="btn btn-lg px-5 shadow text-white fw-bold rounded-pill"
                       style="background-color: #d35400; border-color: #d35400"
                     >
-                      <i class="fas fa-sync-alt me-2"></i>Guardar y Reiniciar Servicio
+                      <i class="fas fa-sync-alt" style="margin-right: 8px !important;"></i>Guardar y Reiniciar Servicio
                     </button>
                     <div class="mt-4">
                       <a
@@ -258,7 +258,7 @@
             if (typeof updateLineNumbers === 'function') setTimeout(updateLineNumbers, 100);
           } else {
             log("API Error:", data.error);
-            codeBody.innerHTML = `<div class="alert alert-warning m-4"><i class="fas fa-exclamation-triangle me-2"></i>${data.error}</div>`;
+            codeBody.innerHTML = `<div class="alert alert-warning m-4"><i class="fas fa-exclamation-triangle" style="margin-right: 8px !important;"></i>${data.error}</div>`;
           }
         })
         .catch(err => {
@@ -312,7 +312,7 @@
       let portsHtml = '';
       if (c.ports && c.ports.length > 0) {
         portsHtml = c.ports.map(p => 
-          `<span class="badge bg-secondary font-monospace me-1 x-small">${p.container}/tcp</span>`
+          `<span class="badge bg-secondary font-monospace x-small" style="margin-right: 8px !important;">${p.container}/tcp</span>`
         ).join('');
       } else {
         portsHtml = '<span class="text-muted x-small">Sin puertos</span>';
@@ -344,7 +344,7 @@
     if (data.warnings && data.warnings.length > 0) {
       html += '<div class="mt-2">';
       data.warnings.forEach(w => {
-        html += `<div class="x-small alert alert-warning py-1 px-2 mb-1"><i class="fas fa-exclamation-triangle me-1"></i>${w}</div>`;
+        html += `<div class="x-small alert alert-warning py-1 px-2 mb-1"><i class="fas fa-exclamation-triangle" style="margin-right: 4px !important;"></i>${w}</div>`;
       });
       html += '</div>';
     }
@@ -387,14 +387,14 @@
     const imageName = input.value.trim();
 
     if (!imageName) {
-      feedback.innerHTML = '<div class="alert alert-warning mb-0"><i class="fas fa-exclamation-circle me-2"></i>Por favor, ingresa un nombre de imagen</div>';
+      feedback.innerHTML = '<div class="alert alert-warning mb-0"><i class="fas fa-exclamation-circle" style="margin-right: 8px !important;"></i>Por favor, ingresa un nombre de imagen</div>';
       feedback.style.display = "block";
       return;
     }
 
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Verificando...';
-    feedback.innerHTML = '<div class="alert alert-info mb-0"><i class="fas fa-spinner fa-spin me-2"></i>Consultando DockerHub...</div>';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 4px !important;"></i> Verificando...';
+    feedback.innerHTML = '<div class="alert alert-info mb-0"><i class="fas fa-spinner fa-spin" style="margin-right: 8px !important;"></i>Consultando DockerHub...</div>';
     feedback.style.display = "block";
 
     try {
@@ -408,20 +408,20 @@
           portInfo = `<br><strong>Puerto detectado:</strong> <code>${data.exposed_port}</code>`;
         }
         feedback.innerHTML = `<div class="alert alert-success mt-2 mb-0 border-0 shadow-sm">
-                                <i class="fas fa-check-circle me-2"></i><strong>Imagen encontrada en DockerHub</strong><br>
+                                <i class="fas fa-check-circle" style="margin-right: 8px !important;"></i><strong>Imagen encontrada en DockerHub</strong><br>
                                 <small class="text-secondary mt-1 d-block">
                                   <strong>Última actualización:</strong> ${lastUpdated}<br>
                                   <strong>Tamaño:</strong> ${sizeInMB} MB ${portInfo}
                                 </small>
                               </div>`;
       } else {
-        feedback.innerHTML = `<div class="alert alert-danger mt-2 mb-0 border-0 shadow-sm"><i class="fas fa-times-circle me-2"></i><strong>${data.error}</strong></div>`;
+        feedback.innerHTML = `<div class="alert alert-danger mt-2 mb-0 border-0 shadow-sm"><i class="fas fa-times-circle" style="margin-right: 8px !important;"></i><strong>${data.error}</strong></div>`;
       }
     } catch (error) {
-      feedback.innerHTML = `<div class="alert alert-danger mt-2 mb-0 border-0 shadow-sm"><i class="fas fa-exclamation-triangle me-2"></i><strong>Error de conexión al verificar</strong></div>`;
+      feedback.innerHTML = `<div class="alert alert-danger mt-2 mb-0 border-0 shadow-sm"><i class="fas fa-exclamation-triangle" style="margin-right: 8px !important;"></i><strong>Error de conexión al verificar</strong></div>`;
     } finally {
       btn.disabled = false;
-      btn.innerHTML = '<i class="fas fa-check-circle me-1" style="margin-right: 0.3rem"></i> Verificar';
+      btn.innerHTML = '<i class="fas fa-check-circle" style="margin-right: 8px !important;"></i> Verificar';
     }
   };
 
@@ -468,10 +468,10 @@
               return;
             }
             JSON.parse(this.value);
-            if (jsonValidation) jsonValidation.innerHTML = '<small class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Válido</small>';
+            if (jsonValidation) jsonValidation.innerHTML = '<small class="text-success fw-bold"><i class="fas fa-check-circle" style="margin-right: 4px !important;"></i>Válido</small>';
             this.classList.replace("is-invalid", "is-valid");
           } catch (e) {
-            if (jsonValidation) jsonValidation.innerHTML = '<small class="text-danger fw-bold"><i class="fas fa-times-circle me-1"></i>Inválido</small>';
+            if (jsonValidation) jsonValidation.innerHTML = '<small class="text-danger fw-bold"><i class="fas fa-times-circle" style="margin-right: 4px !important;"></i>Inválido</small>';
             this.classList.replace("is-valid", "is-invalid");
           }
         });
@@ -514,7 +514,7 @@
         verifyPortBtn.addEventListener("click", function() {
           const port = customPortInput.value;
           if (!port) return;
-          if (portStatus) portStatus.innerHTML = '<small class="text-info"><i class="fas fa-sync fa-spin me-1"></i>...</small>';
+          if (portStatus) portStatus.innerHTML = '<small class="text-info"><i class="fas fa-sync fa-spin" style="margin-right: 4px !important;"></i>...</small>';
           
           fetch(`/paasify/containers/check-port/?port=${port}`)
             .then(r => r.json())
@@ -708,7 +708,7 @@
           const submitBtn = document.getElementById("submitBtn");
           if (submitBtn) {
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Procesando...';
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 8px !important;"></i>Procesando...';
           }
         });
       }

@@ -12,7 +12,7 @@
     <ol class="breadcrumb mb-0">
       <li class="breadcrumb-item">
         <a href="{% url 'containers:student_panel' %}" class="text-decoration-none text-muted">
-          <i class="fas fa-home me-1"></i>Inicio
+          <i class="fas fa-home" style="margin-right: 8px !important;"></i>Inicio
         </a>
       </li>
       {% if current_subject %}
@@ -100,7 +100,7 @@
             {# Seccion 1: Informacion Basica #}
             <div class="mb-4">
               <h5 class="fw-bold text-primary mb-3">
-                <i class="fas fa-info-circle me-2" style="margin-right: 0.5rem; color: #4e73df;"></i>Informacion Basica
+                <i class="fas fa-info-circle" style="margin-right: 0.5rem; color: #4e73df;"></i>Informacion Basica
               </h5>
 
               {# Nombre del servicio #}
@@ -117,7 +117,7 @@
               {# Asignatura #} {% if not current_subject %}
               <div class="mb-3">
                 <label for="service-subject" class="form-label fw-semibold d-block mb-2">
-                  <i class="fas fa-book me-2" style="margin-right: 0.5rem; color: #4e73df;"></i>Asignatura
+                  <i class="fas fa-book" style="margin-right: 0.5rem; color: #4e73df;"></i>Asignatura
                   <span class="text-danger">*</span>
                 </label>
                 {% if available_subjects %}
@@ -136,14 +136,14 @@
                 </select>
                 {% else %}
                 <div class="alert alert-warning mb-0">
-                  <i class="fas fa-exclamation-triangle me-2"></i>No tienes asignaturas disponibles todavia.
+                  <i class="fas fa-exclamation-triangle" style="margin-right: 8px !important;"></i>No tienes asignaturas disponibles todavia.
                 </div>
                 {% endif %}
               </div>
               {% endif %} {# Proyecto #}
               <div class="mb-3">
                 <label for="service-project" class="form-label fw-semibold d-block mb-2">
-                  <i class="fas fa-folder me-2" style="margin-right: 0.5rem; color: #f6c23e;"></i>Proyecto
+                  <i class="fas fa-folder" style="margin-right: 0.5rem; color: #f6c23e;"></i>Proyecto
                   <span class="text-danger">*</span>
                 </label>
                 {% if user_projects %}
@@ -164,7 +164,7 @@
                 </select>
                 {% else %}
                 <div class="alert alert-warning mb-0">
-                  <i class="fas fa-exclamation-triangle me-2"></i>No tienes proyectos asignados. Pide a tu profesor que
+                  <i class="fas fa-exclamation-triangle" style="margin-right: 8px !important;"></i>No tienes proyectos asignados. Pide a tu profesor que
                   te asigne uno.
                 </div>
                 {% endif %}
@@ -174,7 +174,7 @@
             {# Seccion 2: Tipo de Despliegue #}
             <div class="mb-4">
               <h5 class="fw-bold text-primary mb-3">
-                <i class="fas fa-cogs me-2" style="margin-right: 0.5rem"></i>Tipo de Despliegue
+                <i class="fas fa-cogs" style="margin-right: 8px !important;"></i>Tipo de Despliegue
               </h5>
 
               <div class="row g-3">
@@ -185,7 +185,7 @@
                       checked />
                     <label class="form-check-label w-100 m-0" for="mode_default" style="cursor: pointer">
                       <div class="d-flex align-items-center">
-                        <i class="fas fa-box fa-2x text-primary me-3" style="margin-right: 1rem"></i>
+                        <i class="fas fa-box fa-2x text-primary" style="margin-right: 16px !important;"></i>
                         <div>
                           <div class="fw-bold">Imagen por defecto</div>
                           <small class="text-muted">Usa una imagen del catalogo</small>
@@ -201,7 +201,7 @@
                       value="dockerhub" />
                     <label class="form-check-label w-100 m-0" for="mode_dockerhub" style="cursor: pointer">
                       <div class="d-flex align-items-center">
-                        <i class="fab fa-docker fa-2x text-info me-3" style="margin-right: 1rem"></i>
+                        <i class="fab fa-docker fa-2x text-info" style="margin-right: 16px !important;"></i>
                         <div>
                           <div class="fw-bold">Imagen desde DockerHub</div>
                           <small class="text-muted">Usa una imagen publica de DockerHub</small>
@@ -216,7 +216,7 @@
                     <input class="form-check-input d-none" type="radio" name="mode" id="mode_custom" value="custom" />
                     <label class="form-check-label w-100 m-0" for="mode_custom" style="cursor: pointer">
                       <div class="d-flex align-items-center">
-                        <i class="fas fa-code fa-2x text-success me-3" style="margin-right: 1rem"></i>
+                        <i class="fas fa-code fa-2x text-success" style="margin-right: 16px !important;"></i>
                         <div>
                           <div class="fw-bold">Configuracion personalizada</div>
                           <small class="text-muted">Dockerfile o docker-compose</small>
@@ -231,7 +231,7 @@
             {# Seccion 3: Configuracion (depende del modo) #}
             <div class="mb-4">
               <h5 class="fw-bold text-primary mb-3">
-                <i class="fas fa-sliders-h me-2" style="margin-right: 0.5rem"></i>Configuracion
+                <i class="fas fa-sliders-h" style="margin-right: 8px !important;"></i>Configuracion
               </h5>
               {# Imagen (solo modo default) #}
               <div class="mb-3" id="block-default-image">
@@ -256,7 +256,7 @@
                   {% endfor %}
                 </select>
                 <small class="text-muted d-block mt-2">
-                  <i class="fas fa-check-double text-success me-1"></i>Seleccionada una imagen oficial verificada por PaaSify.
+                  <i class="fas fa-check-double text-success" style="margin-right: 8px !important;"></i>Seleccionada una imagen oficial verificada por PaaSify.
                 </small>
               </div>
 
@@ -264,7 +264,7 @@
               {# Imagen desde DockerHub (solo modo dockerhub) #}
               <div class="mb-4" id="block-dockerhub-mode" style="display: none">
                 <label for="service-dockerhub" class="form-label fw-semibold d-block mb-2">
-                  <i class="fab fa-docker me-2" style="margin-right: 0.5rem"></i>Imagen desde DockerHub (publica)
+                  <i class="fab fa-docker" style="margin-right: 8px !important;"></i>Imagen desde DockerHub (publica)
                   <span class="text-danger">*</span>
                 </label>
                 <div class="input-group">
@@ -273,17 +273,17 @@
                     style="border: 2px solid #dee2e6; font-family: monospace" required />
                   <button type="button" class="btn btn-outline-primary" id="verify-dockerhub-btn"
                     onclick="verifyDockerHubImage()">
-                    <i class="fas fa-check-circle me-1" style="margin-right: 0.3rem"></i>
+                    <i class="fas fa-check-circle" style="margin-right: 8px !important;"></i>
                     Verificar
                   </button>
                   <button type="button" class="btn btn-outline-danger" onclick="clearDockerHubField()">
-                    <i class="fas fa-times me-1" style="margin-right: 0.3rem"></i>
+                    <i class="fas fa-times" style="margin-right: 8px !important;"></i>
                     Limpiar
                   </button>
                 </div>
                 <div id="dockerhub-feedback" class="mt-2" style="display: none"></div>
                 <div class="alert alert-warning mt-2 mb-0" style="border-left: 4px solid #ffc107">
-                  <i class="fas fa-exclamation-triangle me-2"></i>
+                  <i class="fas fa-exclamation-triangle" style="margin-right: 8px !important;"></i>
                   <strong>Limitacion:</strong> Actualmente solo se pueden usar imagenes <strong>publicas</strong> de
                   DockerHub. Las imagenes privadas requieren autenticacion y no estan soportadas en esta version.
                 </div>
@@ -298,7 +298,7 @@
                 <div class="card border-0 bg-light shadow-sm">
                   <div class="card-body p-3">
                     <label class="form-label fw-bold d-block mb-3 text-primary">
-                      <i class="fas fa-project-diagram me-2"></i>¿Qué vas a desplegar?
+                      <i class="fas fa-project-diagram" style="margin-right: 8px !important;"></i>¿Qué vas a desplegar?
                     </label>
                     <div class="row g-3">
                       <div class="col-md-6">
@@ -336,7 +336,7 @@
                   <div class="card-body p-3">
                     <div class="d-flex align-items-center mb-3">
                       <h6 class="fw-bold mb-0 text-dark">
-                        <i class="fas fa-network-wired me-2 text-primary"></i>Configuración de Puertos
+                        <i class="fas fa-network-wired text-primary" style="margin-right: 8px !important;"></i>Configuración de Puertos
                       </h6>
                       <span class="badge bg-light text-primary border ms-2">Recomendado</span>
                     </div>
@@ -358,7 +358,7 @@
                       <div class="alert alert-info mt-2 mb-0 py-2 border-0 shadow-sm"
                         style="border-left: 4px solid #0dcaf0 !important;">
                         <div class="d-flex align-items-center">
-                          <i class="fas fa-info-circle me-2 text-info"></i>
+                          <i class="fas fa-info-circle text-info" style="margin-right: 8px !important;"></i>
                           <small>
                             Por defecto se usara el <strong>80</strong> si se deja vacio.
                           </small>
@@ -376,10 +376,10 @@
                           max="50000" placeholder="Ej: 49123" />
                         <button type="button" class="btn btn-outline-primary" id="check-port-btn"
                           onclick="checkPortAvailability()">
-                          <i class="fas fa-search me-1"></i> Verificar
+                          <i class="fas fa-search" style="margin-right: 8px !important;"></i> Verificar
                         </button>
                         <button type="button" class="btn btn-outline-danger" onclick="clearCustomPort()">
-                          <i class="fas fa-times me-1"></i> Limpiar
+                          <i class="fas fa-times" style="margin-right: 8px !important;"></i> Limpiar
                         </button>
                       </div>
                       <small class="text-muted x-small">Rango: 40000 - 50000. Si se omite, se asigna uno libre.</small>
@@ -392,7 +392,7 @@
               {# Dockerfile (solo modo custom + subtipo dockerfile) #}
               <div class="mb-4 custom-block" id="block-dockerfile" style="display: none">
                 <label for="service-dockerfile" class="form-label fw-semibold d-block mb-2">
-                  <i class="fas fa-file-code me-2" style="margin-right: 0.5rem"></i>Dockerfile (opcional, exclusivo con
+                  <i class="fas fa-file-code" style="margin-right: 8px !important;"></i>Dockerfile (opcional, exclusivo con
                   compose y DockerHub)
                 </label>
                 <div class="card border-2" style="border-color: #dee2e6 !important">
@@ -401,11 +401,11 @@
                       <input type="file" class="form-control form-control-lg" id="service-dockerfile" name="dockerfile"
                         accept="*/*" style="border: 2px solid #dee2e6" />
                       <button type="button" class="btn btn-outline-danger" onclick="clearFile('dockerfile')">
-                        <i class="fas fa-times me-1" style="margin-right: 0.3rem"></i>Limpiar
+                        <i class="fas fa-times" style="margin-right: 8px !important;"></i>Limpiar
                       </button>
                     </div>
                     <small class="text-muted d-block mt-2">
-                      <i class="fas fa-info-circle me-1"></i>
+                      <i class="fas fa-info-circle" style="margin-right: 8px !important;"></i>
                       Sube un Dockerfile personalizado para construir tu imagen
                     </small>
                   </div>
@@ -415,7 +415,7 @@
               {# Docker Compose (solo modo custom) #}
               <div class="mb-4 custom-block" id="block-compose" style="display: none">
                 <label for="service-compose" class="form-label fw-semibold d-block mb-2">
-                  <i class="fas fa-layer-group me-2" style="margin-right: 0.5rem"></i>docker-compose.yml (opcional,
+                  <i class="fas fa-layer-group" style="margin-right: 8px !important;"></i>docker-compose.yml (opcional,
                   exclusivo con Dockerfile y DockerHub)
                 </label>
                 <div class="card border-2" style="border-color: #dee2e6 !important">
@@ -424,11 +424,11 @@
                       <input type="file" class="form-control form-control-lg" id="service-compose" name="compose"
                         accept=".yml,.yaml" style="border: 2px solid #dee2e6" />
                       <button type="button" class="btn btn-outline-danger" onclick="clearFile('compose')">
-                        <i class="fas fa-times me-1" style="margin-right: 0.3rem"></i>Limpiar
+                        <i class="fas fa-times" style="margin-right: 8px !important;"></i>Limpiar
                       </button>
                     </div>
                     <small class="text-muted d-block mt-2">
-                      <i class="fas fa-info-circle me-1"></i>
+                      <i class="fas fa-info-circle" style="margin-right: 8px !important;"></i>
                       Sube un archivo docker-compose.yml para servicios multi-contenedor
                     </small>
                   </div>
@@ -438,7 +438,7 @@
               {# Codigo fuente (solo modo custom) #}
               <div class="mb-4 custom-block" id="block-code" style="display: none">
                 <label for="service-code" class="form-label fw-semibold d-block mb-2">
-                  <i class="fas fa-file-archive me-2" style="margin-right: 0.5rem"></i>Codigo fuente (.zip)
+                  <i class="fas fa-file-archive" style="margin-right: 8px !important;"></i>Codigo fuente (.zip)
                   <span class="badge bg-secondary ms-2" id="code-requirement-badge">Requerido con Dockerfile</span>
                 </label>
                 <div class="card border-2" style="border-color: #dee2e6 !important">
@@ -447,13 +447,13 @@
                       <input type="file" class="form-control form-control-lg" id="service-code" name="code"
                         accept=".zip,.rar" style="border: 2px solid #dee2e6" />
                       <button type="button" class="btn btn-outline-danger" onclick="clearFile('code')">
-                        <i class="fas fa-times me-1" style="margin-right: 0.3rem"></i>Limpiar
+                        <i class="fas fa-times" style="margin-right: 8px !important;"></i>Limpiar
                       </button>
                     </div>
                       <div class="alert alert-info mt-2 mb-0 py-2 border-0 shadow-sm"
                         style="border-left: 4px solid #0dcaf0 !important;">
                         <div class="d-flex align-items-center">
-                          <i class="fas fa-info-circle me-2 text-info"></i>
+                          <i class="fas fa-info-circle text-info" style="margin-right: 8px !important;"></i>
                           <small id="code-help-text">
                             <strong>Obligatorio</strong> si usas Dockerfile. <strong>Opcional</strong> si
                             usas Docker Compose o imagen de DockerHub.
@@ -470,7 +470,7 @@
                   <div class="card-body p-3">
                     <div class="d-flex align-items-center justify-content-between mb-2">
                        <label class="form-label fw-bold mb-0 text-primary">
-                         <i class="fas fa-terminal me-2"></i>Variables de Entorno (JSON)
+                         <i class="fas fa-terminal" style="margin-right: 8px !important;"></i>Variables de Entorno (JSON)
                        </label>
                        <div class="custom-switch-huge">
                          <input class="form-check-input" type="checkbox" id="toggleEnvVars">
@@ -491,35 +491,35 @@
                 <div class="card border-0 bg-light shadow-sm">
                   <div class="card-body p-3">
                     <label class="form-label fw-bold d-block mb-3 text-primary">
-                      <i class="fas fa-cog me-2"></i>Personalizar Rol del Contenedor
+                      <i class="fas fa-cog" style="margin-right: 8px !important;"></i>Personalizar Rol del Contenedor
                     </label>
                     <div class="row g-3">
                       <div class="col-md-7">
                         <label class="form-label small fw-bold text-muted text-uppercase mb-2">
-                          <i class="fas fa-tag me-1 text-primary"></i>Tipo de Servicio
+                          <i class="fas fa-tag text-primary" style="margin-right: 4px !important;"></i>Tipo de Servicio
                         </label>
                         <div class="row g-2" id="container-type-selector-buttons">
                           <div class="col-6">
                             <button type="button" class="btn btn-outline-info w-100 py-2 text-start btn-type-sel active" data-type="web">
-                              <i class="fas fa-globe me-2"></i><strong>WEB</strong>
+                              <i class="fas fa-globe" style="margin-right: 8px !important;"></i><strong>WEB</strong>
                               <div class="x-small opacity-75 d-block mt-1">Frontend, Sitios estáticos</div>
                             </button>
                           </div>
                           <div class="col-6">
                             <button type="button" class="btn btn-outline-primary w-100 py-2 text-start btn-type-sel" data-type="api">
-                              <i class="fas fa-server me-2"></i><strong>API</strong>
+                              <i class="fas fa-server" style="margin-right: 8px !important;"></i><strong>API</strong>
                               <div class="x-small opacity-75 d-block mt-1">Backend, Microservicios</div>
                             </button>
                           </div>
                           <div class="col-6">
                             <button type="button" class="btn btn-outline-success w-100 py-2 text-start btn-type-sel" data-type="database">
-                              <i class="fas fa-database me-2"></i><strong>DB</strong>
+                              <i class="fas fa-database" style="margin-right: 8px !important;"></i><strong>DB</strong>
                               <div class="x-small opacity-75 d-block mt-1">Bases de datos, Almacén</div>
                             </button>
                           </div>
                           <div class="col-6">
                             <button type="button" class="btn btn-outline-secondary w-100 py-2 text-start btn-type-sel" data-type="misc">
-                              <i class="fas fa-cube me-2"></i><strong>OTRO</strong>
+                              <i class="fas fa-cube" style="margin-right: 8px !important;"></i><strong>OTRO</strong>
                               <div class="x-small opacity-75 d-block mt-1">Herramientas, Scripts</div>
                             </button>
                           </div>
@@ -529,7 +529,7 @@
                       <div class="col-md-5 ps-md-4 border-start d-flex flex-column justify-content-center">
                         <div class="p-3 rounded-3 bg-white border">
                           <label class="form-label fw-bold text-dark d-flex align-items-center mb-2">
-                            <i class="fas fa-eye me-2 text-warning"></i>Visibilidad Web
+                            <i class="fas fa-eye text-warning" style="margin-right: 8px !important;"></i>Visibilidad Web
                           </label>
                           <div class="form-check form-switch mt-1">
                             <input class="form-check-input" type="checkbox" name="is_web" id="is_web_simple" checked>
@@ -548,7 +548,7 @@
               {# Resultados del Análisis para Docker Compose #}
               <div id="block-analysis" class="mb-4" style="display: none; animation: fadeIn 0.5s;">
                 <h6 class="fw-bold text-primary mb-3">
-                  <i class="fas fa-microscope me-2"></i>Contenedores Detectados
+                  <i class="fas fa-microscope" style="margin-right: 8px !important;"></i>Contenedores Detectados
                 </h6>
                 <div class="card border-0 shadow-sm overflow-hidden">
                   <div class="table-responsive">
@@ -579,10 +579,10 @@
             {# Botones de accion #}
             <div class="d-flex gap-2 justify-content-end mt-4 pt-3 border-top">
               <a href="{{ return_url }}" class="btn btn-outline-secondary px-4">
-                <i class="fas fa-times me-2"></i>Cancelar
+                <i class="fas fa-times" style="margin-right: 8px !important;"></i>Cancelar
               </a>
               <button type="submit" id="submitBtn" class="btn btn-primary px-4 shadow-sm">
-                <i class="fas fa-rocket me-2"></i>Crear Servicio
+                <i class="fas fa-rocket" style="margin-right: 8px !important;"></i>Crear Servicio
               </button>
             </div>
           </form>
@@ -606,20 +606,20 @@
         <div class="card border-0 shadow-sm mb-4">
           <div class="card-body">
             <h5 class="fw-bold text-success mb-3">
-              <i class="fas fa-lightbulb me-2" style="margin-right: 0.5rem"></i>Consejos
+              <i class="fas fa-lightbulb" style="margin-right: 8px !important;"></i>Consejos
             </h5>
             <ul class="list-unstyled mb-0 small">
               <li class="mb-2">
-                <i class="fas fa-check-circle text-success me-2"></i>Nombres cortos y sin espacios
+                <i class="fas fa-check-circle text-success" style="margin-right: 8px !important;"></i>Nombres cortos y sin espacios
               </li>
               <li class="mb-2">
-                <i class="fas fa-check-circle text-success me-2"></i>Verifica la disponibilidad del puerto
+                <i class="fas fa-check-circle text-success" style="margin-right: 8px !important;"></i>Verifica la disponibilidad del puerto
               </li>
               <li class="mb-2">
-                <i class="fas fa-check-circle text-success me-2"></i>El ZIP debe contener el Dockerfile en la raiz
+                <i class="fas fa-check-circle text-success" style="margin-right: 8px !important;"></i>El ZIP debe contener el Dockerfile en la raiz
               </li>
               <li class="mb-2">
-                <i class="fas fa-check-circle text-success me-2"></i>Usa imagenes publicas para DockerHub
+                <i class="fas fa-check-circle text-success" style="margin-right: 8px !important;"></i>Usa imagenes publicas para DockerHub
               </li>
             </ul>
           </div>
@@ -629,7 +629,7 @@
         <div class="card border-0 shadow-sm">
           <div class="card-body">
             <h5 class="fw-bold text-info mb-3">
-              <i class="fas fa-book me-2" style="margin-right: 0.5rem"></i>Guía de Ejemplo
+              <i class="fas fa-book" style="margin-right: 8px !important;"></i>Guía de Ejemplo
             </h5>
 
             <div id="example-default" class="example-block">
@@ -774,10 +774,10 @@ document.addEventListener("DOMContentLoaded", function() {
                     return;
                 }
                 JSON.parse(this.value);
-                if (jsonValidation) jsonValidation.innerHTML = '<small class="text-success fw-bold"><i class="fas fa-check-circle me-1"></i>Válido</small>';
+                if (jsonValidation) jsonValidation.innerHTML = '<small class="text-success fw-bold"><i class="fas fa-check-circle" style="margin-right: 4px !important;"></i>Válido</small>';
                 this.classList.replace("is-invalid", "is-valid");
             } catch (e) {
-                if (jsonValidation) jsonValidation.innerHTML = '<small class="text-danger fw-bold"><i class="fas fa-times-circle me-1"></i>JSON Inválido</small>';
+                if (jsonValidation) jsonValidation.innerHTML = '<small class="text-danger fw-bold"><i class="fas fa-times-circle" style="margin-right: 4px !important;"></i>JSON Inválido</small>';
                 this.classList.replace("is-valid", "is-invalid");
             }
         });
@@ -839,7 +839,7 @@ document.addEventListener("DOMContentLoaded", function() {
             const submitBtn = document.getElementById("submitBtn");
             if (submitBtn) {
                 submitBtn.disabled = true;
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Creando...';
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 8px !important;"></i>Creando...';
             }
         });
     }
