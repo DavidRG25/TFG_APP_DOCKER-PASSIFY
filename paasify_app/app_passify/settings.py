@@ -84,6 +84,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'paasify.middleware.session_timeout.DisableSessionUpdateMiddleware',  # <— Ignorar HTMX para expirar sesión
     'paasify.middleware.TokenAuthMiddleware',  # <â€” Token JWT para API
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -230,6 +231,16 @@ REST_FRAMEWORK = {
 LOGIN_URL = '/paasify/login/'
 LOGIN_REDIRECT_URL = '/post-login/'
 LOGOUT_REDIRECT_URL = '/paasify/login/'
+
+# ---------------------------------------------------------------------
+# Configuración de Sesiones (Timeout)
+# ---------------------------------------------------------------------
+# La sesión expira en 30 minutos (1800 segundos) de inactividad
+SESSION_COOKIE_AGE = 1800
+# Desactivado de base, nosotros le diremos a Django manualmente cuándo renovarla (ignorando HTMX)
+SESSION_SAVE_EVERY_REQUEST = False
+# Expirar la cookie cuando el usuario cierre el navegador
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
 # ---------------------------------------------------------------------
 # Jazzmin (Django Admin Premium UI)
