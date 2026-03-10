@@ -32,12 +32,12 @@
 
 ### Seguridad y Sesiones
 
-- [ ] **Timeout de sesión**: Ajustar la configuración de la sesión en Django para que caduque automáticamente por inactividad.
-- [ ] **Cambio de contraseña forzado del Admin**: Al hacer login por primera vez con el superusuario (admin), el sistema debe forzar obligatoriamente el cambio de contraseña por seguridad.
+- [x] **Timeout de sesión**: Ajustar la configuración de la sesión en Django para que caduque automáticamente por inactividad.
+- [x] **Cambio de contraseña forzado del Admin**: Al hacer login por primera vez con el superusuario (admin), el sistema debe forzar obligatoriamente el cambio de contraseña por seguridad.
 
 ### Bugs / Fixes detectados
 
-- [ ] **Bug ZIP Docker Compose**: Resolver problema de validación frontend donde el formulario exige falsamente subir un archivo ZIP al desplegar una configuración `docker-compose.yml`.
+- [x] **Bug ZIP Docker Compose**: Resolver problema de validación frontend donde el formulario exige falsamente subir un archivo ZIP al desplegar una configuración `docker-compose.yml`.
 - [x] **Admin de profesores**: Resolver el bug en el panel de administrador donde los "Perfiles de profesores" no están cargando correctamente los usuarios asociados.
 - [x] **Despliegue README hardcodeado**: Revisar `deploy/README.md` (o la conf real) porque actualmente figura un `server_name` quemado ("a cañón") con una URL específica en lugar de una variable.
 

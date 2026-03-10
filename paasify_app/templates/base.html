@@ -1,4 +1,4 @@
-﻿{% load static %} {% load security_tags %}
+{% load static %} {% load security_tags %}
 
 <!doctype html>
 <html lang="es">
@@ -58,25 +58,41 @@
           },
         });
 
+        // Estilo dorado para warnings (mismas tonalidades que el modal de cambio de contraseña)
+        const isWarning = icon === "warning";
+        const bg = isWarning ? "linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%)" : "#fff";
+        const textColor = isWarning ? "#664d03" : "#2d3748";
+
         Toast.fire({
           icon: icon,
           title: title ? `<strong>${title}</strong>` : null,
           html: message,
-          background: "#fff",
-          color: "#2d3748",
+          background: bg,
+          color: textColor,
           padding: "1rem",
           borderRadius: "1rem",
           customClass: {
             popup: "shadow-lg border-0 premium-swal-toast",
+            container: 'swal2-toast-front',
+          },
+          didOpen: (toast) => {
+            // Forzar que el contenedor de SweetAlert quede por encima del modal de seguridad (z-index: 105000)
+            const container = toast.closest('.swal2-container');
+            if (container) container.style.zIndex = '999999';
+            toast.addEventListener("mouseenter", Swal.stopTimer);
+            toast.addEventListener("mouseleave", Swal.resumeTimer);
           },
         });
       }
     </script>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     <style>
-      /* Asegurar que las notificaciones de SweetAlert queden por encima de todo (incluido el header) */
+      /* Asegurar que las notificaciones de SweetAlert queden por encima de la cortina negra modal (z-index: 105000) */
+      .swal2-container.swal2-toast-front {
+        z-index: 200000 !important;
+      }
       .swal2-container {
-        z-index: 100000 !important;
+        z-index: 200000 !important;
       }
       .premium-swal-toast {
         box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15) !important;
@@ -95,7 +111,13 @@
         border-left: 5px solid #198754 !important;
       }
       .premium-toast-warning {
-        background-color: rgba(255, 250, 235, 0.95);
+        background-color: rgba(255, 243, 205, 0.98) !important;
+        border-left: 5px solid #ffc107 !important;
+        color: #664d03 !important;
+      }
+      /* Forzar estilo warning en SweetAlert2 para que sea dorado como el modal */
+      .swal2-popup.swal2-toast.premium-swal-toast[class*="warning"] {
+        background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%) !important;
         border-left: 5px solid #ffc107 !important;
       }
       .premium-toast-info {
@@ -318,10 +340,14 @@
         text-decoration: none !important;
       }
 
-      .auth-button:hover {
-        background: #224abe;
-        transform: translateY(-1px);
-        box-shadow: 0 6px 15px rgba(78, 115, 223, 0.3);
+      .btn-check:checked + .btn-outline-primary {
+        background-color: rgba(78, 115, 223, 0.1);
+        font-weight: 600;
+        box-shadow: 0 0 0 2px rgba(78, 115, 223, 0.5);
+      }
+      
+      .swal2-container.swal2-toast-front {
+        z-index: 100000 !important;
       }
 
       .user-status-indicator {
@@ -755,7 +781,7 @@
       tabindex="-1"
       data-bs-backdrop="static"
       data-bs-keyboard="false"
-      style="display: block; background: rgba(0, 0, 0, 0.85); z-index: 105000"
+      style="display: block; background: rgba(0, 0, 0, 0.4); z-index: 105000"
       aria-modal="true"
       role="dialog"
     >
@@ -763,7 +789,7 @@
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
           <div class="modal-header bg-warning text-dark border-0">
             <h5 class="modal-title fw-bold">
-              <i class="fas fa-shield-alt me-2"></i>Actualización de Seguridad
+              <i class="fas fa-shield-alt"></i> Actualización de Seguridad
             </h5>
           </div>
           <div class="modal-body p-4 text-center">
@@ -826,7 +852,7 @@
                   type="submit"
                   class="btn btn-warning py-2 fw-bold text-dark rounded-pill shadow-sm w-100"
                 >
-                  <i class="fas fa-save me-2"></i>Guardar y entrar
+                  <i class="fas fa-save"></i> Guardar y entrar
                 </button>
               </div>
             </form>
