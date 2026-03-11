@@ -1,13 +1,17 @@
+import csv
 import requests
 from django import forms
 from django.contrib import admin, messages
+from django.http import HttpResponse
 from django.template.response import TemplateResponse
+from django.utils.html import strip_tags
 from docker.errors import APIError
 
 from .docker_client import get_docker_client
 from .forms import AllowedImageForm
 from .models import AllowedImage, Service
 from paasify.models.ProjectModel import UserProject
+from paasify.admin_filters import ServiceImageTypeFilter
 
 
 # Acción: Probar imagen (pull & run) y MOSTRAR LOG en una página
@@ -332,7 +336,8 @@ class ServiceAdmin(admin.ModelAdmin):
         'created_at',
     )
     search_fields = ('name', 'owner__username', 'image', 'project__place')
-    list_filter = ('status', 'created_at')
+    list_filter = ('status', 'created_at', ServiceImageTypeFilter)
+    actions = ['restart_services', 'stop_services', 'start_services', 'export_services_csv']
     readonly_fields = (
         'logs',
         'container_id',
@@ -611,4 +616,194 @@ class ServiceAdmin(admin.ModelAdmin):
             # Filtrar proyectos para mostrar solo los del dueño del servicio
             form.base_fields['project'].queryset = UserProject.objects.filter(user_profile__user=obj.owner)
         return form
+
+    @admin.action(description="Reiniciar servicios seleccionados")
+    def restart_services(self, request, queryset):
+        """Mejora 3.2: Acción bulk para reiniciar múltiples servicios."""
+        client = get_docker_client()
+        if client is None:
+            messages.error(request, "Docker no está disponible. Verifica que el servicio esté activo.")
+            return
+
+        success = 0
+        errors = 0
+        skipped = 0
+
+        for service in queryset:
+            cids = []
+            if service.has_compose:
+                cids = [c.container_id for c in service.containers.all() if c.container_id]
+            elif service.container_id:
+                cids = [service.container_id]
+
+            if not cids:
+                skipped += 1
+                continue
+                
+            try:
+                for cid in cids:
+                    try:
+                        container = client.containers.get(cid)
+                        container.restart(timeout=15)
+                    except Exception:
+                        pass
+                
+                service.status = 'running'
+                if service.has_compose:
+                    service.containers.all().update(status="running")
+                service.save(update_fields=['status'])
+                success += 1
+            except Exception as e:
+                errors += 1
+                messages.warning(request, f"Error reiniciando '{service.name}': {e}")
+
+        parts = []
+        if success:
+            parts.append(f"✅ {success} reiniciado(s)")
+        if errors:
+            parts.append(f"❌ {errors} con error")
+        if skipped:
+            parts.append(f"⚪ {skipped} sin contenedor")
+        messages.success(request, " | ".join(parts))
+    restart_services.short_description = "Reiniciar servicios seleccionados"
+
+    @admin.action(description="Detener servicios seleccionados")
+    def stop_services(self, request, queryset):
+        """Acción bulk para detener múltiples servicios."""
+        client = get_docker_client()
+        if client is None:
+            messages.error(request, "Docker no está disponible.")
+            return
+
+        success, errors, skipped = 0, 0, 0
+
+        for service in queryset:
+            if service.status in ['stopped', 'removed']:
+                skipped += 1
+                continue
+                
+            cids = []
+            if service.has_compose:
+                cids = [c.container_id for c in service.containers.all() if c.container_id]
+            elif service.container_id:
+                cids = [service.container_id]
+
+            if not cids:
+                skipped += 1
+                continue
+
+            try:
+                for cid in cids:
+                    try:
+                        container = client.containers.get(cid)
+                        container.stop(timeout=10)
+                    except Exception:
+                        pass
+
+                service.status = 'stopped'
+                if service.has_compose:
+                    service.containers.all().update(status="stopped")
+                service.save(update_fields=['status'])
+                success += 1
+            except Exception as e:
+                errors += 1
+                messages.warning(request, f"Error deteniendo '{service.name}': {e}")
+
+        parts = []
+        if success: parts.append(f"🛑 {success} detenido(s)")
+        if errors: parts.append(f"❌ {errors} con error")
+        if skipped: parts.append(f"⚪ {skipped} ignorados / ya detenidos")
+        if parts: messages.success(request, " | ".join(parts))
+
+    @admin.action(description="Iniciar servicios seleccionados")
+    def start_services(self, request, queryset):
+        """Acción bulk para iniciar múltiples servicios ya creados pero detenidos."""
+        client = get_docker_client()
+        if client is None:
+            messages.error(request, "Docker no está disponible.")
+            return
+
+        success, errors, skipped = 0, 0, 0
+
+        for service in queryset:
+            if service.status == 'running':
+                skipped += 1
+                continue
+
+            cids = []
+            if service.has_compose:
+                cids = [c.container_id for c in service.containers.all() if c.container_id]
+            elif service.container_id:
+                cids = [service.container_id]
+
+            if not cids:
+                skipped += 1
+                continue
+
+            try:
+                for cid in cids:
+                    try:
+                        container = client.containers.get(cid)
+                        container.start()
+                    except Exception:
+                        pass
+                
+                service.status = 'running'
+                if service.has_compose:
+                    service.containers.all().update(status="running")
+                service.save(update_fields=['status'])
+                success += 1
+            except Exception as e:
+                errors += 1
+                messages.warning(request, f"Error iniciando '{service.name}': {e}")
+
+        parts = []
+        if success: parts.append(f"▶️ {success} iniciado(s)")
+        if errors: parts.append(f"❌ {errors} con error")
+        if skipped: parts.append(f"⚪ {skipped} ignorados / ya activos")
+        if parts: messages.success(request, " | ".join(parts))
+
+    @admin.action(description="Exportar a CSV Excel")
+    def export_services_csv(self, request, queryset):
+        """Exporta los servicios a un CSV compatible con Excel."""
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = 'attachment; filename="servicios.csv"'
+        
+        response.write('\ufeff'.encode('utf8'))  # BOM para Excel
+        writer = csv.writer(response, delimiter=';')
+        writer.writerow(['Nombre', 'Propietario', 'Proyecto', 'Imagen', 'Tipo', 'Estado', 'ID Contenedor', 'Puerto Asignado', 'Fecha Creación'])
+        
+        for service in queryset:
+            owner = service.owner.username if service.owner else 'N/A'
+            project = service.project.place if service.project else 'N/A'
+            
+            tipo = "Desconocido"
+            if service.compose:
+                tipo = "Personalizado (Compose)"
+            elif service.image:
+                try:
+                    name = service.image.split(':')[0]
+                    tag = service.image.split(':')[1] if ':' in service.image else 'latest'
+                    allowed = AllowedImage.objects.filter(name=name, tag=tag).first()
+                    tipo = allowed.get_image_type_display() if allowed else "Dockerfile Custom"
+                except Exception:
+                    tipo = "Desconocido"
+                    
+            status_map = {
+                'running': 'Activo',
+                'stopped': 'Detenido',
+                'error': 'Error',
+                'removed': 'Sin Contenedor/Eliminado'
+            }
+            status_es = status_map.get(service.status, service.status)
+
+            created = service.created_at.strftime("%d/%m/%Y %H:%M") if service.created_at else 'N/A'
+
+            writer.writerow([
+                service.name, owner, project, service.image or 'N/A', 
+                tipo, status_es, service.container_id or 'N/A', 
+                service.assigned_port or 'N/A', created
+            ])
+            
+        return response
 

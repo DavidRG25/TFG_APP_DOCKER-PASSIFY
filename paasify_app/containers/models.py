@@ -278,6 +278,5 @@ def auto_cleanup_service_files(sender, instance, **kwargs):
         stop_container(instance)
         remove_container(instance)
         cleanup_service_workspace(instance)
-    except Exception as e:
-        print(f"ERROR durante la limpieza del servicio {instance.name}: {e}")
+    except Exception:
         pass

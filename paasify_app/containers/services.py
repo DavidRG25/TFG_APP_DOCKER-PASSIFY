@@ -943,13 +943,13 @@ def _run_container_internal(
     # ========== DECISIÓN: ¿Es compose o simple? ==========
     if service.has_compose:
         # ===== MODO COMPOSE =====
-        _run_compose_service(service, docker_client, force_restart, container_configs)
+        _run_compose_service(service, docker_client, force_restart, container_configs, keep_volumes=keep_volumes)
     else:
         # ===== MODO SIMPLE (mantiene funcionalidad anterior 100%) =====
-        _run_simple_service(service, docker_client, force_restart, custom_port, command)
+        _run_simple_service(service, docker_client, force_restart, custom_port, command, keep_volumes=keep_volumes)
 
 
-def _run_compose_service(service: Service, docker_client, force_restart: bool, container_configs: dict | None = None):
+def _run_compose_service(service: Service, docker_client, force_restart: bool, container_configs: dict | None = None, keep_volumes: bool = True):
     """
     Ejecuta un servicio docker-compose.
     Crea ServiceContainer records para cada contenedor.
@@ -1092,12 +1092,21 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool, c
     # Dejar en 'starting' para que sync_service_status haga la transición a 'running'
     # cuando verifique que todos los contenedores están realmente listos.
     # Esto evita condiciones de carrera donde marcamos como running antes de tiempo.
-    _append_log(service, "docker-compose up ejecutado. Verificando estado de contenedores...")
-    service.save()
+    _append_log(service, "docker-compose up ejecutado. Sincronizando estados finales...")
+    
+    # IMPORTANTE: Asegurar que salimos de 'restarting' o 'pending' para que sync_service_status lo procese
+    service.status = "starting"
+    service.save(update_fields=["status", "logs", "updated_at"])
+    
+    # Intentar una sincronización inmediata
+    try:
+        sync_service_status(service)
+    except:
+        pass
 
 
 
-def _run_simple_service(service: Service, docker_client, force_restart: bool, custom_port: int | None, command: list[str] | None):
+def _run_simple_service(service: Service, docker_client, force_restart: bool, custom_port: int | None, command: list[str] | None, keep_volumes: bool = True):
     """
     Ejecuta un servicio simple (Dockerfile o catálogo).
     MANTIENE 100% compatibilidad con funcionalidad anterior.
@@ -1186,6 +1195,7 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
             _append_log(service, "Imagen descargada.")
             service.save(update_fields=["logs"])
 
+        image_attrs = {}
         try:
             image_attrs = docker_client.images.get(image_to_run).attrs
             image_cmd = image_attrs.get("Config", {}).get("Cmd") or None
@@ -1353,17 +1363,6 @@ def run_container(service: Service, force_restart: bool = False, custom_port: in
     # Si viene desde un serializer o vista con _keep_volumes, usarlo si no se pasa explícito
     if keep_volumes is True:
         keep_volumes = getattr(service, '_keep_volumes', True)
-
-    if settings.DEBUG:
-        _run_container_internal(
-            service,
-            force_restart=force_restart,
-            custom_port=custom_port,
-            command=command,
-            container_configs=container_configs,
-            keep_volumes=keep_volumes
-        )
-        return
 
     # Guardar contra ejecuciones duplicadas si ya está en cola o iniciándose
     if service.status in ["pending", "starting"] and not force_restart:

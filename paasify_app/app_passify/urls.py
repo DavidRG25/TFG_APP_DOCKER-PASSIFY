@@ -44,6 +44,7 @@ router.register(r'projects', ProjectViewSet, basename='project')
 urlpatterns = [
     # Vistas públicas / HTML
     path('', RedirectView.as_view(url='/paasify/', permanent=False), name='index'),
+    path('favicon.ico', RedirectView.as_view(url='/static/assets/img/paasify-logo.png', permanent=True)),
     path('paasify/', include('paasify.urls', namespace='paasify')),
 
     # Auth

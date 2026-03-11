@@ -149,11 +149,14 @@ class ServiceViewSet(viewsets.ModelViewSet):
         level="text-bg-success",
         extra_triggers=None,
     ):
+        """Helper para generar respuestas HTMX consistentes con Toasts."""
         html = ""
         # Si no es HTMX (raro pero posible), devolvemos el fragmento de la tabla
         if not self._is_htmx(request):
             html = self._render_table_fragment(request)
-        response = DRF_Response(html, status=status)
+        
+        # Usar HttpResponse con un pequeño contenido para asegurar que HTMX y el socket lo procesen
+        response = HttpResponse(" ", status=status)
         
         # Siempre incluimos el refresh de la tabla para asegurar que el pooling se active/actualice
         trigger = dict(extra_triggers or {})
@@ -162,7 +165,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if message:
             trigger["service:toast"] = {"message": message, "variant": level}
             
-        # Siempre enviar como JSON para que HTMX lo procese consistentemente
+        # Siempre enviar como JSON en la cabecera HX-Trigger
         response["HX-Trigger"] = json.dumps(trigger)
             
         return response
@@ -283,11 +286,22 @@ class ServiceViewSet(viewsets.ModelViewSet):
             except:
                 container_configs = None
 
-        service = serializer.save(owner=request.user, status="creating", project=project)
+        try:
+            service = serializer.save(owner=request.user, status="creating", project=project)
+        except Exception as e:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"DEBUG: Error in serializer.save(): {e}\n{error_trace}")
+            if self._is_htmx(request):
+                return self._htmx_response(request, status=500, message=f"Error al guardar servicio: {e}", level="text-bg-danger")
+            return DRF_Response({"error": str(e), "trace": error_trace}, status=500)
 
         try:
             run_container(service, custom_port=custom_port, container_configs=container_configs)
         except Exception as exc:
+            import traceback
+            error_trace = traceback.format_exc()
+            print(f"DEBUG: Error in run_container(): {exc}\n{error_trace}")
             service.status = "error"
             service.logs = str(exc)
             service.save(update_fields=["status", "logs"])
@@ -295,17 +309,21 @@ class ServiceViewSet(viewsets.ModelViewSet):
                 return self._htmx_response(
                     request,
                     status=500,
-                    message=str(exc),
+                    message=f"Error al iniciar contenedor: {exc}",
                     level="text-bg-danger",
                 )
-            return DRF_Response({"error": str(exc)}, status=500)
+            return DRF_Response({"error": str(exc), "trace": error_trace}, status=500)
 
         if self._is_htmx(request):
+            msg = "Servicio creado y encolado para iniciar."
+            if service.has_compose:
+                msg = "Stack Compose creado. Iniciando orquestación..."
+                
             return self._htmx_response(
                 request,
                 status=201,
-                message="Servicio encolado para iniciar.",
-                level="text-bg-success",
+                message=msg,
+                level="text-bg-info",
                 extra_triggers={"service:modal-close": {"modalId": "newServiceModal"}},
             )
 
@@ -329,7 +347,6 @@ class ServiceViewSet(viewsets.ModelViewSet):
         self._attach_uploaded_files(updated_service, self.request, updated_service.mode)
         
         # Reiniciar contenedor SOLO cuando la DB sea estable (tras commit)
-        # Esto previene que el worker vea datos viejos o archivos ya borrados.
         def _restart_task():
             try:
                 keep_vols = getattr(updated_service, '_keep_volumes', True)
@@ -343,6 +360,34 @@ class ServiceViewSet(viewsets.ModelViewSet):
                 updated_service.save(update_fields=["status", "logs"])
         
         transaction.on_commit(_restart_task)
+
+    def update(self, request, *args, **kwargs):
+        """Override para soportar Toasts en HTMX al editar."""
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        
+        try:
+            serializer.is_valid(raise_exception=True)
+        except ValidationError as exc:
+            if self._is_htmx(request):
+                return self._validation_error_response(exc)
+            raise
+            
+        self.perform_update(serializer)
+        
+        if self._is_htmx(request):
+            return self._htmx_response(
+                request,
+                message=f"Servicio '{instance.name}' actualizado correctamente.",
+                level="text-bg-info"
+            )
+        
+        return DRF_Response(serializer.data)
+
+    def partial_update(self, request, *args, **kwargs):
+        kwargs['partial'] = True
+        return self.update(request, *args, **kwargs)
 
     def _validation_error_response(self, exc: ValidationError):
         """Devuelve un fragmento HTML con errores de validación para HTMX."""
@@ -444,10 +489,14 @@ class ServiceViewSet(viewsets.ModelViewSet):
             return DRF_Response({"status": "error", "message": str(exc)}, status=500)
 
         if self._is_htmx(request):
+            msg = f"Servicio '{service.name}' iniciado."
+            if service.has_compose:
+                msg = f"Iniciando orquestación de '{service.name}'... (Puede tardar unos segundos)"
+            
             return self._htmx_response(
                 request, 
-                message=f"Servicio '{service.name}' iniciado correctamente.",
-                level="text-bg-success"
+                message=msg,
+                level="text-bg-info"
             )
         return DRF_Response({"status": "queued", "message": "Servicio encolado para iniciar."})
 
@@ -473,7 +522,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
             return self._htmx_response(
                 request,
                 message=f"Servicio '{service.name}' deteniendo...",
-                level="text-bg-warning"
+                level="text-bg-light"
             )
         return DRF_Response({"status": "stopping", "message": "Servicio deteniendo."})
 
@@ -485,9 +534,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
         service.save(update_fields=["status"])
         try:
             from .services import run_container
-            import time
-            # Delay para que el auto-refresh de HTMX (cada 3s) capture el estado 'restarting'
-            time.sleep(1.5)
+            # Eliminado el delay artificial para que sea instantáneo
             run_container(service, force_restart=True)
         except Exception as exc:
             # Si falla, el sync_service_status lo pondrá en error o stopped después
@@ -496,10 +543,14 @@ class ServiceViewSet(viewsets.ModelViewSet):
             return DRF_Response({"status": "error", "message": str(exc)}, status=500)
 
         if self._is_htmx(request):
+            msg = "El servicio se está reiniciando..."
+            if service.has_compose:
+                msg = "Reiniciando orquestación completa... Por favor, espera."
+
             return self._htmx_response(
                 request,
-                message="El servicio está siendo reiniciado...",
-                level="text-bg-warning",
+                message=msg,
+                level="text-bg-light",
             )
         return DRF_Response({"status": "restarting", "message": "Servicio reiniciando."})
 
@@ -639,8 +690,8 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if self._is_htmx(request):
             return self._htmx_response(
                 request,
-                message=f"Contenedor {container.name} iniciado.",
-                level="text-bg-success",
+                message=f"Iniciando contenedor '{container.name}'...",
+                level="text-bg-info",
             )
         return DRF_Response({"status": "started", "message": f"Contenedor {container.name} iniciado."})
     
@@ -665,8 +716,8 @@ class ServiceViewSet(viewsets.ModelViewSet):
         if self._is_htmx(request):
             return self._htmx_response(
                 request,
-                message=f"Contenedor {container.name} detenido.",
-                level="text-bg-warning",
+                message=f"Deteniendo contenedor '{container.name}'...",
+                level="text-bg-light",
             )
         return DRF_Response({"status": "stopped", "message": f"Contenedor {container.name} detenido."})
 
@@ -1834,6 +1885,8 @@ def edit_service(request, pk):
         except Exception as exc:
             return HttpResponse(f"Error al reiniciar: {exc}", status=500)
 
+        messages.success(request, f"Servicio '{service.name}' actualizado correctamente.")
+        
         return_url = request.POST.get('return_url')
         if not return_url:
             return_url = reverse('containers:student_panel')

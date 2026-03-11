@@ -64,3 +64,18 @@
 2. **Fase 2: Autenticación y Seguridad** (Sesiones inactivas, Cambio forzado de clave Admin).
 3. **Fase 3: Importaciones Excel y Gestión Múltiple** (Lógica de pandas/openpyxl, lógica de BD masiva).
 4. **Fase 4: Documentación y CI/CD** (Postman, README deploy, GH Actions).
+
+---
+
+### 🌟 Mejoras Adicionales y Evolución (Extra)
+
+Se han completado un conjunto de mejoras transversales documentadas en el plan adicional:
+[COMPLETADO_plan_mejoras_adicionales_20251128.md](file:///c:/Users/david/OneDrive/Escritorio/TFG/TGF_APP_DOCKER-PASSIFY/paasify_app/document/04_planes/completado/COMPLETADO_plan_mejoras_adicionales_20251128.md)
+
+**Resumen de lo realizado (Esquema):**
+1. **Admin Panel**: Filtros avanzados por tipo de imagen y estado real de Docker.
+2. **Bulk Actions**: Reinicio masivo de servicios, exportación a CSV (BOM Excel) y refresco de tokens API.
+3. **Persistencia**: Sistema de volúmenes automáticos y persistencia garantizada en reinicios.
+4. **Seguridad**: Cambio obligado de clave, tokens API con caducidad de 30 días y auditoría.
+5. **UI/UX**: Toasts premium (fondo blanco/dorado), micro-animaciones y espaciado corregido en todo el panel.
+6. **Docker Engine**: Soporte completo para Compose multi-contenedor con mapeo de puertos dinámico.
