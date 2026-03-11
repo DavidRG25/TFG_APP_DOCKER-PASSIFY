@@ -1,4 +1,4 @@
-﻿import os
+import os
 import uuid
 from django.conf import settings
 from django.db import models
@@ -31,7 +31,7 @@ class Subject(models.Model):
 
     genero = models.CharField(
         max_length=100,
-        verbose_name="Ano",
+        verbose_name="Año",
     )
 
     category = models.CharField(

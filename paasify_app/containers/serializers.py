@@ -339,22 +339,33 @@ class ServiceSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         """
         Reglas de modo y subject.
+        Envuelve la lógica de validación para capturar errores inesperados y depurar.
+        """
+        try:
+            return self._perform_validate(attrs)
+        except serializers.ValidationError:
+            raise
+        except Exception as e:
+            import traceback
+            print(f"DEBUG VALIDATE ERROR: {e}\n{traceback.format_exc()}")
+            raise serializers.ValidationError(f"Error inesperado en validación: {e}")
+
+    def _perform_validate(self, attrs):
+        """
+        Lógica real de validación movida aquí para el envoltorio de debug.
         """
         request = self.context.get("request")
         user = getattr(request, "user", None)
 
         # Detectar si es una actualización (PATCH) o creación (POST)
         is_update = self.instance is not None
-
         # Determinar el modo real del servicio existente
         if is_update:
-            existing_mode = "custom" if getattr(self.instance, 'dockerfile', None) or getattr(self.instance, 'compose', None) else "dockerhub"
+            # Seguro: solo acceder si existe instancia
+            instance = self.instance
+            existing_mode = "custom" if (instance.dockerfile or instance.compose) else "dockerhub"
             
             # Revisar si se intentó enviar mode en la petición cruda
-            print("PATCH DEBUG attrs:", attrs)
-            if hasattr(self, 'initial_data'):
-                print("PATCH DEBUG initial_data:", self.initial_data)
-                
             if hasattr(self, 'initial_data') and "mode" in self.initial_data:
                 requested_mode = str(self.initial_data["mode"]).lower()
                 if requested_mode != existing_mode and requested_mode != "default":

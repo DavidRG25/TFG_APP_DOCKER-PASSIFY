@@ -13,6 +13,7 @@ from paasify.roles import (
     TEACHER_GROUP_NAMES,
     ensure_user_group,
 )
+from paasify.admin_filters import ProjectStatusFilter
 
 User = get_user_model()
 
@@ -168,15 +169,15 @@ class SubjectAdmin(admin.ModelAdmin):
         "teacher_user",
         "category",
         "genero",
-        "get_students_count",    # Nuevo
-        "get_services_count",    # Nuevo
+        "get_students_count",
+        "get_services_count",
     )
     search_fields = ("name", "teacher_user__username", "teacher_user__email")
     list_filter = ("category", "genero")
-    # autocomplete_fields = ("teacher_user",)  # QUITADO: ignora el queryset del formulario
     filter_horizontal = ("students",)
     inlines = [UserProjectInlineForSubject]
-    exclude = ("players",)  # oculta campo legacy
+    exclude = ("players",)
+    actions = ["export_students_csv"]
     
     # Fieldsets con diseño de franjas
     fieldsets = (
@@ -215,6 +216,38 @@ class SubjectAdmin(admin.ModelAdmin):
             return "-"
         return f"🐳 {count}"
     get_services_count.short_description = 'Servicios'
+
+    @admin.action(description="Exportar alumnos de asignaturas seleccionadas a CSV")
+    def export_students_csv(self, request, queryset):
+        """Mejora 4.2: Exportar lista de alumnos de asignaturas seleccionadas a CSV."""
+        import csv
+        from django.http import HttpResponse
+        from containers.models import Service
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="alumnos_asignaturas.csv"'
+        response.write('\ufeff')  # BOM para Excel
+
+        writer = csv.writer(response, delimiter=';')
+        writer.writerow(['Asignatura', 'Username', 'Email', 'Nombre Completo', 'Servicios Running', 'Servicios Totales', 'Última Conexión'])
+
+        for subject in queryset:
+            for student in subject.students.all().order_by('username'):
+                running = Service.objects.filter(owner=student, subject=subject, status='running').count()
+                total = Service.objects.filter(owner=student, subject=subject).exclude(status='removed').count()
+                last_login = student.last_login.strftime('%d/%m/%Y %H:%M') if student.last_login else 'Nunca'
+                writer.writerow([
+                    subject.name,
+                    student.username,
+                    student.email,
+                    student.get_full_name() or student.username,
+                    running,
+                    total,
+                    last_login,
+                ])
+
+        self.message_user(request, f"Exportados alumnos de {queryset.count()} asignatura(s) a CSV.")
+        return response
 
     # Auto-matricular: si en el inline se añade un UserProject, matriculamos al user del alumno
     def save_formset(self, request, form, formset, change):
@@ -462,9 +495,10 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_display = (
         "nombre",
         "user",
-        "get_role",              # Nuevo
+        "get_role",
         "year",
-        "get_subjects_count",    # Nuevo
+        "get_services_count",
+        "get_last_login",
         "display_token",
         "token_created_at"
     )
@@ -472,10 +506,9 @@ class UserProfileAdmin(admin.ModelAdmin):
     list_filter = (
         'token_created_at',
     )
-    # autocomplete_fields = ("user",)  # QUITADO: interfiere con el queryset del formulario
     inlines = [UserProjectInlineForProfile]
     readonly_fields = ("display_token", "token_created_at", "get_nombre_display", "get_year_display")
-    actions = ["refresh_api_tokens"]
+    actions = ["refresh_api_tokens", "export_profiles_csv"]
     
     # Fieldsets con diseño de franjas
     fieldsets = (
@@ -584,17 +617,44 @@ class UserProfileAdmin(admin.ModelAdmin):
             )
     get_role.short_description = 'Rol'
     
-    def get_subjects_count(self, obj):
-        """Muestra el número de asignaturas del alumno"""
+    def get_services_count(self, obj):
+        """Mejora Admin: Muestra el número de servicios (running/total) del alumno"""
         if not obj.user:
             return "-"
         
-        # Contar asignaturas donde el usuario es estudiante
-        count = obj.user.subjects_as_student.count()
-        if count == 0:
+        from containers.models import Service
+        running = Service.objects.filter(owner=obj.user, status='running').count()
+        total = Service.objects.filter(owner=obj.user).exclude(status='removed').count()
+        
+        if total == 0:
             return "-"
-        return f"📚 {count}"
-    get_subjects_count.short_description = 'Asignaturas'
+            
+        color = "green" if running == total else "orange" if running > 0 else "gray"
+        return format_html('<span style="color: {};">🐳 {}/{}</span>', color, running, total)
+    get_services_count.short_description = 'Servicios'
+
+    def get_last_login(self, obj):
+        """Mejora 5.3 y 1.3: Muestra la última conexión del usuario en formato amigable."""
+        if not obj.user or not obj.user.last_login:
+            return "Nunca"
+        from django.utils import timezone
+        diff = timezone.now() - obj.user.last_login
+        if diff.days == 0:
+            hours = diff.seconds // 3600
+            if hours == 0:
+                return "Hace unos minutos"
+            return f"Hace {hours}h"
+        elif diff.days == 1:
+            return "Ayer"
+        elif diff.days < 7:
+            return f"Hace {diff.days} días"
+        elif diff.days < 30:
+            weeks = diff.days // 7
+            return f"Hace {weeks} semana{'s' if weeks > 1 else ''}"
+        else:
+            return obj.user.last_login.strftime('%d/%m/%Y')
+    get_last_login.short_description = 'Última conexión'
+    get_last_login.admin_order_field = 'user__last_login'
 
     def es_usuario_alumno(self, obj):
         return bool(
@@ -629,6 +689,64 @@ class UserProfileAdmin(admin.ModelAdmin):
         
         if count > 0:
             messages.success(request, f"Se refrescaron {count} token(es) exitosamente.")
+
+    @admin.action(description="Exportar perfiles seleccionados a CSV")
+    def export_profiles_csv(self, request, queryset):
+        """Exportar lista de perfiles a CSV."""
+        import csv
+        from django.http import HttpResponse
+        from containers.models import Service
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="perfiles_exportados.csv"'
+        response.write('\ufeff')  # BOM para Excel
+
+        writer = csv.writer(response, delimiter=';')
+        
+        # Determinar si estamos exportando profesores o alumnos basándonos en el queryset
+        from paasify.models.StudentModel import TeacherProfile
+        is_teacher_export = queryset.model == TeacherProfile
+
+        if is_teacher_export:
+            writer.writerow(['Nombre', 'Username', 'Email', 'Rol', 'Asignaturas', 'Última Conexión'])
+        else:
+            writer.writerow(['Nombre', 'Username', 'Email', 'Rol', 'Servicios Running', 'Servicios Totales', 'Última Conexión'])
+
+        for profile in queryset:
+            if not profile.user: continue
+            
+            # Determinar rol
+            groups = profile.user.groups.values_list('name', flat=True)
+            if any(n in groups for n in TEACHER_GROUP_NAMES): role = 'Profesor'
+            else: role = 'Alumno'
+
+            last_login = profile.user.last_login.strftime('%d/%m/%Y %H:%M') if profile.user.last_login else 'Nunca'
+            
+            if is_teacher_export:
+                from paasify.models.SubjectModel import Subject
+                subj_count = Subject.objects.filter(teacher_user=profile.user).count()
+                writer.writerow([
+                    profile.nombre,
+                    profile.user.username,
+                    profile.user.email,
+                    role,
+                    subj_count,
+                    last_login,
+                ])
+            else:
+                running = Service.objects.filter(owner=profile.user, status='running').count()
+                total = Service.objects.filter(owner=profile.user).exclude(status='removed').count()
+                writer.writerow([
+                    profile.nombre,
+                    profile.user.username,
+                    profile.user.email,
+                    role,
+                    running,
+                    total,
+                    last_login,
+                ])
+
+        return response
 
 
 #  TeacherProfile (Profesores)
@@ -708,7 +826,7 @@ class TeacherProfileAdmin(admin.ModelAdmin):
     )
     inlines = []  # Sin inlines para profesores
     readonly_fields = ("display_token", "token_created_at", "get_nombre_display", "get_year_display")
-    actions = ["refresh_api_tokens"]
+    actions = ["refresh_api_tokens", "export_profiles_csv"]
     
     # Fieldsets con diseño de franjas
     fieldsets = (
@@ -842,6 +960,11 @@ class TeacherProfileAdmin(admin.ModelAdmin):
         if count > 0:
             messages.success(request, f"Se refrescaron {count} token(es) exitosamente.")
 
+    @admin.action(description="Exportar perfiles seleccionados a CSV")
+    def export_profiles_csv(self, request, queryset):
+        """Reutiliza la lógica de exportación de UserProfileAdmin"""
+        return UserProfileAdmin.export_profiles_csv(self, request, queryset)
+
 
 
 # ============================================================================
@@ -951,9 +1074,11 @@ class CustomUserAdmin(BaseUserAdmin):
         'get_role_display',
         'get_subjects_count',
         'get_active_services',
+        'get_last_login_display',
         'date_joined',
         'is_active',
     ]
+    actions = ['export_users_csv']
     
     # Filtros
     list_filter = [
@@ -1072,6 +1197,66 @@ class CustomUserAdmin(BaseUserAdmin):
         except Exception:
             return "-"
     get_active_services.short_description = 'Servicios Activos'
+
+    def get_last_login_display(self, obj):
+        """Mejora 1.3: Muestra la última conexión del usuario en formato amigable."""
+        if not obj.last_login:
+            return "Nunca"
+        from django.utils import timezone
+        diff = timezone.now() - obj.last_login
+        if diff.days == 0:
+            hours = diff.seconds // 3600
+            if hours == 0:
+                return "Hace unos minutos"
+            return f"Hace {hours}h"
+        elif diff.days == 1:
+            return "Ayer"
+        elif diff.days < 7:
+            return f"Hace {diff.days} días"
+        elif diff.days < 30:
+            weeks = diff.days // 7
+            return f"Hace {weeks} semana{'s' if weeks > 1 else ''}"
+        else:
+            return obj.last_login.strftime('%d/%m/%Y')
+    get_last_login_display.short_description = 'Última conexión'
+    get_last_login_display.admin_order_field = 'last_login'
+
+    @admin.action(description="Exportar usuarios seleccionados a CSV")
+    def export_users_csv(self, request, queryset):
+        """Mejora 1.1: Exportar lista de usuarios a CSV."""
+        import csv
+        from django.http import HttpResponse
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="usuarios_paasify.csv"'
+        response.write('\ufeff')  # BOM para Excel
+
+        writer = csv.writer(response, delimiter=';')
+        writer.writerow(['Username', 'Email', 'Nombre Completo', 'Rol', 'Fecha Registro', 'Última Conexión', 'Activo'])
+
+        for user in queryset:
+            # Determinar rol
+            if user.is_superuser:
+                role = 'Admin'
+            elif user.groups.filter(name__in=TEACHER_GROUP_NAMES).exists():
+                role = 'Profesor'
+            elif user.groups.filter(name__in=STUDENT_GROUP_NAMES).exists():
+                role = 'Alumno'
+            else:
+                role = 'Sin rol'
+
+            writer.writerow([
+                user.username,
+                user.email,
+                user.get_full_name() or '-',
+                role,
+                user.date_joined.strftime('%d/%m/%Y %H:%M') if user.date_joined else '-',
+                user.last_login.strftime('%d/%m/%Y %H:%M') if user.last_login else 'Nunca',
+                'Sí' if user.is_active else 'No',
+            ])
+
+        self.message_user(request, f"Exportados {queryset.count()} usuario(s) a CSV.")
+        return response
     
     def save_model(self, request, obj, form, change):
         """Guardar modelo y mostrar contraseña generada si aplica"""
@@ -1136,7 +1321,7 @@ class UserProjectAdmin(admin.ModelAdmin):
         'user_profile__user__username',
         'subject__name',
     )
-    list_filter = ('subject', 'date')  # Agregado 'date' de version anterior
+    list_filter = ('subject', 'date', ProjectStatusFilter)
     autocomplete_fields = ('user_profile', 'subject')
     readonly_fields = ('get_services_list',)
     
@@ -1361,6 +1546,28 @@ class ExpiringTokenAdmin(admin.ModelAdmin):
     search_fields = ['user__username', 'key']
     readonly_fields = ['key', 'created', 'expires_at']
     ordering = ['-created']
+    actions = ['refresh_api_tokens']
+    
+    @admin.action(description="Refrescar tokens seleccionados (regenera key y amplia 30 días)")
+    def refresh_api_tokens(self, request, queryset):
+        """Action para regenerar el token estático de múltiples usuarios."""
+        from django.contrib import messages
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        count = 0
+        for token_obj in queryset:
+            try:
+                # Al poner key a None, el save() generará una nueva
+                token_obj.key = None
+                token_obj.expires_at = timezone.now() + timedelta(days=30)
+                token_obj.save()
+                count += 1
+            except Exception as e:
+                messages.error(request, f"Error al refrescar token de {token_obj.user.username}: {e}")
+        
+        if count > 0:
+            messages.success(request, f"Se regeneraron {count} token(es) exitosamente.")
     
     def key_preview(self, obj):
         """Mostrar preview del token (primeros 10 caracteres)"""

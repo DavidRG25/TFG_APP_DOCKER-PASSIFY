@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %} {% load static %} {% block body %}
+{% extends "base.html" %} {% load static %} {% block body %}
 <div class="container-fluid py-4" style="background-color: #f8f9fc; min-height: 100vh">
   <script>
     (function() {
@@ -840,6 +840,19 @@ document.addEventListener("DOMContentLoaded", function() {
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right: 8px !important;"></i>Creando...';
+            }
+        });
+
+        // Asegurar que el loading desaparezca si hay un error o termina el proceso
+        form.addEventListener("htmx:afterRequest", function(evt) {
+            if (!evt.detail.successful) {
+                const overlay = document.getElementById("loadingOverlay");
+                if (overlay) overlay.style.display = "none";
+                const submitBtn = document.getElementById("submitBtn");
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fas fa-rocket" style="margin-right: 8px !important;"></i>Crear Servicio';
+                }
             }
         });
     }

@@ -677,6 +677,7 @@
 
           const modal = new bootstrap.Modal(document.getElementById("tokenModal"));
           modal.show();
+          showToast(data.message || "Token generado correctamente", "success");
         } else {
           showToast(data.error || "Error al generar token", "error");
         }
@@ -781,7 +782,7 @@
             const modalEl = document.getElementById("tokenModal");
             const modal = new bootstrap.Modal(modalEl);
             modal.show();
-
+            showToast(data.message || "Token refrescado correctamente", "info");
         } else {
             showToast(data.error || "Error al regenerar", "error");
         }
