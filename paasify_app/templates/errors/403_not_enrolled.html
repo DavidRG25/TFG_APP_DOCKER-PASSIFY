@@ -36,8 +36,8 @@
     {# Tarjeta principal #}
     <div class="card border-0 shadow-lg text-center overflow-hidden" style="border-radius: 1.5rem;">
 
-      {# Barra decorativa con gradiente amarillo/naranja (404) #}
-      <div style="height: 6px; background: linear-gradient(90deg, #f6c23e 0%, #e74a3b 50%, #f6c23e 100%);"></div>
+      {# Barra decorativa con gradiente naranja/rojo (403) #}
+      <div style="height: 6px; background: linear-gradient(90deg, #e74a3b 0%, #f6c23e 50%, #e74a3b 100%);"></div>
 
       <div class="card-body p-5">
 
@@ -45,40 +45,43 @@
         <div class="error-icon-wrap position-relative d-inline-flex align-items-center justify-content-center mx-auto mb-4"
              style="width: 110px; height: 110px;">
           <div class="position-absolute rounded-circle"
-               style="width: 110px; height: 110px; background: linear-gradient(135deg, rgba(246,194,62,0.08) 0%, rgba(231,74,59,0.08) 100%);"></div>
+               style="width: 110px; height: 110px; background: linear-gradient(135deg, rgba(231,74,59,0.08) 0%, rgba(246,194,62,0.08) 100%);"></div>
           <div class="position-absolute rounded-circle"
-               style="width: 80px; height: 80px; background: linear-gradient(135deg, rgba(246,194,62,0.12) 0%, rgba(231,74,59,0.12) 100%);"></div>
-          <i class="fas fa-book-open" style="font-size: 2.5rem; color: #f6c23e; position: relative; z-index: 1;"></i>
+               style="width: 80px; height: 80px; background: linear-gradient(135deg, rgba(231,74,59,0.12) 0%, rgba(246,194,62,0.12) 100%);"></div>
+          <i class="fas fa-lock" style="font-size: 2.5rem; color: #e74a3b; position: relative; z-index: 1;"></i>
         </div>
 
         {# Código de error #}
         <span class="badge rounded-pill px-3 py-2 mb-3 fw-bold"
-              style="background: rgba(246,194,62,0.1); color: #856404; font-size: 0.75rem; letter-spacing: 1px;">
-          ERROR 404 — No Encontrada
+              style="background: rgba(231,74,59,0.08); color: #e74a3b; font-size: 0.75rem; letter-spacing: 1px;">
+          ERROR 403 — Acceso Denegado
         </span>
 
         {# Título y descripción #}
         <h2 class="fw-bold text-dark mb-2" style="letter-spacing: -0.3px;">
-          Asignatura no encontrada
+          No estás matriculado en esta asignatura
         </h2>
+        {% if subject %}
+        <p class="fw-semibold text-primary mb-1" style="font-size: 1rem;">
+          <i class="fas fa-book" style="margin-right: 8px !important;"></i>
+          {{ subject.name }}
+        </p>
+        {% endif %}
         <p class="text-muted mb-4 mx-auto" style="max-width: 420px; line-height: 1.7;">
-          La asignatura que estás intentando consultar ha sido eliminada o el ID de acceso no es válido. Puede que ya no esté disponible.
+          No tienes permiso para acceder a esta asignatura. Si crees que deberías tener acceso, contacta con tu profesor o administrador.
         </p>
 
         {# Separador #}
         <hr class="my-4 mx-auto" style="max-width: 200px; border-color: #edf2f7; border-width: 2px; border-radius: 4px;">
 
-        {# Bloque informativo #}
-        <div class="d-inline-flex align-items-center gap-3 px-4 py-3 rounded-3 mb-4 text-start"
-             style="background: #fffbeb; border: 1px solid #fde68a; max-width: 400px;">
-          <div class="d-flex align-items-center justify-content-center flex-shrink-0 rounded-3"
-               style="width: 38px; height: 38px; background: rgba(246,194,62,0.15); color: #f6c23e; font-size: 1rem;">
-            <i class="fas fa-exclamation-triangle"></i>
-          </div>
-          <div>
-            <p class="fw-bold text-dark mb-0 small">Recurso no disponible</p>
-            <p class="text-muted mb-0" style="font-size: 0.78rem;">Si crees que esto es un error, contacta con tu docente o administrador.</p>
-          </div>
+        {# Información de sesión #}
+        <div class="d-inline-flex align-items-center gap-2 px-4 py-2 rounded-3 mb-4"
+             style="background: #f8fafc; border: 1px solid #edf2f7;">
+          <i class="fas fa-user-circle text-muted" style="font-size: 1rem; margin-right: 8px !important;"></i>
+          <span class="text-muted small">
+            Sesión activa como
+            <strong class="text-dark">{{ request.user.username }}</strong>
+          </span>
         </div>
 
         {# Botones de acción #}
@@ -101,8 +104,7 @@
       <div class="card-footer border-0 py-3" style="background: #f8fafc;">
         <small class="text-muted">
           <i class="fas fa-info-circle" style="margin-right: 8px !important; opacity: 0.5;"></i>
-          Sesión activa como
-          <strong class="text-dark">{{ request.user.username }}</strong>
+          Si esto es un error, contacta con tu docente o con el equipo de administración.
         </small>
       </div>
 

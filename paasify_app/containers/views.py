@@ -1003,6 +1003,46 @@ def check_port_availability(request):
         })
 
 
+# ------------------------------ HELPERS VISTA -----------------------
+
+def prepare_hierarchy(available_subjects, all_user_projects, services):
+    """Construye una estructura anidada para representar Asignaturas > Proyectos > Servicios."""
+    hierarchy = []
+    # Pre-cargar servicios en memoria para evitar N+1 queries en el bucle si es posible, 
+    # aunque aquí services ya es un queryset evaluable o lista.
+    services_list = list(services)
+    
+    for subj in available_subjects:
+        subj_projects = []
+        # Proyectos asignados a esta asignatura
+        projects_in_subj = all_user_projects.filter(subject=subj)
+        
+        for proj in projects_in_subj:
+            # Servicios asociados a este proyecto específico
+            proj_services = [s for s in services_list if s.project_id == proj.id]
+            subj_projects.append({
+                'grouper': proj,
+                'list': proj_services,
+                'is_empty': len(proj_services) == 0
+            })
+            
+        # También buscar servicios en esta asignatura que no tengan proyecto asociado
+        extra_services = [s for s in services_list if s.subject_id == subj.id and s.project_id is None]
+        if extra_services:
+            subj_projects.append({
+                'grouper': None, # Representa "Proyecto Principal" o sin proyecto
+                'list': extra_services,
+                'is_empty': False
+            })
+        
+        hierarchy.append({
+            'grouper': subj,
+            'list': subj_projects,
+            'is_empty': len(subj_projects) == 0
+        })
+    return hierarchy
+
+
 # ------------------------------ HTML -------------------------------
 
 @login_required
@@ -1027,6 +1067,9 @@ def student_panel(request):
     error_count = services.filter(status="error").count()
     total_services = services.count()
     subjects_count = available_subjects.count() if hasattr(available_subjects, "count") else 0
+    
+    # Para visualización de proyectos vacíos
+    is_searching = False
 
     return render(
         request,
@@ -1047,6 +1090,8 @@ def student_panel(request):
                 "subjects": subjects_count,
                 "projects": user_projects.count(),
             },
+            "is_searching": is_searching,
+            "hierarchy": prepare_hierarchy(available_subjects, user_projects, services),
         },
     )
 
@@ -1059,11 +1104,18 @@ def student_subjects(request):
     - Student: asignaturas donde estÃƒÂ¡ matriculado (Subject.students contiene user)
     """
     if request.user.is_superuser:
-        subjects = Subject.objects.all()
+        subjects = Subject.objects.all().annotate(
+            user_projects_count=models.Count('projects')
+        )
     elif user_is_teacher(request.user):
         return redirect("professor_dashboard")
     else:
-        subjects = Subject.objects.filter(students=request.user).distinct()
+        subjects = Subject.objects.filter(students=request.user).annotate(
+            user_projects_count=models.Count(
+                'projects', 
+                filter=models.Q(projects__user_profile__user=request.user)
+            )
+        ).distinct()
     return render(request, "containers/subjects.html", {"subjects": subjects, "title": "PaaSify - Asignaturas"})
 
 
@@ -1080,7 +1132,7 @@ def student_services_in_subject(request, subject_id):
 
     # Solo alumnos matriculados pueden entrar (salvo administradores)
     if not (user_is_admin(request.user) or subject.students.filter(pk=request.user.pk).exists()):
-        return HttpResponse("No estas matriculado en esta asignatura.", status=403)
+        return render(request, 'errors/403_not_enrolled.html', {'subject': subject}, status=403)
 
     services = (
         Service.objects
@@ -1101,8 +1153,8 @@ def student_services_in_subject(request, subject_id):
     
     # Necesario para el selector de asignaturas en el filtro
     available_subjects = Subject.objects.filter(students=request.user).distinct()
-    # Identificar proyectos de la asignatura actual
-    user_projects = UserProject.objects.filter(subject=subject).order_by('place')
+    # Identificar proyectos de la asignatura actual asignados a este alumno
+    user_projects = UserProject.objects.filter(subject=subject, user_profile__user=request.user).order_by('place')
 
     images = AllowedImage.objects.all()
     host = request.get_host().split(":")[0]
@@ -1171,6 +1223,24 @@ def service_table(request):
         qs = qs.filter(mode=mode)
         
     q = request.GET.get("q")
+    is_searching = bool(q or status or mode)
+    
+    # Para visualización de proyectos vacíos
+    if user.is_superuser:
+        available_subjects = Subject.objects.all()
+        all_user_projects = UserProject.objects.all()
+    elif user_is_teacher(user):
+        available_subjects = Subject.objects.filter(teacher_user=user)
+        all_user_projects = UserProject.objects.filter(subject__in=available_subjects)
+    else:
+        available_subjects = Subject.objects.filter(students=user).distinct()
+        all_user_projects = UserProject.objects.filter(user_profile__user=user)
+
+    if subject_id:
+        available_subjects = available_subjects.filter(pk=subject_id)
+        all_user_projects = all_user_projects.filter(subject_id=subject_id)
+    if project_id:
+        all_user_projects = all_user_projects.filter(pk=project_id)
     if q:
         from django.db.models import Q
         qs = qs.filter(Q(name__icontains=q) | Q(image__icontains=q) | Q(owner__username__icontains=q) | Q(owner__first_name__icontains=q) | Q(owner__last_name__icontains=q))
@@ -1254,6 +1324,10 @@ def service_table(request):
         "hide_table_header": hide_table_header,
         "is_sorting": user_has_custom_sort,
         "group_by": group_by,
+        "is_searching": is_searching,
+        "available_subjects": available_subjects,
+        "all_user_projects": all_user_projects,
+        "hierarchy": prepare_hierarchy(available_subjects, all_user_projects, qs),
     }, request=request)
     return HttpResponse(html)
 

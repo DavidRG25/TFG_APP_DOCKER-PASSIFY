@@ -14,8 +14,8 @@
 - [x] **Mejoras Modal Asignatura (Nueva/Editar)**: Implementar previsualización de logo, botón para limpiar logo, reinicio del formulario al cerrar y validación estricta del nombre del archivo (< 90 caracteres).
 - [x] **Renombrar panel**: Cambiar el nombre del panel superior/lateral de "Proyectos" a "Mis Servicios".
 - [x] **Panel de personalización más pequeño**: Ajustar el tamaño del panel de diseño/personalización para que no ocupe demasiado espacio en pantalla.
-- [ ] **Panel "No estás matriculado" visual**: Mejorar el diseño del panel vacío que se muestra cuando un alumno no tiene asignaturas, haciéndolo más amigable/visual y validando correctamente el estado de su sesión.
-- [ ] **Visualización de proyectos vacíos**: Permitir que los profesores/alumnos puedan ver y entrar en proyectos que todavía no tienen servicios asociados.
+- [x] **Panel "No estás matriculado" visual**: Mejorar el diseño del panel vacío que se muestra cuando un alumno no tiene asignaturas, haciéndolo más amigable/visual y validando correctamente el estado de su sesión.
+- [x] **Visualización de proyectos vacíos**: Permitir que los profesores/alumnos puedan ver y entrar en proyectos que todavía no tienen servicios asociados.
 - [x] **Cerrar botón cerrar sesión**: Arreglar/Ajustar el comportamiento o estilo del botón de cerrar sesión.
 
 ### Funcionalidades de Carga (Excel)
