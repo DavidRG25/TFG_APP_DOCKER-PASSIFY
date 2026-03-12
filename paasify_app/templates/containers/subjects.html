@@ -83,8 +83,18 @@
     from { opacity: 0; transform: translateY(10px); }
     to { opacity: 1; transform: translateY(0); }
 }
+@keyframes floatIcon {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+}
 .animate-fade-in {
     animation: fadeIn 0.8s ease-out forwards;
+}
+.empty-state-icon {
+    animation: floatIcon 3s ease-in-out infinite;
+}
+.empty-state-card {
+    animation: fadeIn 0.6s ease-out forwards;
 }
 .tracking-tighter {
     letter-spacing: -0.05em;
@@ -134,7 +144,7 @@
               <div class="badge rounded-pill px-3 py-2 subject-badge" 
                    style="color: white; border: 1px solid rgba(255,255,255,0.2);">
                 <i class="fas fa-layer-group me-1"></i>
-                {{ s.projects.count }} Proy.
+                {{ s.user_projects_count|default:0 }} Proy.
               </div>
             </div>
           </div>
@@ -142,19 +152,108 @@
       {% endfor %}
     </div>
   {% else %}
-    <div class="card border-0 shadow-sm rounded-4 p-5 text-center">
-        <div class="mb-4 text-muted">
-            <i class="fas fa-folder-open display-1 opacity-25"></i>
+    <div class="row justify-content-center">
+      <div class="col-lg-7 col-xl-6">
+
+        {# --- Tarjeta de Estado Vacío Premium --- #}
+        <div class="card border-0 shadow rounded-4 overflow-hidden text-center empty-state-card" style="background: white;">
+
+          {# Barra decorativa superior con gradiente #}
+          <div style="height: 6px; background: linear-gradient(90deg, #4e73df 0%, #36b9cc 50%, #1cc88a 100%);"></div>
+
+          <div class="card-body p-5">
+            {# Ilustración con Icono grande y capas de fondo #}
+            <div class="position-relative d-inline-flex align-items-center justify-content-center mx-auto mb-4 empty-state-icon" style="width: 110px; height: 110px;">
+              <div class="position-absolute rounded-circle" style="width: 110px; height: 110px; background: linear-gradient(135deg, rgba(78,115,223,0.08) 0%, rgba(54,185,204,0.08) 100%);"></div>
+              <div class="position-absolute rounded-circle" style="width: 82px; height: 82px; background: linear-gradient(135deg, rgba(78,115,223,0.12) 0%, rgba(54,185,204,0.12) 100%);"></div>
+              <i class="fas fa-graduation-cap" style="font-size: 2.5rem; color: #4e73df; position: relative; z-index: 1;"></i>
+            </div>
+
+            {# Título y descripción principal #}
+            <h3 class="fw-bold text-dark mb-2" style="letter-spacing: -0.3px;">
+              Aún no estás matriculado
+            </h3>
+            <p class="text-muted mb-4 mx-auto" style="max-width: 400px; line-height: 1.6;">
+              Cuando seas incorporado a una asignatura, aparecerá aquí con todos tus proyectos y contenedores.
+            </p>
+
+            {# Separador #}
+            <hr class="my-4 mx-auto" style="max-width: 200px; border-color: #edf2f7; border-width: 2px; border-radius: 4px;">
+
+            {# Pasos de qué hacer #}
+            <p class="text-muted fw-bold small text-uppercase mb-3" style="letter-spacing: 1px; font-size: 0.7rem;">
+              ¿Qué hacer ahora?
+            </p>
+            <div class="row g-3 mb-4 text-start mx-auto" style="max-width: 460px;">
+
+              <div class="col-12">
+                <div class="d-flex align-items-center p-3 px-4 rounded-3" style="background: #f8fafc; border: 1px solid #edf2f7;">
+                  <div class="d-flex align-items-center justify-content-center flex-shrink-0 rounded-3" 
+                       style="width: 40px; height: 40px; min-width: 40px; background: rgba(78,115,223,0.1); color: #4e73df; font-size: 1rem; margin-right: 1.25rem !important;">
+                    <i class="fas fa-chalkboard-teacher"></i>
+                  </div>
+                  <div>
+                    <p class="fw-bold text-dark mb-0 small">Contacta con tu profesor</p>
+                    <p class="text-muted mb-0" style="font-size: 0.78rem;">Pídele que te añada a su asignatura desde el panel de gestión.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="d-flex align-items-center p-3 px-4 rounded-3" style="background: #f8fafc; border: 1px solid #edf2f7;">
+                  <div class="d-flex align-items-center justify-content-center flex-shrink-0 rounded-3" 
+                       style="width: 40px; height: 40px; min-width: 40px; background: rgba(28,200,138,0.1); color: #1cc88a; font-size: 1rem; margin-right: 1.25rem !important;">
+                    <i class="fas fa-user-shield"></i>
+                  </div>
+                  <div>
+                    <p class="fw-bold text-dark mb-0 small">O avisa a un administrador</p>
+                    <p class="text-muted mb-0" style="font-size: 0.78rem;">El equipo de administración también puede matricularte directamente.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="d-flex align-items-center p-3 px-4 rounded-3" style="background: #f8fafc; border: 1px solid #edf2f7;">
+                  <div class="d-flex align-items-center justify-content-center flex-shrink-0 rounded-3" 
+                       style="width: 40px; height: 40px; min-width: 40px; background: rgba(246,194,62,0.1); color: #f6c23e; font-size: 1rem; margin-right: 1.25rem !important;">
+                    <i class="fas fa-sync-alt"></i>
+                  </div>
+                  <div>
+                    <p class="fw-bold text-dark mb-0 small">¿Ya te han matriculado?</p>
+                    <p class="text-muted mb-0" style="font-size: 0.78rem;">Recarga la página para ver tus asignaturas actualizadas.</p>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+
+            {# CTA: Recargar #}
+            <button onclick="window.location.reload()" class="btn btn-primary rounded-pill px-4 py-2 fw-bold shadow-sm">
+              <i class="fas fa-sync-alt me-2"></i>
+              Actualizar asignaturas
+            </button>
+
+          </div>
+
+          {# Pie decorativo #}
+          <div class="card-footer border-0 py-3" style="background: #f8fafc;">
+            <small class="text-muted">
+              <i class="fas fa-info-circle me-2 opacity-50"></i>
+              Sesión activa como
+              <strong class="text-dark">{{ request.user.username }}</strong>
+            </small>
+          </div>
+
         </div>
-        <h3 class="fw-bold">No hay asignaturas activas</h3>
-        <p class="text-muted">Pide a tu profesor o administrador que te matricule en alguna asignatura para empezar.</p>
+      </div>
     </div>
   {% endif %}
 </div>
 
 <div class="mt-5 pt-3 text-center">
     <a href="{% url 'containers:student_panel' %}" class="btn btn-outline-secondary rounded-pill px-4">
-        <i class="fas fa-arrow-left me-2"></i>Ir a Mis Servicios
+        <i class="fas fa-arrow-left" style="margin-right: 10px !important;"></i>
+        Ir a Mis Servicios
     </a>
 </div>
 
