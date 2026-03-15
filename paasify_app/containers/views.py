@@ -2185,6 +2185,8 @@ def api_documentation_view(request, section_slug="introduccion"):
 
     # Definicion del orden fijo de secciones (Jerarquia completa)
     SECTIONS = [
+        {"slug": "postman",         "title": "Colección Postman",        "file": "00_postman/postman.md", "icon": "📮"},
+
         {"slug": "introduccion",    "title": "1. Introducción",          "file": "01_intro/intro.md"},
         {"slug": "bienvenida",      "title": "1.1 Bienvenida",           "file": "01_intro/01_bienvenida.md", "parent_slug": "introduccion", "icon": "👋"},
         
@@ -2298,6 +2300,30 @@ def api_documentation_view(request, section_slug="introduccion"):
     }
     
     return render(request, 'containers/api_documentation.html', context)
+
+
+@login_required
+def export_api_schema(request):
+    """
+    Exporta el esquema OpenAPI actual como un archivo JSON descargable 
+    optimizado para ser importado en Postman.
+    """
+    from drf_spectacular.generators import SchemaGenerator
+    from django.http import HttpResponse
+    import json
+
+    generator = SchemaGenerator(title="PaaSify API", description="Documentación oficial de la API de PaaSify")
+    schema = generator.get_schema(public=True)
+    
+    if not schema:
+        return HttpResponse("No se pudo generar el esquema de la API.", status=500)
+
+    # Convertir a JSON bonito
+    schema_json = json.dumps(schema, indent=2, ensure_ascii=False)
+    
+    response = HttpResponse(schema_json, content_type='application/json')
+    response['Content-Disposition'] = 'attachment; filename="paasify_api_collection.json"'
+    return response
 
 
 @login_required

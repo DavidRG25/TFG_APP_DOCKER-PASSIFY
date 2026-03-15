@@ -34,6 +34,7 @@ urlpatterns = [
     
     # Documentación dedicada de la API (Navegación por secciones)
     path("api-docs/", views.api_documentation_view, name="api_docs"),
+    path("api-docs/export/", views.export_api_schema, name="export_api_docs"),
     path("api-docs/<slug:section_slug>/", views.api_documentation_view, name="api_docs_section"),
 
 

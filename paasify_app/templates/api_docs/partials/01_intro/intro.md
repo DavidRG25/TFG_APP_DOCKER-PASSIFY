@@ -17,6 +17,11 @@ PaaSify no es solo un servidor; es un ecosistema diseñado para tu aprendizaje:
 
 ---
 
+### 📮 Herramientas de Testing
+Para una experiencia de desarrollo más avanzada, puedes utilizar nuestra **Colección de Postman**. Encontrarás el acceso directo para descargarla y las instrucciones de uso justo encima de esta sección en el menú lateral.
+
+---
+
 ### 🚦 Primeros Pasos Sugeridos
 
 1.  **Explora**: Mira qué asignaturas y proyectos tienes disponibles en la sección **3. Consultas**.

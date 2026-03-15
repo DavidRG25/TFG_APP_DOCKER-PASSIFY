@@ -439,8 +439,87 @@ PaaSify{% endblock %} {% block extrahead %}
 
 <div class="api-docs-container">
   <aside class="api-sidebar" id="api-sidebar">
+    <div class="px-3 mb-4">
+      <style>
+        @keyframes rocket-float {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-4px); }
+        }
+        @keyframes border-spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        .premium-resource-card {
+          background: #7c2d12 !important; /* Marrón/Naranja muy oscuro para contraste */
+          position: relative;
+          z-index: 1;
+          overflow: hidden;
+          transition: all 0.4s ease;
+          border: none !important;
+          border-radius: 16px;
+        }
+        .premium-resource-card::before {
+          content: "";
+          position: absolute;
+          z-index: -2;
+          left: -50%;
+          top: -50%;
+          width: 200%;
+          height: 200%;
+          background: conic-gradient(
+            transparent, 
+            #fbbf24, /* Amarillo/Oro para la línea */
+            transparent 20%
+          );
+          animation: border-spin 3s linear infinite;
+        }
+        .premium-resource-card::after {
+          content: "";
+          position: absolute;
+          z-index: -1;
+          left: 2px;
+          top: 2px;
+          width: calc(100% - 4px);
+          height: calc(100% - 4px);
+          background: linear-gradient(135deg, #ff6c37 0%, #ea580c 100%);
+          border-radius: 14px;
+        }
+        .premium-resource-card:hover {
+          transform: translateY(-5px);
+          box-shadow: 0 15px 30px rgba(29, 78, 216, 0.45) !important;
+        }
+        .floating-rocket {
+          animation: rocket-float 2.5s ease-in-out infinite;
+          font-size: 1.1rem;
+          margin-right: 18px !important;
+          display: inline-block;
+        }
+        .postman-btn {
+          background: white !important;
+          color: #ea580c !important;
+          border-radius: 12px;
+          padding: 10px 16px !important;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .postman-btn:hover {
+          transform: scale(1.03);
+          background: #fdf2f0 !important;
+        }
+      </style>
+      <div class="card shadow-lg premium-resource-card p-3">
+        <div class="d-flex align-items-center mb-3">
+            <i class="fas fa-rocket text-white floating-rocket"></i>
+            <span class="fw-bold text-uppercase text-white" style="letter-spacing: 2.5px; font-size: 0.75rem;">Recursos API</span>
+        </div>
+        <a href="{% url 'containers:api_docs_section' 'postman' %}" class="nav-link postman-btn text-decoration-none d-flex align-items-center transition-all">
+            <img src="https://www.vectorlogo.zone/logos/getpostman/getpostman-icon.svg" width="24" style="margin-right: 12px !important;" alt="Postman">
+            <span class="fw-bold" style="font-size: 0.85rem;">Colección Postman</span>
+        </a>
+      </div>
+    </div>
+
     <div class="d-flex justify-content-between align-items-center mb-1 pe-2">
-      <h6>Guía de Inicio</h6>
+      <h6 class="text-muted fw-bold" style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px;">Guía de Inicio</h6>
       <span
         class="expand-toggle"
         id="toggle-all-sections"
@@ -451,8 +530,8 @@ PaaSify{% endblock %} {% block extrahead %}
     </div>
     <ul class="api-nav">
       {% for section in sections %}
-      {# Solo renderizar secciones principales (sin padre) #}
-      {% if not section.parent_slug %}
+      {# Solo renderizar secciones principales (sin padre) y saltar Postman que ya está arriba #}
+      {% if not section.parent_slug and section.slug != 'postman' %}
       <li
         class="api-nav-item {% if current_slug == section.slug or current_section.parent_slug == section.slug %}active-parent{% endif %}"
         data-slug="{{ section.slug }}"
