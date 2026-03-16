@@ -27,7 +27,15 @@
 
 ### APIs y Documentación
 
-- [ ] **Colección Postman exportable**: A partir de nuestra documentación OAS (Swagger/drf-spectacular), generar un JSON de Postman o un mecanismo que permita descargar un archivo directo para importarlo en Postman.
+- [x] **Colección Postman exportable**: A partir de nuestra documentación OAS (Swagger/drf-spectacular), generar un JSON de Postman o un mecanismo que permita descargar un archivo directo para importarlo en Postman.
+  - **Esquema de mejoras adicionales aportadas al testing de Postman**:
+    - _Autenticación Dinámica_: Neutralización de `cookieAuth` individual para priorizar autenticación en cascada `Inherit auth from parent` y no depender de pre-scripts.
+    - _URLs Resolutivas_: Eliminado el path absoluto roto de exportación DRF (`/api/`) e instanciado un `baseUrl` iterativo a base de Host Request Django.
+    - _Semántica Limpia_: Translación automática de `operationIds` internos (`api_containers_create`) por etiquetas de lectura humana (`Create container`).
+    - _Inyección de Ejemplos_: Los métodos POST y dependientes de Compose ahora cuentan con Bodies auto-completados por defecto con plantillas Json.
+    - _Documentación Estructurada_: Implementación de descripciones formales Markdown tanto en subcarpetas de interfaz como en métodos específicos.
+    - _Exportación OpenAPI Nivelada_: Generación dinámica paralela a drf-spectacular del mismo JSON pero adaptado 100% a la especificación estándar Postman/OpenAPI sin depender de librerías extraídas.
+    - _Guía de API Docs Incorporada_: Creación de un documento volcado/guía (sección interactiva dentro del portal) con equivalente funcionalidad semántica para acompañar la experiencia técnica del usuario con ejemplos visuales y explicaciones precisas.
 - [x] **Menú Profesor - API Docs**: El enlace a `API-DOCS` debe estar visible también en el panel del profesor, no solo en el del admin o alumno.
 
 ### Seguridad y Sesiones
@@ -73,6 +81,7 @@ Se han completado un conjunto de mejoras transversales documentadas en el plan a
 [COMPLETADO_plan_mejoras_adicionales_20251128.md](file:///c:/Users/david/OneDrive/Escritorio/TFG/TGF_APP_DOCKER-PASSIFY/paasify_app/document/04_planes/completado/COMPLETADO_plan_mejoras_adicionales_20251128.md)
 
 **Resumen de lo realizado (Esquema):**
+
 1. **Admin Panel**: Filtros avanzados por tipo de imagen y estado real de Docker.
 2. **Bulk Actions**: Reinicio masivo de servicios, exportación a CSV (BOM Excel) y refresco de tokens API.
 3. **Persistencia**: Sistema de volúmenes automáticos y persistencia garantizada en reinicios.

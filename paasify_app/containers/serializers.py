@@ -78,7 +78,7 @@ class ServiceSerializer(serializers.ModelSerializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         request = self.context.get("request")
-        if request and request.user:
+        if request and request.user and request.user.is_authenticated:
             # Filtrar asignaturas disponibles para el alumno
             self.fields["subject"].queryset = Subject.objects.filter(
                 students=request.user

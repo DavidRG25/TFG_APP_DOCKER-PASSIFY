@@ -328,4 +328,32 @@ JAZZMIN_UI_TWEAKS = {
     }
 }
 
+# ---------------------------------------------------------------------
+# Spectacular (OpenAPI 3.0)
+# ---------------------------------------------------------------------
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'PaaSify API',
+    'DESCRIPTION': 'Documentación oficial de la API de PaaSify para integración y automatización.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    # Aseguramos reflejar oficialmente la autenticación soportada real:
+    # 1. cookieAuth (Sesión estándar de DRF)
+    # 2. Bearer (TokenAuthMiddleware)
+    'SECURITY': [
+        {'cookieAuth': []},
+        {'Bearer': []},
+    ],
+    'APPEND_COMPONENTS': {
+        'securitySchemes': {
+            'Bearer': {
+                'type': 'http',
+                'scheme': 'bearer',
+                'bearerFormat': 'Token',
+                'description': 'Pega tu Token API generado en la sección "Mi Perfil". No incluyas la palabra "Bearer", Postman lo hará por ti.',
+            }
+        }
+    },
+    'COMPONENT_SPLIT_REQUEST': True,
+}
+
 APPEND_SLASH=False

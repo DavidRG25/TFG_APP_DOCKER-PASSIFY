@@ -179,7 +179,11 @@ class ServiceViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Solo los alumnos pueden gestionar contenedores.")
 
     def get_queryset(self):
-        user = self.request.user
+        # Manejo de AnonymousUser para drf-spectacular (introspección)
+        user = getattr(self.request, 'user', None)
+        if not user or not user.is_authenticated:
+            return Service.objects.none()
+
         if user_is_admin(user) or user_is_teacher(user):
             qs = Service.objects.all()
         else:
@@ -746,7 +750,10 @@ class SubjectViewSet(viewsets.ReadOnlyModelViewSet):
         return SubjectSerializer
 
     def get_queryset(self):
-        user = self.request.user
+        user = getattr(self.request, 'user', None)
+        if not user or not user.is_authenticated:
+            return Subject.objects.none()
+            
         if user_is_admin(user) or user.is_superuser:
             return Subject.objects.all()
         # Si es profesor, sus asignaturas
@@ -769,7 +776,10 @@ class ProjectViewSet(viewsets.ReadOnlyModelViewSet):
         return ProjectSerializer
 
     def get_queryset(self):
-        user = self.request.user
+        user = getattr(self.request, 'user', None)
+        if not user or not user.is_authenticated:
+            return UserProject.objects.none()
+
         if user_is_admin(user) or user.is_superuser:
             qs = UserProject.objects.all()
         # Si es profesor, proyectos de sus asignaturas
@@ -2305,18 +2315,237 @@ def api_documentation_view(request, section_slug="introduccion"):
 @login_required
 def export_api_schema(request):
     """
-    Exporta el esquema OpenAPI actual como un archivo JSON descargable 
-    optimizado para ser importado en Postman.
+    Exporta el esquema OpenAPI actual como un archivo JSON descargable.
+    Realiza un post-procesado orientado puramente a Developer Experience
+    para que se auto-configure correctamente en Postman al ser importado,
+    manteniendo la fidelidad con los esquemas reales definidos en el código.
     """
     from drf_spectacular.generators import SchemaGenerator
     from django.http import HttpResponse
     import json
 
-    generator = SchemaGenerator(title="PaaSify API", description="Documentación oficial de la API de PaaSify")
+    generator = SchemaGenerator()
     schema = generator.get_schema(public=True)
     
     if not schema:
         return HttpResponse("No se pudo generar el esquema de la API.", status=500)
+
+    # =========================================================================
+    # POST-PROCESADO: ORIENTADO A MEJORAR LA EXPERIENCIA EN POSTMAN (DEVEX)
+    # =========================================================================
+
+    # 1. Variables de Colección de Postman: baseUrl
+    # Generamos la URL base real basada en la petición actual usando request.build_absolute_uri
+    current_baseUrl = request.build_absolute_uri('/api')
+    # Convertimos el path en una variable de Servidor, Postman lo lee como Colección
+    schema['servers'] = [{
+        'url': '{baseUrl}',
+        'variables': {
+            'baseUrl': {
+                'default': current_baseUrl,
+                'description': 'URL base del servidor PaaSify (incluye /api)'
+            }
+        }
+    }]
+
+    # 2. Preferir Bearer Token en la UI del cliente (manteniendo fidelidad de la API)
+    # y evitar duplicados a nivel global
+    if 'security' in schema:
+        seen = []
+        new_global_security = []
+        for sec in schema['security']:
+            sec_str = str(sec)
+            if sec_str not in seen:
+                seen.append(sec_str)
+                new_global_security.append(sec)
+        schema['security'] = sorted(
+            new_global_security, 
+            key=lambda item: 0 if 'Bearer' in item else 1
+        )
+
+    # Diccionario para convertir OperationIds internos en descripciones claras y unificadas
+    summary_map = {
+        'api_containers_list': 'List containers',
+        'api_containers_create': 'Create container',
+        'api_containers_retrieve': 'Get container details',
+        'api_containers_update': 'Update container',
+        'api_containers_partial_update': 'Partially update container',
+        'api_containers_destroy': 'Delete container',
+        'api_containers_remove_create': 'Remove container',
+        'api_containers_start_create': 'Start container',
+        'api_containers_stop_create': 'Stop container',
+        'api_containers_restart_create': 'Restart container',
+        'api_containers_logs_retrieve': 'Get container logs',
+        'api_containers_dockerfile_retrieve': 'Get Dockerfile',
+        'api_containers_compose_retrieve': 'Get compose file',
+        'api_containers_containers_start_create': 'Start sub-container',
+        'api_containers_containers_stop_create': 'Stop sub-container',
+        
+        'api_images_list': 'List images',
+        'api_images_retrieve': 'Get image details',
+        
+        'api_projects_list': 'List projects',
+        'api_projects_retrieve': 'Get project details',
+        
+        'api_subjects_list': 'List subjects',
+        'api_subjects_retrieve': 'Get subject details',
+    }
+
+    # 3. Limpieza de estructura de carpetas (Tags y Paths) y Auto-Relleno
+    new_paths = {}
+    for path, path_item in schema.get('paths', {}).items():
+        # A) Quitar el prefijo '/api' de las rutas del JSON
+        clean_path = path
+        if path.startswith('/api/'):
+            clean_path = '/' + path[5:]
+
+        for method, operation in path_item.items():
+            if not isinstance(operation, dict):
+                continue
+            
+            # B) Agrupación por Carpetas Limpias (limpiamos el tag 'api')
+            tags = operation.get('tags', [])
+            if 'api' in tags:
+                tags.remove('api')
+            if not tags:
+                # Deducir del path: p.e /containers/ -> ['Containers']
+                parts = [p for p in clean_path.split('/') if p and not p.startswith('{')]
+                if parts:
+                    tags = [parts[0].capitalize()]
+                else:
+                    tags = ['General']
+            operation['tags'] = tags
+
+            # C) Renombramos internal operationIds a Summaries Mapeados
+            op_id = operation.get('operationId', '')
+            if op_id in summary_map:
+                operation['summary'] = summary_map[op_id]
+            elif not operation.get('summary'):
+                operation['summary'] = op_id.replace('_', ' ').capitalize()
+
+            # D) Uniformar las descripciones de responses
+            resp_desc_map = {
+                '200': 'Operación completada correctamente',
+                '201': 'Recurso creado correctamente',
+                '204': 'Recurso eliminado correctamente',
+                '400': 'Solicitud inválida',
+                '401': 'No autenticado',
+                '404': 'Recurso no encontrado',
+                '500': 'Error interno del servidor',
+            }
+
+            resp_dict = operation.setdefault('responses', {})
+            for code, resp in resp_dict.items():
+                if code in resp_desc_map:
+                    resp['description'] = resp_desc_map[code]
+                elif not resp.get('description'):
+                    resp['description'] = f"Status {code}"
+
+            # E) Añadir errores básicos donde falten para mayor completitud
+            if '401' not in resp_dict:
+                resp_dict['401'] = {'description': resp_desc_map['401']}
+            
+            # Asumimos que si hay una variable de ruta ({id}), puede lanzar 404
+            if '{' in clean_path and '404' not in resp_dict:
+                resp_dict['404'] = {'description': resp_desc_map['404']}
+            
+            # Para métodos de escritura o acciones, suele haber error 400 y 500
+            if method in ['post', 'put', 'patch'] or any(act in clean_path for act in ['start', 'stop', 'restart', 'remove']):
+                if '400' not in resp_dict:
+                    resp_dict['400'] = {'description': resp_desc_map['400']}
+                if '500' not in resp_dict:
+                    resp_dict['500'] = {'description': resp_desc_map['500']}
+
+            # F) Forzar herencia de Autenticación de la Colección (Inherit auth from parent)
+            # Postman tiene la mala costumbre de configurar Type: Bearer vacío en cada
+            # petición individual si 'security' está declarado a nivel de endpoint.
+            # Borrando los de nivel de endpoint obligamos a que use el Global, que el usuario ha rellenado.
+            if 'security' in operation:
+                del operation['security']
+                
+            # G) Descripciones y Ejemplos de uso (Específico para UI/Ux Postman)
+            if op_id == 'api_containers_create':
+                operation['description'] = (
+                    "**Despliega un nuevo servicio en la plataforma.**\n\n"
+                    "Puedes crear un contenedor base seleccionando una `image`, o "
+                    "desplegar un stack completo seleccionando un `project` y un archivo `compose_file`.\n\n"
+                    "**Campos obligatorios:**\n"
+                    "- `subject`: ID numérico de la asignatura.\n"
+                    "- Y al menos uno de los tres orígenes:\n"
+                    "  1. `image`: ID de la imagen base (ej. Ubuntu).\n"
+                    "  2. `project`: ID de repositorio clonado (requiere `compose_file` relativo al repositorio).\n"
+                    "  3. `dockerfile_content`: Texto en crudo con el contenido de un Dockerfile.\n"
+                )
+                try:
+                    if 'requestBody' in operation and 'application/json' in operation['requestBody'].get('content', {}):
+                        content_json = operation['requestBody']['content']['application/json']
+                        
+                        # Inyectamos el ejemplo directamente en el nivel 'example' para que
+                        # al abrir 'Body -> raw -> JSON' en Postman, este sea el texto por defecto en la caja del editor.
+                        content_json['example'] = {
+                            "name": "mi-servidor-web",
+                            "subject": 1,
+                            "image": 5
+                        }
+                        
+                        # También mantenemos la lista de examples opcionales por si Postman
+                        # soporta el autocompletado avanzado en versiones futuras.
+                        content_json['examples'] = {
+                            "Basado en Imagen": {
+                                "summary": "Despliegue Simple (Ejemplo guiado)",
+                                "value": {
+                                    "name": "mi-servidor-web",
+                                    "subject": 1,
+                                    "image": 5
+                                }
+                            },
+                            "Basado en Proyecto Compose": {
+                                "summary": "Despliegue Complejo (Compose)",
+                                "value": {
+                                    "name": "mi-app-completa",
+                                    "subject": 2,
+                                    "project": 8,
+                                    "branch": "main",
+                                    "compose_file": "docker-compose.yml"
+                                }
+                            }
+                        }
+                except Exception:
+                    pass
+            elif op_id in ['api_containers_containers_start_create', 'api_containers_containers_stop_create']:
+                operation['description'] = (
+                    "**Acción de Sub-Contenedor (Docker Compose)**\n\n"
+                    "Esta petición no actúa sobre el entorno principal, sino sobre un **sub-contenedor específico** "
+                    "aislado que forma parte de un entorno de Docker Compose multihilo. \n\n"
+                    "Usa el ID del contenedor hijo."
+                )
+
+        new_paths[clean_path] = path_item
+
+    # Reasignamos nuestro diccionario procesado al esquema exportado
+    schema['paths'] = new_paths
+    
+    # 4. Descripciones Grupales de Postman (Carpetas)
+    schema['tags'] = [
+        {
+            'name': 'Containers',
+            'description': 'Gestión del ciclo de vida de los servicios (crear, encender, apagar, consultar logs, eliminar). Incluye interacción avanzada con sub-contenedores de Docker Compose.'
+        },
+        {
+            'name': 'Images',
+            'description': 'Catálogo de imágenes base permitidas en la plataforma para despliegues sencillos y unitarios (ej. Ubuntu, Alpine, Nginx...).'
+        },
+        {
+            'name': 'Projects',
+            'description': 'Información sobre proyectos y repositorios de código vinculados a la cuenta del alumno a través de integraciones Git.'
+        },
+        {
+            'name': 'Subjects',
+            'description': 'Datos relativos a las asignaturas en las que está matriculado el alumno y a las que obligatoriamente imputará las máquinas desplegadas.'
+        }
+    ]
+
+    # =========================================================================
 
     # Convertir a JSON bonito
     schema_json = json.dumps(schema, indent=2, ensure_ascii=False)
