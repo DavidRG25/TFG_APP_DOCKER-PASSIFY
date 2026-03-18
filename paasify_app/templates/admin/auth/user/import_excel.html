@@ -1,0 +1,176 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block title %}Carga Masiva de Usuarios (Excel) | {{ site_title|default:_("Django site admin") }}{% endblock %}
+
+{% block extrastyle %}
+    {{ block.super }}
+    <style>
+        .import-container {
+            max-width: 800px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border: 1px solid #e0e0e0;
+        }
+        .import-header {
+            border-bottom: 2px solid #79aec8;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+        }
+        .import-header h2 {
+            margin: 0;
+            color: #333;
+            font-size: 24px;
+        }
+        .info-box {
+            background-color: #f8f9fa;
+            border-left: 5px solid #17a2b8;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 0 4px 4px 0;
+        }
+        .upload-area {
+            border: 2px dashed #ccc;
+            padding: 40px 20px;
+            text-align: center;
+            background-color: #fafafa;
+            border-radius: 6px;
+            margin-bottom: 25px;
+            transition: all 0.3s ease;
+        }
+        .upload-area:hover {
+            border-color: #79aec8;
+            background-color: #f1f6f8;
+        }
+        .btn-custom {
+            background-color: #79aec8;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn-custom:hover {
+            background-color: #609ab6;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-weight: bold;
+            display: inline-block;
+        }
+        .btn-secondary:hover {
+            background-color: #5a6268;
+        }
+        .download-btn {
+            background-color: #28a745;
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .download-btn:hover {
+            background-color: #218838;
+        }
+        .messages {
+            margin-bottom: 20px;
+        }
+        .errornote {
+            background-color: #ffeaea;
+            border: 1px solid #ffcaca;
+            color: #cc0000;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+        .successnote {
+            background-color: #eafbee;
+            border: 1px solid #c8e6c9;
+            color: #2e7d32;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            font-weight: bold;
+        }
+    </style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=opts.app_label %}">{{ opts.app_config.verbose_name }}</a>
+&rsaquo; <a href="{% url 'admin:auth_user_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+&rsaquo; Carga Masiva (Excel)
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <div class="import-container">
+        
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="{% if message.tags == 'error' %}errornote{% else %}successnote{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="import-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2>Importación Masiva de Usuarios (Admin)</h2>
+            <a href="{% url 'admin:auth_user_changelist' %}" class="btn-custom" style="padding: 6px 12px; font-size: 14px; text-decoration: none; color: white !important;">
+                &larr; Volver a Usuarios
+            </a>
+        </div>
+
+        <div class="info-box">
+            <strong>Instrucciones Strict Mode:</strong>
+            <ul style="margin-top: 5px; margin-bottom: 0;">
+                <li>Utilice EXCLUSIVAMENTE la plantilla proporcionada.</li>
+                <li><strong>Obligatorio:</strong> Nombre de usuario, Nombre Completo, Email y Rol (student/teacher/admin).</li>
+                <li><strong>Contraseña (Opcional):</strong> Si se deja en blanco, se utilizará el Email como contraseña inicial por defecto.</li>
+                <li>Si ocurre un error en CUALQUIER fila, se abortará toda la transacción y no se importará NADA para garantizar la integridad de los datos.</li>
+            </ul>
+        </div>
+
+        <form method="post" action="." enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div style="text-align: right;">
+                <button type="submit" name="download_template" value="1" class="download-btn" formnovalidate>
+                    <i class="fas fa-file-excel"></i> Descargar Plantilla .xlsx
+                </button>
+            </div>
+
+            <div class="upload-area">
+                <i class="fas fa-file-upload fa-3x" style="color: #999; margin-bottom: 15px;"></i>
+                <h3 style="margin-bottom: 10px; color: #555;">Seleccione el archivo llenado</h3>
+                <input type="file" name="excel_file" accept=".xlsx" required style="font-size: 16px;">
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; margin-top: 30px;">
+                <button type="submit" class="btn-custom" onclick="this.innerHTML='Procesando...';">
+                    Confirmar y Ejecutar Importación
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

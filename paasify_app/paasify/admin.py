@@ -602,12 +602,17 @@ class UserProfileAdmin(admin.ModelAdmin):
             return "-"
         
         # Verificar si es profesor
-        if obj.user.groups.filter(name__in=TEACHER_GROUP_NAMES).exists():
+        if obj.user.groups.filter(name__in=TEACHER_GROUP_NAMES).exists() or getattr(obj, 'role', '') == 'teacher':
             return format_html(
                 '<span style="background: #4caf50; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px;">👨‍🏫 Profesor</span>'
             )
+        # Verificar si es admin
+        elif obj.user.is_superuser or getattr(obj, 'role', '') == 'admin':
+            return format_html(
+                '<span style="background: #e91e63; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px;">👑 Admin</span>'
+            )
         # Verificar si es alumno
-        elif obj.user.groups.filter(name__in=STUDENT_GROUP_NAMES).exists():
+        elif obj.user.groups.filter(name__in=STUDENT_GROUP_NAMES).exists() or getattr(obj, 'role', '') == 'student':
             return format_html(
                 '<span style="background: #2196f3; color: white; padding: 3px 8px; border-radius: 3px; font-size: 11px;">👨‍🎓 Alumno</span>'
             )
@@ -1079,6 +1084,54 @@ class CustomUserAdmin(BaseUserAdmin):
         'is_active',
     ]
     actions = ['export_users_csv']
+    change_list_template = "admin/auth/user/change_list.html"
+    
+    def get_urls(self):
+        urls = super().get_urls()
+        from django.urls import path
+        my_urls = [
+            path('import-excel/', self.admin_site.admin_view(self.import_excel), name='auth_user_import_excel'),
+        ]
+        return my_urls + urls
+
+    def import_excel(self, request):
+        from django.shortcuts import render, redirect
+        from django.contrib import messages
+        from paasify.services.excel_importer import ExcelImporterService
+        
+        if request.method == "POST":
+            # Si descargan la plantilla
+            if "download_template" in request.POST:
+                from django.http import HttpResponse
+                output_bytes = ExcelImporterService.generate_template('admin')
+                response = HttpResponse(output_bytes, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                response['Content-Disposition'] = 'attachment; filename="plantilla_admin_usuarios.xlsx"'
+                return response
+                
+            # Si suben el archivo
+            file_obj = request.FILES.get("excel_file")
+            if not file_obj:
+                messages.error(request, "Debe seleccionar un archivo .xlsx para importar.")
+                return redirect("..")
+                
+            try:
+                result = ExcelImporterService.process_admin_import(file_obj)
+                messages.success(request, f"Operación Completada: Se han creado exitosamente {result.get('count', 0)} usuarios.")
+                return redirect("..")
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                messages.error(request, f"Error Transaccional Abortado: {str(e)}")
+                return redirect("..")
+                
+        # Al acceder por GET
+        context = dict(
+            self.admin_site.each_context(request),
+            opts=self.model._meta,
+            has_view_permission=self.has_view_permission(request),
+            title="Carga Masiva (Excel)",
+        )
+        return render(request, "admin/auth/user/import_excel.html", context)
     
     # Filtros
     list_filter = [

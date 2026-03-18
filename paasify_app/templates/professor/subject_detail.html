@@ -143,6 +143,9 @@
               <button class="btn btn-sm btn-outline-success rounded-pill px-3 shadow-sm hover-elevate" id="student-btn-existente" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#addExistingStudentModal" data-target="#addExistingStudentModal" title="Matricular Alumno Existente">
                 <i class="fas fa-link" style="margin-right: 8px !important;"></i>Existente
               </button>
+              <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm hover-elevate text-dark" id="student-btn-import" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#importExcelModal" data-target="#importExcelModal" title="Carga Masiva (Excel)">
+                <i class="fas fa-file-excel" style="margin-right: 8px !important; color: #107c41;"></i>Importar
+              </button>
               <button class="btn btn-sm rounded-pill px-3 shadow-sm hover-elevate" style="background-color: var(--subject-primary); color: white;" id="student-btn-nuevo" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createStudentModal" data-target="#createStudentModal">
                 <i class="fas fa-plus" style="margin-right: 8px !important;"></i>Nuevo Alumno
               </button>
@@ -367,6 +370,271 @@
       err.classList.add('d-none');
       btn.disabled = false;
     }
+  }
+</script>
+
+<!-- Modal Importacion Masiva (Excel) -->
+<div class="modal fade" id="importExcelModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered modal-xl">
+    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+        <div class="modal-header border-0 text-white py-4 px-4 position-relative overflow-hidden" style="background-color: var(--subject-primary);">
+          <div class="d-flex align-items-center position-relative mt-2 ps-2">
+            <div class="rounded-circle p-3 border border-white border-opacity-25 shadow-sm d-flex align-items-center justify-content-center" style="background-color: rgba(255, 255, 255, 0.1); width: 48px; height: 48px; margin-right: 16px !important;">
+              <i class="fas fa-file-excel fa-lg text-white"></i>
+            </div>
+            <div>
+              <h5 class="modal-title fw-bold mb-0">Carga Masiva de Alumnos y Proyectos</h5>
+              <p class="text-white-50 small mb-0">Importa múltiples alumnos desde Excel y genera sus proyectos automáticamente.</p>
+            </div>
+          </div>
+          <button type="button" class="bg-transparent border-0 text-white shadow-none" onclick="resetImportModal()" data-bs-dismiss="modal" data-dismiss="modal" aria-label="Cerrar" style="position: absolute; top: 1.5rem; right: 1.5rem; z-index: 10; cursor: pointer;">
+            <i class="fas fa-times fa-lg"></i>
+          </button>
+        </div>
+        <div class="modal-body p-4 bg-light bg-opacity-50">
+          <div class="row g-4">
+            <!-- Columna Izquierda: Instrucciones y Subida -->
+            <div class="col-lg-4 d-flex flex-column gap-3">
+              <div class="p-4 bg-white rounded-4 shadow-sm border border-light w-100 flex-grow-1">
+                <h6 class="fw-bold mb-3 text-dark"><i class="fas fa-1 me-2 text-primary" style="margin-right:8px;"></i>Descargar Plantilla</h6>
+                <p class="small text-muted mb-3">Utilice la plantilla oficial en formato <code>.xlsx</code>. Complete las columnas requeridas (Nombre de usuario y Email obligatorios) y guárdela.</p>
+                <a href="/api/subjects/import_template/" class="btn btn-outline-primary btn-sm rounded-pill fw-bold w-100 mb-4 shadow-sm">
+                  <i class="fas fa-download me-2" style="margin-right:8px;"></i>Descargar Plantilla.xlsx
+                </a>
+
+                <h6 class="fw-bold mb-3 text-dark mt-2"><i class="fas fa-2 me-2 text-primary" style="margin-right:8px;"></i>Subir Archivo Excel</h6>
+                <div class="custom-file-upload position-relative text-center p-4 border rounded-3 bg-light" style="border: 2px dashed #cbd5e1 !important; transition: all 0.3s;" id="dropzoneContent">
+                  <input type="file" id="excelFileInput" accept=".xlsx" class="position-absolute w-100 h-100 top-0 start-0 opacity-0" style="cursor: pointer; z-index:2;" onchange="handleExcelUpload(this)">
+                  <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-2 opacity-50" id="uploadIcon"></i>
+                  <p class="small text-muted fw-bold mb-0" id="uploadText">Arrastrar o clicar aquí</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Columna Derecha: Previsualización -->
+            <div class="col-lg-8">
+              <div class="p-3 bg-white rounded-4 shadow-sm border border-light h-100 d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-table me-2 text-primary" style="margin-right:8px;"></i>Previsualización de Datos</h6>
+                    <div id="importStats" class="small fw-bold d-none">
+                        <span class="badge bg-success bg-opacity-25 text-success me-2 rounded-pill px-2" style="margin-right: 5px;" id="statCreate">0 Nuevos</span>
+                        <span class="badge bg-warning bg-opacity-25 text-warning me-2 rounded-pill px-2" style="margin-right: 5px;" id="statLink">0 Vinculados</span>
+                        <span class="badge bg-danger bg-opacity-25 text-danger rounded-pill px-2" id="statError">0 Errores</span>
+                    </div>
+                </div>
+                
+                <div class="table-responsive flex-grow-1 border rounded-3 overflow-auto" style="max-height: 400px; background-color: #fafafa;">
+                  <table class="table table-sm table-hover mb-0" id="previewTable">
+                    <thead class="bg-light sticky-top">
+                      <tr>
+                        <th class="small text-muted text-uppercase text-center">Fila</th>
+                        <th class="small text-muted text-uppercase">Usuario</th>
+                        <th class="small text-muted text-uppercase">Email</th>
+                        <th class="small text-muted text-uppercase">Estudiante</th>
+                        <th class="small text-muted text-uppercase">Proyecto</th>
+                        <th class="small text-muted text-uppercase">Estado</th>
+                        <th class="small text-muted text-uppercase" style="min-width: 250px;">Detalles</th>
+                      </tr>
+                    </thead>
+                    <tbody id="previewTableBody">
+                      <tr>
+                        <td colspan="7" class="text-center text-muted p-5 italic border-0">
+                            <i class="fas fa-inbox fa-3x mb-3 opacity-25 d-block"></i>
+                            Esperando archivo para analizar...
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-0 p-4 bg-white justify-content-end">
+          <button type="button" class="btn btn-light rounded-pill px-4 py-2 fw-bold shadow-sm" style="margin-right: 15px;" onclick="resetImportModal()" data-bs-dismiss="modal" data-dismiss="modal">
+            Cancelar
+          </button>
+          <button type="button" id="btn-confirm-import" class="btn text-white rounded-pill px-5 py-2 fw-bold shadow-sm" style="background-color: var(--subject-primary);" onclick="confirmImport()" disabled>
+            <i class="fas fa-check-circle" style="margin-right: 8px !important;"></i>Confirmar y Ejecutar Importación
+          </button>
+        </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentFile = null;
+
+  function resetImportModal() {
+      document.getElementById('excelFileInput').value = '';
+      currentFile = null;
+      document.getElementById('uploadText').innerText = "Arrastrar o clicar aquí";
+      document.getElementById('uploadIcon').className = "fas fa-cloud-upload-alt fa-3x text-muted mb-2 opacity-50";
+      document.getElementById('btn-confirm-import').disabled = true;
+      document.getElementById('importStats').classList.add('d-none');
+      document.getElementById('previewTableBody').innerHTML = `
+        <tr>
+          <td colspan="6" class="text-center text-muted p-5 italic border-0">
+              <i class="fas fa-inbox fa-3x mb-3 opacity-25 d-block"></i>
+              Esperando archivo para analizar...
+          </td>
+        </tr>
+      `;
+  }
+
+  function handleExcelUpload(input) {
+      if (input.files && input.files[0]) {
+          const file = input.files[0];
+          if (!file.name.endsWith('.xlsx')) {
+              alert("Por favor, sube únicamente archivos Excel (.xlsx).");
+              resetImportModal();
+              return;
+          }
+          currentFile = file;
+          document.getElementById('uploadText').innerText = file.name;
+          document.getElementById('uploadIcon').className = "fas fa-file-excel fa-3x mb-2 text-success opacity-75";
+          
+          document.getElementById('previewTableBody').innerHTML = `<tr><td colspan="6" class="text-center text-muted p-4"><i class="fas fa-circle-notch fa-spin text-primary me-2"></i> Analizando archivo...</td></tr>`;
+          
+          // Send to API preview endpoint
+          const formData = new FormData();
+          formData.append('file', file);
+          
+          fetch(`/api/subjects/{{ subject.id }}/import_preview/`, {
+              method: 'POST',
+              headers: {
+                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+              },
+              body: formData
+          })
+          .then(response => response.json())
+          .then(data => {
+              renderPreviewTable(data);
+          })
+          .catch(error => {
+              console.error(error);
+              document.getElementById('previewTableBody').innerHTML = `<tr><td colspan="6" class="text-center text-danger p-4"><i class="fas fa-exclamation-triangle me-2"></i>Error inesperado analizando el archivo.</td></tr>`;
+          });
+      }
+  }
+
+  function renderPreviewTable(data) {
+      const tbody = document.getElementById('previewTableBody');
+      tbody.innerHTML = '';
+      
+      if (data.error && (!data.rows || data.rows.length === 0)) {
+          tbody.innerHTML = `<tr><td colspan="7" class="text-center text-danger fw-bold p-4 bg-danger bg-opacity-10">${data.error}</td></tr>`;
+          document.getElementById('btn-confirm-import').disabled = true;
+          return;
+      }
+      
+      let countCreate = 0;
+      let countLink = 0;
+      let countError = 0;
+      
+      data.rows.forEach(row => {
+          let badgeColor = '';
+          let badgeText = '';
+          let iconState = '';
+          let bgRow = '';
+          
+          if (row.status === 'ok') {
+              countCreate++;
+              badgeColor = 'bg-success';
+              badgeText = 'Nuevo';
+              iconState = '<i class="fas fa-check-circle text-success"></i>';
+          } else if (row.status === 'warning') {
+              countLink++;
+              badgeColor = 'bg-warning text-dark';
+              badgeText = 'Vinculación';
+              iconState = '<i class="fas fa-link text-warning"></i>';
+          } else {
+              countError++;
+              badgeColor = 'bg-danger';
+              badgeText = 'ERROR';
+              iconState = '<i class="fas fa-times-circle text-danger"></i>';
+              bgRow = 'bg-danger bg-opacity-10';
+          }
+          
+          const msgs = row.messages.map(m => `<div><i class="fas fa-caret-right opacity-50 me-1"></i> ${m}</div>`).join('');
+          
+          const tr = document.createElement('tr');
+          tr.className = bgRow;
+          tr.innerHTML = `
+              <td class="text-center fw-bold text-muted lh-lg">\${row.row}</td>
+              <td class="fw-bold lh-lg">\${row.username ? '@'+row.username : '<span class="text-danger">Falta</span>'}</td>
+              <td class="lh-lg">\${row.email}</td>
+              <td class="lh-lg">\${row.name} \${row.lastname}</td>
+              <td class="lh-lg">\${row.project_name ? '<span class="badge bg-secondary">' + row.project_name + '</span>' : '-'}</td>
+              <td class="lh-lg">\${iconState} <span class="badge \${badgeColor}">\${badgeText}</span></td>
+              <td class="small text-muted" style="line-height:1.2;">\${msgs}</td>
+          `;
+          tbody.appendChild(tr);
+      });
+      
+      // Update Stats
+      document.getElementById('statCreate').innerText = `${countCreate} Nuevos`;
+      document.getElementById('statLink').innerText = `${countLink} Vinculados`;
+      document.getElementById('statError').innerText = `${countError} Errores`;
+      document.getElementById('importStats').classList.remove('d-none');
+      
+      // Enable confirm only if there are NO errors and length > 0
+      if (countError === 0 && data.rows.length > 0 && !data.error) {
+          document.getElementById('btn-confirm-import').disabled = false;
+      } else {
+          document.getElementById('btn-confirm-import').disabled = true;
+          if (data.error) {
+              if (typeof showToast === 'function') showToast(data.error, "text-bg-danger");
+          }
+      }
+  }
+
+  function confirmImport() {
+      if (!currentFile) return;
+      const btn = document.getElementById('btn-confirm-import');
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fas fa-spinner fa-spin me-2" style="margin-right: 8px !important;"></i> Importando...`;
+      
+      const formData = new FormData();
+      formData.append('file', currentFile);
+      
+      fetch(`/api/subjects/{{ subject.id }}/import_confirm/`, {
+          method: 'POST',
+          headers: {
+              'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+          },
+          body: formData
+      })
+      .then(response => {
+          if (!response.ok) {
+              throw response;
+          }
+          return response.json();
+      })
+      .then(data => {
+          if (data.success) {
+              if (typeof showToast === 'function') showToast("Importación masiva completada exitosamente.", "text-bg-success");
+              setTimeout(() => {
+                  window.location.reload();
+              }, 1500);
+          } else {
+              if (typeof showToast === 'function') showToast(data.error || "Error desconocido", "text-bg-danger");
+              btn.disabled = false;
+              btn.innerHTML = `<i class="fas fa-check-circle" style="margin-right: 8px !important;"></i>Confirmar y Ejecutar Importación`;
+          }
+      })
+      .catch(err => {
+          console.error(err);
+          err.json().then(data => {
+            if (typeof showToast === 'function') showToast(data.error || "Error de red procesando la importación.", "text-bg-danger");
+            renderPreviewTable(data);
+          }).catch(() => {
+            if (typeof showToast === 'function') showToast("Error de red procesando la importación.", "text-bg-danger");
+          })
+          
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fas fa-check-circle" style="margin-right: 8px !important;"></i>Confirmar y Ejecutar Importación`;
+      });
   }
 </script>
 

@@ -745,6 +745,53 @@ class SubjectViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [IsAuthenticated]
     pagination_class = None
 
+    from rest_framework.decorators import action
+    from rest_framework.parsers import MultiPartParser
+
+    @action(detail=False, methods=['get'])
+    def import_template(self, request):
+        from paasify.services.excel_importer import ExcelImporterService
+        from django.http import HttpResponse
+        output_bytes = ExcelImporterService.generate_template('professor')
+        response = HttpResponse(output_bytes, content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = 'attachment; filename="plantilla_alumnos_proyectos_paasify.xlsx"'
+        return response
+
+    @action(detail=True, methods=['post'], parser_classes=[MultiPartParser])
+    def import_preview(self, request, pk=None):
+        from paasify.services.excel_importer import ExcelImporterService
+        from rest_framework.response import Response
+        subject = self.get_object()
+        user = request.user
+        
+        # Verificar permisos
+        if not (user_is_teacher(user) or user_is_admin(user) or user.is_superuser):
+            return Response({"error": "No autorizado para importar alumnos."}, status=403)
+            
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({"error": "Debe adjuntar un archivo (file)."}, status=400)
+            
+        result = ExcelImporterService.process_professor_import(file_obj, subject, confirm=False)
+        return Response(result, status=200 if not result.get("error") else 400)
+
+    @action(detail=True, methods=['post'], parser_classes=[MultiPartParser])
+    def import_confirm(self, request, pk=None):
+        from paasify.services.excel_importer import ExcelImporterService
+        from rest_framework.response import Response
+        subject = self.get_object()
+        user = request.user
+        
+        if not (user_is_teacher(user) or user_is_admin(user) or user.is_superuser):
+            return Response({"error": "No autorizado para importar alumnos."}, status=403)
+            
+        file_obj = request.FILES.get('file')
+        if not file_obj:
+            return Response({"error": "Debe adjuntar un archivo (file)."}, status=400)
+            
+        result = ExcelImporterService.process_professor_import(file_obj, subject, confirm=True)
+        return Response(result, status=200 if not result.get("error") else 400)
+
     def get_serializer_class(self):
         from .api_serializers import SubjectSerializer
         return SubjectSerializer
