@@ -106,6 +106,13 @@
       <div class="d-flex prof-action-group align-items-center">
         <button class="btn btn-customize d-flex align-items-center" 
                 data-bs-toggle="modal" data-toggle="modal" 
+                data-bs-target="#importExcelModal" data-target="#importExcelModal"
+                title="Carga Masiva (Excel) Alumnos + Proyectos">
+          <i class="fas fa-file-excel" style="margin-right: 8px !important;"></i> Importación Masiva (Excel)
+        </button>
+        <button class="btn btn-customize d-flex align-items-center" 
+                style="margin-left: 10px;"
+                data-bs-toggle="modal" data-toggle="modal" 
                 data-bs-target="#editSubjectModal" data-target="#editSubjectModal">
           <i class="fas fa-palette" style="margin-right: 8px !important;"></i> Personalizar
         </button>
@@ -138,20 +145,25 @@
                     <i class="fas fa-sort-alpha-up"></i>
                 </button>
             </div>
+
+            <div class="ms-auto d-flex gap-2">
+              <button class="btn btn-xs btn-light border rounded-pill px-3 shadow-sm hover-elevate fw-bold" id="btn-select-all-students" onclick="selectAllStudents()" {% if not students %}disabled{% endif %} style="font-size: 0.75rem;">
+                <i class="fas fa-check-double" style="margin-right: 8px !important;"></i>Seleccionar Todos
+              </button>
+              <button class="btn btn-xs btn-light border rounded-pill px-3 shadow-sm hover-elevate fw-bold" id="btn-deselect-students" onclick="deselectAllStudents()" disabled style="font-size: 0.75rem;">
+                <i class="fas fa-times" style="margin-right: 8px !important;"></i>Deseleccionar
+              </button>
+            </div>
           </div>
           <div class="d-flex align-items-center gap-2">
               <button class="btn btn-sm btn-outline-success rounded-pill px-3 shadow-sm hover-elevate" id="student-btn-existente" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#addExistingStudentModal" data-target="#addExistingStudentModal" title="Matricular Alumno Existente">
                 <i class="fas fa-link" style="margin-right: 8px !important;"></i>Existente
-              </button>
-              <button class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm hover-elevate text-dark" id="student-btn-import" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#importExcelModal" data-target="#importExcelModal" title="Carga Masiva (Excel)">
-                <i class="fas fa-file-excel" style="margin-right: 8px !important; color: #107c41;"></i>Importar
               </button>
               <button class="btn btn-sm rounded-pill px-3 shadow-sm hover-elevate" style="background-color: var(--subject-primary); color: white;" id="student-btn-nuevo" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createStudentModal" data-target="#createStudentModal">
                 <i class="fas fa-plus" style="margin-right: 8px !important;"></i>Nuevo Alumno
               </button>
               <div class="vr mx-1"></div>
               <span class="small fw-bold text-muted" id="student-actions-counter" style="display: none; margin-right: 20px !important; margin-left: 10px !important;"><span id="selected-student-count">0</span> seleccionados</span>
-              <button class="btn btn-sm btn-light rounded-pill px-3 shadow-sm hover-elevate" id="btn-deselect-students" onclick="deselectAllStudents()" disabled>Deseleccionar</button>
               <button class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm hover-elevate" id="btn-delete-students" onclick="confirmRemoveMultipleStudents()" disabled>
                 <i class="fas fa-trash-alt" style="margin-right: 8px !important;"></i>Eliminar
               </button>
@@ -214,6 +226,15 @@
                     <i class="fas fa-sort-alpha-up"></i>
                 </button>
             </div>
+
+            <div class="ms-auto d-flex gap-2">
+              <button class="btn btn-xs btn-light border rounded-pill px-3 shadow-sm hover-elevate fw-bold" id="btn-select-all-projects" onclick="selectAllProjects()" {% if not projects %}disabled{% endif %} style="font-size: 0.75rem;">
+                <i class="fas fa-check-double" style="margin-right: 8px !important;"></i>Seleccionar Todos
+              </button>
+              <button class="btn btn-xs btn-light border rounded-pill px-3 shadow-sm hover-elevate fw-bold" id="btn-deselect-projects" onclick="deselectAllProjects()" disabled style="font-size: 0.75rem;">
+                <i class="fas fa-times" style="margin-right: 8px !important;"></i>Deseleccionar
+              </button>
+            </div>
           </div>
           <div class="d-flex align-items-center gap-2">
               <button class="btn btn-sm rounded-pill px-3 shadow-sm hover-elevate" style="background-color: var(--subject-primary); color: white;" id="project-btn-nuevo" data-bs-toggle="modal" data-toggle="modal" data-bs-target="#createProjectModal" data-target="#createProjectModal">
@@ -221,7 +242,6 @@
               </button>
               <div class="vr mx-1"></div>
               <span class="small fw-bold text-muted" id="project-actions-counter" style="display: none; margin-right: 20px !important; margin-left: 10px !important;"><span id="selected-project-count">0</span> seleccionados</span>
-              <button class="btn btn-sm btn-light rounded-pill px-3 shadow-sm hover-elevate" id="btn-deselect-projects" onclick="deselectAllProjects()" disabled>Deseleccionar</button>
               <button class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm hover-elevate" id="btn-delete-projects" onclick="confirmRemoveMultipleProjects()" disabled>
                 <i class="fas fa-trash-alt" style="margin-right: 8px !important;"></i>Eliminar
               </button>
@@ -393,27 +413,53 @@
         </div>
         <div class="modal-body p-4 bg-light bg-opacity-50">
           <div class="row g-4">
-            <!-- Columna Izquierda: Instrucciones y Subida -->
-            <div class="col-lg-4 d-flex flex-column gap-3">
-              <div class="p-4 bg-white rounded-4 shadow-sm border border-light w-100 flex-grow-1">
-                <h6 class="fw-bold mb-3 text-dark"><i class="fas fa-1 me-2 text-primary" style="margin-right:8px;"></i>Descargar Plantilla</h6>
-                <p class="small text-muted mb-3">Utilice la plantilla oficial en formato <code>.xlsx</code>. Complete las columnas requeridas (Nombre de usuario y Email obligatorios) y guárdela.</p>
-                <a href="/api/subjects/import_template/" class="btn btn-outline-primary btn-sm rounded-pill fw-bold w-100 mb-4 shadow-sm">
-                  <i class="fas fa-download me-2" style="margin-right:8px;"></i>Descargar Plantilla.xlsx
-                </a>
+            
+            <!-- Bloque Superior: Descarga y Subida (Lado a Lado) -->
+            <div class="col-12">
+              <div class="row g-4 align-items-stretch">
+                <!-- Zona 1: Plantilla -->
+                <div class="col-lg-6">
+                  <div class="p-4 bg-white rounded-4 shadow-sm border border-light h-100">
+                    <h6 class="fw-bold mb-3 text-dark"><i class="fas fa-1 me-2 text-primary" style="margin-right:8px;"></i>Descargar Plantilla</h6>
+                    <div class="small text-muted mb-3 pb-2 border-bottom">
+                      Utilice la plantilla oficial en formato <code>.xlsx</code>.<br><br>
+                      <span class="text-dark fw-bold"><i class="fas fa-check-circle text-success me-1"></i> Obligatorio:</span> Nombre de usuario y Email.<br>
+                      <span class="text-dark fw-bold"><i class="fas fa-info-circle text-info me-1 mt-2"></i> Opcional:</span>
+                      <ul class="ps-3 mt-1 mb-0 pb-0">
+                        <li class="mb-1">Si deja la <strong>Contraseña</strong> en blanco, se utilizará su Email.</li>
+                        <li class="mb-1">Si indica el <strong>Proyecto</strong>, el sistema lo creará y asignará.</li>
+                      </ul>
+                      <span class="text-dark fw-bold mt-2 d-inline-block"><i class="fas fa-exclamation-triangle text-warning me-1"></i> Importante:</span> El archivo debe contener una <strong>única hoja</strong>.
+                    </div>
+                    <a href="/api/subjects/import_template/" class="btn btn-outline-primary btn-sm rounded-pill fw-bold w-100 mt-2 shadow-sm" formnovalidate>
+                      <i class="fas fa-download me-2" style="margin-right:8px;"></i>Descargar Plantilla.xlsx
+                    </a>
+                  </div>
+                </div>
 
-                <h6 class="fw-bold mb-3 text-dark mt-2"><i class="fas fa-2 me-2 text-primary" style="margin-right:8px;"></i>Subir Archivo Excel</h6>
-                <div class="custom-file-upload position-relative text-center p-4 border rounded-3 bg-light" style="border: 2px dashed #cbd5e1 !important; transition: all 0.3s;" id="dropzoneContent">
-                  <input type="file" id="excelFileInput" accept=".xlsx" class="position-absolute w-100 h-100 top-0 start-0 opacity-0" style="cursor: pointer; z-index:2;" onchange="handleExcelUpload(this)">
-                  <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-2 opacity-50" id="uploadIcon"></i>
-                  <p class="small text-muted fw-bold mb-0" id="uploadText">Arrastrar o clicar aquí</p>
+                <!-- Zona 2: Subida -->
+                <div class="col-lg-6">
+                  <div class="p-4 bg-white rounded-4 shadow-sm border border-light h-100 d-flex flex-column">
+                    <h6 class="fw-bold mb-3 text-dark"><i class="fas fa-2 me-2 text-primary" style="margin-right:8px;"></i>Subir Archivo Excel</h6>
+                    <div class="custom-file-upload position-relative text-center p-4 border rounded-3 bg-light flex-grow-1 d-flex flex-column align-items-center justify-content-center" style="border: 2px dashed #cbd5e1 !important; transition: all 0.3s;" id="dropzoneContent">
+                      <input type="file" id="excelFileInput" accept=".xlsx" class="position-absolute w-100 h-100 top-0 start-0" style="cursor: pointer; z-index:2; opacity: 0; filter: alpha(opacity=0);" onchange="handleExcelUpload(this)">
+                      <i class="fas fa-cloud-upload-alt fa-3x text-muted mb-2 opacity-50" id="uploadIcon"></i>
+                      <p class="small text-muted fw-bold mb-0" id="uploadText">Arrastrar o clicar aquí</p>
+                    </div>
+                    <!-- Botón Quitar abajo, alineado -->
+                    <div class="mt-3 text-center" style="min-height: 31px; display: flex; align-items: center; justify-content: center; z-index: 3;">
+                      <button type="button" id="removeFileBtn" class="btn btn-sm btn-outline-danger shadow-sm fw-bold px-4 d-none" style="border-radius: 5px;" onclick="resetImportModal(); event.stopPropagation();" title="Descartar archivo">
+                        <i class="fas fa-trash-alt me-1"></i> Quitar Archivo
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <!-- Columna Derecha: Previsualización -->
-            <div class="col-lg-8">
-              <div class="p-3 bg-white rounded-4 shadow-sm border border-light h-100 d-flex flex-column">
+            <!-- Bloque Inferior: Previsualización de Datos -->
+            <div class="col-12">
+              <div class="p-3 bg-white rounded-4 shadow-sm border border-light d-flex flex-column">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-table me-2 text-primary" style="margin-right:8px;"></i>Previsualización de Datos</h6>
                     <div id="importStats" class="small fw-bold d-none">
@@ -423,14 +469,14 @@
                     </div>
                 </div>
                 
-                <div class="table-responsive flex-grow-1 border rounded-3 overflow-auto" style="max-height: 400px; background-color: #fafafa;">
+                <div class="table-responsive border rounded-3 overflow-auto" style="max-height: 400px; background-color: #fafafa;">
                   <table class="table table-sm table-hover mb-0" id="previewTable">
                     <thead class="bg-light sticky-top">
                       <tr>
                         <th class="small text-muted text-uppercase text-center">Fila</th>
                         <th class="small text-muted text-uppercase">Usuario</th>
                         <th class="small text-muted text-uppercase">Email</th>
-                        <th class="small text-muted text-uppercase">Estudiante</th>
+                        <th class="small text-muted text-uppercase">Nombre Completo</th>
                         <th class="small text-muted text-uppercase">Proyecto</th>
                         <th class="small text-muted text-uppercase">Estado</th>
                         <th class="small text-muted text-uppercase" style="min-width: 250px;">Detalles</th>
@@ -451,9 +497,6 @@
           </div>
         </div>
         <div class="modal-footer border-0 p-4 bg-white justify-content-end">
-          <button type="button" class="btn btn-light rounded-pill px-4 py-2 fw-bold shadow-sm" style="margin-right: 15px;" onclick="resetImportModal()" data-bs-dismiss="modal" data-dismiss="modal">
-            Cancelar
-          </button>
           <button type="button" id="btn-confirm-import" class="btn text-white rounded-pill px-5 py-2 fw-bold shadow-sm" style="background-color: var(--subject-primary);" onclick="confirmImport()" disabled>
             <i class="fas fa-check-circle" style="margin-right: 8px !important;"></i>Confirmar y Ejecutar Importación
           </button>
@@ -472,6 +515,7 @@
       document.getElementById('uploadIcon').className = "fas fa-cloud-upload-alt fa-3x text-muted mb-2 opacity-50";
       document.getElementById('btn-confirm-import').disabled = true;
       document.getElementById('importStats').classList.add('d-none');
+      document.getElementById('removeFileBtn').classList.add('d-none');
       document.getElementById('previewTableBody').innerHTML = `
         <tr>
           <td colspan="6" class="text-center text-muted p-5 italic border-0">
@@ -493,6 +537,7 @@
           currentFile = file;
           document.getElementById('uploadText').innerText = file.name;
           document.getElementById('uploadIcon').className = "fas fa-file-excel fa-3x mb-2 text-success opacity-75";
+          document.getElementById('removeFileBtn').classList.remove('d-none');
           
           document.getElementById('previewTableBody').innerHTML = `<tr><td colspan="6" class="text-center text-muted p-4"><i class="fas fa-circle-notch fa-spin text-primary me-2"></i> Analizando archivo...</td></tr>`;
           
@@ -561,13 +606,13 @@
           const tr = document.createElement('tr');
           tr.className = bgRow;
           tr.innerHTML = `
-              <td class="text-center fw-bold text-muted lh-lg">\${row.row}</td>
-              <td class="fw-bold lh-lg">\${row.username ? '@'+row.username : '<span class="text-danger">Falta</span>'}</td>
-              <td class="lh-lg">\${row.email}</td>
-              <td class="lh-lg">\${row.name} \${row.lastname}</td>
-              <td class="lh-lg">\${row.project_name ? '<span class="badge bg-secondary">' + row.project_name + '</span>' : '-'}</td>
-              <td class="lh-lg">\${iconState} <span class="badge \${badgeColor}">\${badgeText}</span></td>
-              <td class="small text-muted" style="line-height:1.2;">\${msgs}</td>
+              <td class="text-center fw-bold text-muted lh-lg">${row.row}</td>
+              <td class="fw-bold lh-lg">${row.username ? '@'+row.username : '<span class="text-danger">Falta</span>'}</td>
+              <td class="lh-lg">${row.email}</td>
+              <td class="lh-lg">${row.name} ${row.lastname}</td>
+              <td class="lh-lg">${row.project_name ? '<span class="badge bg-secondary">' + row.project_name + '</span>' : '-'}</td>
+              <td class="lh-lg">${iconState} <span class="badge ${badgeColor}">${badgeText}</span></td>
+              <td class="small text-muted" style="line-height:1.2;">${msgs}</td>
           `;
           tbody.appendChild(tr);
       });
@@ -1279,6 +1324,13 @@
       }
   }
 
+  function selectAllStudents() {
+      document.querySelectorAll('.student-select-checkbox').forEach(cb => {
+          cb.checked = true;
+      });
+      handleStudentSelection();
+  }
+
   function deselectAllStudents() {
       document.querySelectorAll('.student-select-checkbox').forEach(cb => {
           cb.checked = false;
@@ -1484,6 +1536,13 @@
           editButtons.forEach(btn => btn.disabled = false);
           detailButtons.forEach(btn => btn.disabled = false);
       }
+  }
+
+  function selectAllProjects() {
+      document.querySelectorAll('.project-select-checkbox').forEach(cb => {
+          cb.checked = true;
+      });
+      handleProjectSelection();
   }
 
   function deselectAllProjects() {

@@ -8,36 +8,40 @@ Este documento servirá de batería de validación manual para verificar la inte
 
 ### 1.1 UI y Flujos Básicos
 
-- [ ] Entrar al panel de profesor -> Seleccionar Asignatura.
-- [ ] Hacer clic en el nuevo botón `Importar` (junto a "Nuevo Alumno").
-- [ ] Verificar que se abre el modal "Carga Masiva de Alumnos y Proyectos".
-- [ ] Hacer clic en "Descargar Plantilla.xlsx".
-- [ ] Comprobar que el archivo se descarga correctamente indicando `Email, Nombre, Apellido, Proyecto y Contraseña`.
+- [SI] Entrar al panel de profesor -> Seleccionar Asignatura.
+- [SI] Hacer clic en el nuevo botón `Importar` (junto a "Nuevo Alumno").
+- [SI] Verificar que se abre el modal "Carga Masiva de Alumnos y Proyectos".
+- [SI] Hacer clic en "Descargar Plantilla.xlsx".
+- [] Comprobar que el archivo se descarga correctamente indicando `Email, Nombre, Apellido, Proyecto y Contraseña`.
 
-### 1.2 Importación de Estudiantes Nuevos (Status: OK)
+### 1.2 Casos Correctos
 
-- [ ] Rellenar la plantilla con un par de emails únicos. Dejar Proyecto en blanco.
-- [ ] Subir el Excel.
-- [ ] **Validación Frontend**: Se despliega tabla de Previsualización: "Estado Nuevo, Verde" y las Rows coinciden con las filas leídas.
-- [ ] Pulsar `Confirmar y Ejecutar...` -> Confirmar en base de datos la matriculación exitosa de los usuarios.
+- [SI] **Caso 1 — Alumno mínimo válido**: Rellenar solo `Nombre de usuario` y `Email`. Se crea el usuario, se le configura el email como contraseña por defecto y se activa `must_change_password`.
+- [ ] **Caso 2 — Alumno válido con contraseña explícita**: Rellenar contraseña custom. Se usa esa indicada directamente.
+- [ ] **Caso 3 — Alumno válido con proyecto**: Indicar "Nombre Proyecto". El sistema lo procesa, inyecta y vincula del tirón.
+- [ ] **Caso 4 — Alumno sin nombre/apellidos**: Dejar Nombre y Apellido vacíos. El sistema traga limpiamente al ser opcionales.
+- [ ] **Caso 5 — Varios alumnos mezclados**: Bloque con algunos alumnos que tienen contraseña, otros no; unos con proyecto, otros no. 100% Correctos.
 
-### 1.3 Alumnos Existentes (Status: WARNING)
+### 1.3 Casos Erróneos (Interceptación de Filas)
 
-- [ ] Utilizar un correo de un estudiante YA existente en otra asignatura (o creado previamente) en una fila.
-- [ ] Rellenar otra fila con un estudiante nuevo.
-- [ ] Subir archivo -> Verificar que la tabla muestra en amarillo "Vinculación" para el caso existente, y el total de "Vinculados" sube en el summary (Badge Superior).
-- [ ] Confirmar importación y comprobar que no hay colisión ni doble inserción de Profile, solo de relaciones `subject.students.add()`.
+- [ ] **Caso 6 — Falta nombre de usuario**: Fila marcada como inválida en ROJO.
+- [ ] **Caso 7 — Falta email**: Fila marcada como inválida en ROJO.
+- [ ] **Caso 8 — Faltan ambos obligatorios**: Ídem, el parser levanta bandera de falta grave.
+- [ ] **Caso 9 — Email inválido**: Usuario rellenado pero email tipo `no_es_email`. Formato no aceptado.
+- [ ] **Caso 10 — Username duplicado (en Excel)**: El mismo username escrito 2 veces en filas distintas. El inspector de colisiones en RAM lo debe cazar.
+- [ ] **Caso 11 — Email duplicado (en Excel)**: El mismo correo clonado 2 veces en filas distintas. Caza idéntica a la anterior.
 
-### 1.4 Auto-Generación de Proyectos simultánea
+### 1.4 Casos Existentes y Frontera
 
-- [ ] En la plantilla, añadir datos en la columna opcional **Proyecto** (Ej: _Espacio Ciberseguridad A_).
-- [ ] Tras importar y confirmar, navegar a "Proyectos de la Asignatura" y confirmar su creación en la lista de paneles lateral de PaaSify vinculando correctamente a ese estudiante.
+- [ ] **Caso 12 — Usuario ya existente en sistema**: Subir el email y usuario de `alumno2`. Debe marcar en AMARILLO el badge de `Vinculación`. (_Nota Técnica: PaaSify lo vincula limpiamente sin borrar ni destruir su UserProfile original_).
+- [ ] **Caso 13 — Trim de espacios**: Celda tipo `  usuario_trim  `. El backend debe barrer los espacios extra y sanearlos (Trim automático).
+- [ ] **Caso 14 — Espacios en el Proyecto**: Ejemplo "Proyecto Final TFG". Lo aceptará como nombre string literal.
+- [ ] **Caso 15 — Caracteres UTF-8 (Tildes/eñes)**: Rellenar celdas con eñes para garantizar que no peta la serialización de Preview (Ej: `Peña`).
 
-### 1.5 Colisión y Errores (Status: ERROR)
+### 1.5 Caso Maestro Mixto (El Batiburrillo)
 
-- [ ] Subir archivo Excel adulterado (ej. fila sin correo, o correo sin formato válido).
-- [ ] El preview marca en rojo `ERROR` e inhabilita el botón verde "Confirmar...".
-- [ ] Tratar de duplicar un email internamente en la propia hoja Excel. Confirmar notificación de "Duplicados encontrados".
+- [ ] **Caso Final (Mixed)**: Tabla que contenga de todo. Usuarios OK, Usuarios sin correo, usuarios existentes.
+  - _Validación Exigida:_ El botón Confirmar **tiene que estar 100% deshabilitado**. La validación de PaaSify protege el Rollback total; si hay _una_ fila en rojo, no deja importar a nadie de forma parcial hasta que el profesor arregle su Excel.
 
 ---
 

@@ -59,6 +59,8 @@ class ExcelImporterService:
         """
         try:
             wb = load_workbook(filename=file_obj, read_only=True, data_only=True)
+            if len(wb.sheetnames) > 1:
+                return {"error": "El archivo Excel contiene múltiples hojas. Solo se admite un archivo con una única hoja.", "rows": []}
             ws = wb.active
         except Exception as e:
             return {"error": "Formato de archivo inválido. Asegúrese de subir un .xlsx.", "rows": []}
@@ -90,12 +92,12 @@ class ExcelImporterService:
             if not any(row):
                 continue
                 
-            username = str(row[idx_username] or "").strip() if idx_username >= 0 else ""
-            name = str(row[idx_name] or "").strip() if idx_name >= 0 else ""
-            lastname = str(row[idx_lastname] or "").strip() if idx_lastname >= 0 else ""
-            email = str(row[idx_email] or "").strip().lower() if idx_email >= 0 else ""
-            password = str(row[idx_password] or "").strip() if idx_password >= 0 else ""
-            project_name = str(row[idx_project] or "").strip() if idx_project >= 0 else ""
+            username = str(row[idx_username] or "").strip() if 0 <= idx_username < len(row) else ""
+            name = str(row[idx_name] or "").strip() if 0 <= idx_name < len(row) else ""
+            lastname = str(row[idx_lastname] or "").strip() if 0 <= idx_lastname < len(row) else ""
+            email = str(row[idx_email] or "").strip().lower() if 0 <= idx_email < len(row) else ""
+            password = str(row[idx_password] or "").strip() if 0 <= idx_password < len(row) else ""
+            project_name = str(row[idx_project] or "").strip() if 0 <= idx_project < len(row) else ""
             
             row_status = "ok" # 'ok', 'warning', 'error'
             messages = []
@@ -151,8 +153,7 @@ class ExcelImporterService:
                         messages.append(f"Conflicto de identidad: ya existe en DB (User: {user_obj.username}, Email: {user_obj.email}).")
                     
                     try:
-                        profile = user_obj.userprofile
-                        if subject in profile.subjects.all():
+                        if user_obj in subject.students.all():
                             user_already_in_subject = True
                     except Exception:
                         pass
@@ -231,16 +232,21 @@ class ExcelImporterService:
                                 last_name=data['lastname']
                             )
                             # Perfil Alumno automatico
-                            profile = UserProfile.objects.create(
+                            from paasify.roles import ensure_user_group, STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP
+                            ensure_user_group(user, STUDENT_GROUP_NAMES, DEFAULT_STUDENT_GROUP)
+                            profile, _ = UserProfile.objects.update_or_create(
                                 user=user,
-                                role='student'
+                                defaults={
+                                    'nombre': f"{data['name']} {data['lastname']}".strip() or data['username'],
+                                    'year': email,
+                                    'must_change_password': not bool(data['password'])
+                                }
                             )
                             # Matricular
-                            profile.subjects.add(subject)
+                            subject.students.add(user)
                         else:
                             # VINCULAR EXISTENTE
-                            profile = user.userprofile
-                            profile.subjects.add(subject)
+                            subject.students.add(user)
                             
                         # Mapear Proyecto
                         if project_name:
@@ -265,8 +271,12 @@ class ExcelImporterService:
         """
         try:
             wb = load_workbook(filename=file_obj, read_only=True, data_only=True)
+            if len(wb.sheetnames) > 1:
+                raise Exception("El archivo Excel contiene múltiples hojas. Solo se admite un archivo con una única hoja.")
             ws = wb.active
-        except Exception:
+        except Exception as e:
+            if "múltiples hojas" in str(e):
+                raise
             raise Exception("Formato de archivo inválido. Asegúrese de subir un .xlsx.")
 
         header = [str(cell.value).strip().lower() if cell.value else "" for cell in ws[1]]
@@ -289,7 +299,7 @@ class ExcelImporterService:
             if not any(row):
                 continue
 
-            username = str(row[idx_username] or "").strip() if idx_username >= 0 else ""
+            username = str(row[idx_username] or "").strip() if 0 <= idx_username < len(row) else ""
             if not username:
                 raise Exception(f"Fila {row_num}: El 'Nombre de usuario' está vacío.")
             
@@ -297,7 +307,7 @@ class ExcelImporterService:
                 raise Exception(f"Fila {row_num}: El nombre de usuario '{username}' está duplicado en el Excel.")
             all_usernames_in_sheet.add(username)
 
-            email = str(row[idx_email] or "").strip().lower() if idx_email >= 0 else ""
+            email = str(row[idx_email] or "").strip().lower() if 0 <= idx_email < len(row) else ""
             if not email or not ExcelImporterService._is_valid_email(email):
                 raise Exception(f"Fila {row_num}: El email '{email}' es inválido o está vacío.")
             
@@ -309,16 +319,16 @@ class ExcelImporterService:
             if User.objects.filter(Q(username=username) | Q(email=email)).exists():
                 raise Exception(f"Fila {row_num}: El usuario '{username}' o email '{email}' ya existe en la base de datos de PaaSify.")
                 
-            role = str(row[idx_role] or "").strip().lower() if idx_role >= 0 else "student"
+            role = str(row[idx_role] or "").strip().lower() if 0 <= idx_role < len(row) else "student"
             if role not in ['student', 'teacher', 'admin']:
                 raise Exception(f"Fila {row_num}: Rol '{role}' no válido. Use 'student', 'teacher', o 'admin'.")
 
-            raw_pass = str(row[idx_password] or "").strip() if idx_password >= 0 else ""
+            raw_pass = str(row[idx_password] or "").strip() if 0 <= idx_password < len(row) else ""
             
             to_create_data.append({
                 "username": username,
-                "name": str(row[idx_name] or "").strip() if idx_name >= 0 else "",
-                "lastname": str(row[idx_lastname] or "").strip() if idx_lastname >= 0 else "",
+                "name": str(row[idx_name] or "").strip() if 0 <= idx_name < len(row) else "",
+                "lastname": str(row[idx_lastname] or "").strip() if 0 <= idx_lastname < len(row) else "",
                 "email": email,
                 "password": raw_pass if raw_pass else email,
                 "must_change": not bool(raw_pass),  # True si se autogeneró
