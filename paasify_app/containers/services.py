@@ -59,27 +59,63 @@ def cleanup_service_workspace(service: Service) -> None:
     sid = str(service.id)
     workspace = SERVICE_WORKSPACES_ROOT / sid
     
+    # --- PURGA DE TMP (Mantenimiento Proactivo) ---
+    # Aprovechamos el trigger de limpieza para purgar archivos muy viejos en tmp 
+    # (por si falló el post-save move o se cancelaron subidas)
+    tmp_path = SERVICE_WORKSPACES_ROOT / "tmp"
+    if tmp_path.exists():
+        try:
+            now = time.time()
+            for item in tmp_path.iterdir():
+                # Borrar archivos de más de 24 horas
+                if item.is_file() and item.stat().st_mtime < now - 86400:
+                    item.unlink()
+        except: pass
+
     if workspace.exists():
-        for attempt in range(3):
+        # Pequeño delay adicional por si subprocess (docker compose) aún tiene handles
+        if os.name == 'nt':
+            time.sleep(0.5)
+
+        for attempt in range(4): # Un intento más
             try:
                 # En Windows a veces hay problemas de permisos con archivos de solo lectura dentro de .git o similares
                 if os.name == 'nt':
-                    for root, dirs, files in os.walk(workspace):
-                        for d in dirs:
-                            try: os.chmod(os.path.join(root, d), stat.S_IRWXU)
-                            except: pass
+                    for root, dirs, files in os.walk(workspace, topdown=False):
                         for f in files:
-                            try: os.chmod(os.path.join(root, f), stat.S_IRWXU)
+                            try:
+                                fpath = os.path.join(root, f)
+                                os.chmod(fpath, stat.S_IWRITE)
+                                os.remove(fpath)
+                            except: pass
+                        for d in dirs:
+                            try:
+                                dpath = os.path.join(root, d)
+                                os.chmod(dpath, stat.S_IWRITE)
+                                os.rmdir(dpath)
                             except: pass
                 
-                shutil.rmtree(workspace)
-                break
+                # Intentar rmtree sin ignorar errores primero para ver si falla
+                shutil.rmtree(workspace, ignore_errors=False)
+                
+                # Verificación final post-rmtree
+                if not workspace.exists():
+                    break
             except Exception:
-                if attempt < 2: 
-                    time.sleep(1)
-                else: 
-                    # Último intento: forzar borrado ignorando errores
-                    shutil.rmtree(workspace, ignore_errors=True)
+                # Si falla, último recurso con ignore_errors=True
+                if attempt == 3:
+                     shutil.rmtree(workspace, ignore_errors=True)
+                     # Forzado manual de la carpeta raíz
+                     try: os.rmdir(workspace)
+                     except: pass
+                
+                if not workspace.exists():
+                    break
+                time.sleep(1)
+        
+        # Log final si persiste (debug)
+        if workspace.exists():
+            print(f"[warning] No se pudo eliminar completamente el workspace {workspace}")
 
 
 def prepare_service_workspace(service: Service, *, unpack_code: bool = True, keep_volumes: bool = True) -> Path:
@@ -128,7 +164,9 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True, kee
         dest = workspace / "Dockerfile"
         try:
             if os.path.exists(service.dockerfile.path):
-                shutil.copy2(service.dockerfile.path, dest)
+                # Solo copiar si no es ya el mismo archivo (evita error en Windows si ya se movió en el save)
+                if not os.path.exists(dest) or not os.path.samefile(service.dockerfile.path, dest):
+                    shutil.copy2(service.dockerfile.path, dest)
             else:
                 print(f"[warning] Archivo Dockerfile físico no hallado: {service.dockerfile.path}")
         except Exception as e:
@@ -139,7 +177,9 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True, kee
         dest = workspace / "docker-compose.yml"
         try:
             if os.path.exists(service.compose.path):
-                shutil.copy2(service.compose.path, dest)
+                # Solo copiar si no es ya el mismo archivo
+                if not os.path.exists(dest) or not os.path.samefile(service.compose.path, dest):
+                    shutil.copy2(service.compose.path, dest)
             else:
                 print(f"[warning] Archivo Compose físico no hallado: {service.compose.path}")
         except Exception as e:

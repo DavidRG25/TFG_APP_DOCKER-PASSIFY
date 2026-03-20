@@ -133,13 +133,14 @@ class ExcelImporterService:
                     
                     # Validar si el proyecto ya existe en la asignatura (globalmente o por nombre)
                     # En la BD real el UserProject no fuerza unique global de name, pero es buena práctica no duplicar nombres en la misma Asignatura por claridad
-                    if UserProject.objects.filter(subject=subject, name=project_name).exists():
+                    if UserProject.objects.filter(subject=subject, place=project_name).exists():
                         row_status = "error"
                         messages.append(f"El proyecto '{project_name}' ya existe en esta asignatura.")
 
             # --- VERIFICACIÓN EN BASE DE DATOS ---
             user_exists = False
             user_already_in_subject = False
+            project_is_new = False # Flag para UI
             
             if row_status != "error":
                 # Check username or email matching an existing user
@@ -151,6 +152,7 @@ class ExcelImporterService:
                     if user_obj.username != username or user_obj.email != email:
                         row_status = "error"
                         messages.append(f"Conflicto de identidad: ya existe en DB (User: {user_obj.username}, Email: {user_obj.email}).")
+                        messages.append("Sugerencia: Use los datos exactos que ya existen en PaaSify para vincularlo, o elija un nombre de usuario y email que no estén en uso.")
                     
                     try:
                         if user_obj in subject.students.all():
@@ -160,25 +162,42 @@ class ExcelImporterService:
                 
                 if user_exists and row_status != "error":
                     if not user_already_in_subject:
-                        row_status = "warning"
                         # Alumno existe pero no en la asig
                         if project_name:
                             messages.append("Usuario ya existe en PaaSify. Se le vinculará a la asignatura y se creará el proyecto.")
                         else:
                             messages.append("Usuario ya existe en PaaSify. Simplemente se le matriculará en la asignatura.")
-                    else:
+                            project_is_new = False
                         row_status = "warning"
+                    else: # user_already_in_subject is True
                         if project_name:
-                            messages.append("El usuario ya está matriculado en la asignatura. Se le creará el nuevo proyecto.")
+                            # Check if project already exists in this subject
+                            if UserProject.objects.filter(subject=subject, place=project_name).exists():
+                                messages.append(f"El proyecto '{project_name}' ya existe en esta asignatura.")
+                                row_status = "error" # Project name conflict for existing user in subject
+                            else:
+                                messages.append(f"El usuario ya está matriculado en la asignatura. Se le creará el nuevo proyecto.")
+                                row_status = "matriculado"
+                                project_is_new = True
                         else:
-                            row_status = "error"
-                            messages.append("El usuario ya está matriculado y no se ha especificado proyecto nuevo. Fila redundante.")
-                else:
+                            row_status = "matriculado"
+                            messages.append("El usuario ya está matriculado en esta asignatura y no se pide crear proyecto. Fila ignorada.")
+                            project_is_new = False
+                elif not user_exists:
                     if project_name:
                         messages.append("Usuario nuevo. Se creará su cuenta, se le matriculará y se generará su proyecto.")
+                        project_is_new = True
                     else:
                         messages.append("Usuario nuevo. Solo se creará la cuenta y se le matriculará.")
-                        
+                        project_is_new = False
+                # If row_status is already error, project_is_new should remain False (default)
+                # If row_status is 'ok' and project_name exists, it's a new project for a new user.
+                # This is handled in the 'elif not user_exists' block.
+                # If row_status is 'ok' and project_name does not exist, project_is_new is False.
+                # If row_status is 'warning' (user exists, not in subject), project_is_new is set there.
+                # If row_status is 'matriculado' (user exists, in subject), project_is_new is set there.
+                # So, no general assignment for project_is_new is needed here.
+            
             if row_status == 'error':
                 has_errors = True
 
@@ -191,6 +210,7 @@ class ExcelImporterService:
                 "email": email,
                 "password": password,
                 "project_name": project_name,
+                "project_is_new": project_is_new,
                 "user_exists": user_exists,
                 "status": row_status,
                 "messages": messages
@@ -251,8 +271,8 @@ class ExcelImporterService:
                         # Mapear Proyecto
                         if project_name:
                             UserProject.objects.create(
-                                name=project_name, # Permite strings vacíos en DB, pero ya verificamos que sea válido
-                                user=user,
+                                place=project_name, 
+                                user_profile=user.user_profile,
                                 subject=subject
                             )
                             

@@ -20,9 +20,9 @@
 
 ### Funcionalidades de Carga (Excel)
 
-- [ ] **Carga masiva por Excel**: Implementar/afinar la importación de datos.
-- [ ] **Creación de alumnos por Excel**: Cargar una lista de alumnos a partir de un archivo Excel.
-- [ ] **Generación de proyectos desde Excel**: A partir de la carga de alumnos, auto-generar sus proyectos/espacios de trabajo automáticamente.
+- [x] **Carga masiva por Excel**: Implementar/afinar la importación de datos.
+- [x] **Creación de alumnos por Excel**: Cargar una lista de alumnos a partir de un archivo Excel.
+- [x] **Generación de proyectos desde Excel**: A partir de la carga de alumnos, auto-generar sus proyectos/espacios de trabajo automáticamente.
 - [x] **Selección múltiple de alumnos**: Permitir que al vincular alumnos existentes a un proyecto/asignatura se puedan seleccionar múltiples a la vez en lugar de uno por uno.
 
 ### APIs y Documentación
@@ -49,6 +49,14 @@
 - [x] **Admin de profesores**: Resolver el bug en el panel de administrador donde los "Perfiles de profesores" no están cargando correctamente los usuarios asociados.
 - [x] **Despliegue README hardcodeado**: Revisar `deploy/README.md` (o la conf real) porque actualmente figura un `server_name` quemado ("a cañón") con una URL específica en lugar de una variable.
 
+### Feedback Tutor (20/03/2026) 🎓
+
+- [ ] **Optimizar Git Sparse-Checkout**: Revisar por qué se clona todo el repo en lugar de solo la carpeta `deploy` y corregir el comando en el README.
+- [ ] **Limpiar Warnings Docker**: Eliminar `version: "3.8"` de los archivos compose ya que es obsoleto y provoca advertencias.
+- [ ] **Documentación de Certificados**: Añadir guía paso a paso de cómo generar o sustituir los certificados SSL y el `server_name` de Nginx.
+- [ ] **Requisito apache2-utils**: Notificar o documentar que `htpasswd` requiere la instalación de `apache2-utils`.
+- [ ] **Fix UI: Spinner infinito en errores**: Corregir el bug donde el spinner de "Creando servicio..." no desaparece si falla el despliegue de un Docker Compose.
+
 ### CI / CD
 
 - [ ] **Montar el modelo GitHub Action**: Establecer y configurar los flujos de GitHub Actions para el empaquetado y subida del contenedor directamente desde el refactor realizado.
@@ -74,6 +82,46 @@
 4. **Fase 4: Documentación y CI/CD** (Postman, README deploy, GH Actions).
 
 ---
+
+## 📧 ANEXO: Correo del Tutor (20-03-2026)
+
+**Asunto**: Feedback revisión local y despliegue.
+
+> Buenas tardes David,
+> 
+> Por fin he podido lanzarlo en local con calma. Algunos comentarios:
+> 
+> **1. Despliegue Git Sparse**:
+> Al arrancar utilizas lo siguiente, pero creo que no consigue su objetivo de no clonar todo el proyecto (se acaba clonando todo completo)
+> ```bash
+> mkdir PaaSify && cd PaaSify
+> git clone --no-checkout --sparse https://github.com/DavidRG25/TFG_APP_DOCKER-PASSIFY.git .
+> git sparse-checkout set deploy
+> git checkout main
+> ```
+> 
+> **2. Compose Version Warning**:
+> Ya no es necesario usar el `version: "3.8"`, salta un warning.
+> 
+> **3. Certificados y Configuración Nginx**:
+> Los certificados siguen a fuego en la configuración, debería indicarse cómo generar uno nuevo/sustituirlo. Los certificados incluidos son los de producción, al igual que el `server_name` de la config de nginx.
+> 
+> **4. Herramientas del sistema**:
+> `htpasswd -c .htpasswd admin` -> La herramienta no está instalada por defecto en los sistemas: `sudo apt install apache2-utils`
+> 
+> **5. Bug UI (Spinner Bloqueado)**:
+> He probado a subir un docker compose que parece que no es válido: me dices correctamente el error, sin embargo, como **se queda el spinner dando vueltas**, me toca recargar la página.
+> 
+> He probado otro Docker Compose y parece que todo iba bien.
+> 
+> **6. Postman**:
+> Respecto a lo de Postman, no he conseguido encontrarlo, quizás no estaba subido aún.
+> 
+> Cuando tengas los cambios restantes, los puedo probar directamente en el de producción.
+> 
+> Muchas gracias por tu trabajo, David, está quedando muy redondo.
+> 
+> Un saludo.
 
 ### 🌟 Mejoras Adicionales y Evolución (Extra)
 

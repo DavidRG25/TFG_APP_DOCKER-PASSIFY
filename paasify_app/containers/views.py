@@ -1062,7 +1062,7 @@ def check_port_availability(request):
 
 # ------------------------------ HELPERS VISTA -----------------------
 
-def prepare_hierarchy(available_subjects, all_user_projects, services):
+def prepare_hierarchy(available_subjects, all_user_projects, services, is_searching=False):
     """Construye una estructura anidada para representar Asignaturas > Proyectos > Servicios."""
     hierarchy = []
     # Pre-cargar servicios en memoria para evitar N+1 queries en el bucle si es posible, 
@@ -1092,11 +1092,17 @@ def prepare_hierarchy(available_subjects, all_user_projects, services):
                 'is_empty': False
             })
         
+        is_empty = len(subj_projects) == 0
+        if is_searching and is_empty:
+            continue
+
         hierarchy.append({
             'grouper': subj,
             'list': subj_projects,
-            'is_empty': len(subj_projects) == 0
+            'is_empty': is_empty
         })
+    
+    # Retornamos la jerarquía tal cual, respetando el orden de 'available_subjects'
     return hierarchy
 
 
@@ -1147,8 +1153,7 @@ def student_panel(request):
                 "subjects": subjects_count,
                 "projects": user_projects.count(),
             },
-            "is_searching": is_searching,
-            "hierarchy": prepare_hierarchy(available_subjects, user_projects, services),
+            "hierarchy": prepare_hierarchy(available_subjects, user_projects, services, is_searching=is_searching),
         },
     )
 
@@ -1293,6 +1298,9 @@ def service_table(request):
         available_subjects = Subject.objects.filter(students=user).distinct()
         all_user_projects = UserProject.objects.filter(user_profile__user=user)
 
+    # Orden por defecto: Nombre de asignatura ascendente
+    available_subjects = available_subjects.order_by("name")
+
     if subject_id:
         available_subjects = available_subjects.filter(pk=subject_id)
         all_user_projects = all_user_projects.filter(subject_id=subject_id)
@@ -1334,6 +1342,16 @@ def service_table(request):
         qs = qs.order_by("owner__first_name", "owner__last_name", "project__place", "-id")
     else:
         qs = qs.order_by("-id")
+
+    # Sincronizar el orden de available_subjects con el orden solicitado por el usuario
+    if ordering == 'name':
+        available_subjects = available_subjects.order_by("name")
+    elif ordering == '-name':
+        available_subjects = available_subjects.order_by("-name")
+    elif ordering == 'subject':
+        available_subjects = available_subjects.order_by("name")
+    elif ordering == '-subject':
+        available_subjects = available_subjects.order_by("-name")
 
     # Sincronizar estados con Docker antes de renderizar
     for s in qs:
@@ -1384,7 +1402,7 @@ def service_table(request):
         "is_searching": is_searching,
         "available_subjects": available_subjects,
         "all_user_projects": all_user_projects,
-        "hierarchy": prepare_hierarchy(available_subjects, all_user_projects, qs),
+        "hierarchy": prepare_hierarchy(available_subjects, all_user_projects, qs, is_searching=is_searching),
     }, request=request)
     return HttpResponse(html)
 
@@ -1686,14 +1704,8 @@ def professor_subject_detail(request, subject_id):
                         profile = UserProfile.objects.get(user=student_user)
                         
                         # 1. Borrar servicios del alumno en esta asignatura
-                        services_to_remove = Service.objects.filter(subject=subject, owner=student_user)
-                        for svc in services_to_remove:
-                            try:
-                                stop_container(svc)
-                                remove_container(svc)
-                            except Exception:
-                                pass
-                            svc.delete()
+                        # Dejamos que el signal pre_delete de Service haga la limpieza pesada
+                        Service.objects.filter(subject=subject, owner=student_user).delete()
                         
                         # 2. Borrar asignaciones de proyectos
                         UserProject.objects.filter(subject=subject, user_profile=profile).delete()

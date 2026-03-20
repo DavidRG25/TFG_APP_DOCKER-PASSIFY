@@ -12,35 +12,36 @@ Este documento servirá de batería de validación manual para verificar la inte
 - [SI] Hacer clic en el nuevo botón `Importar` (junto a "Nuevo Alumno").
 - [SI] Verificar que se abre el modal "Carga Masiva de Alumnos y Proyectos".
 - [SI] Hacer clic en "Descargar Plantilla.xlsx".
-- [] Comprobar que el archivo se descarga correctamente indicando `Email, Nombre, Apellido, Proyecto y Contraseña`.
+- [SI] Comprobar que el archivo se descarga correctamente indicando `Email, Nombre, Apellido, Proyecto y Contraseña`.
 
 ### 1.2 Casos Correctos
 
 - [SI] **Caso 1 — Alumno mínimo válido**: Rellenar solo `Nombre de usuario` y `Email`. Se crea el usuario, se le configura el email como contraseña por defecto y se activa `must_change_password`.
-- [ ] **Caso 2 — Alumno válido con contraseña explícita**: Rellenar contraseña custom. Se usa esa indicada directamente.
-- [ ] **Caso 3 — Alumno válido con proyecto**: Indicar "Nombre Proyecto". El sistema lo procesa, inyecta y vincula del tirón.
-- [ ] **Caso 4 — Alumno sin nombre/apellidos**: Dejar Nombre y Apellido vacíos. El sistema traga limpiamente al ser opcionales.
-- [ ] **Caso 5 — Varios alumnos mezclados**: Bloque con algunos alumnos que tienen contraseña, otros no; unos con proyecto, otros no. 100% Correctos.
+- [SI] **Caso 2 — Alumno válido con contraseña explícita**: Rellenar contraseña custom. Se usa esa indicada directamente. ✅ _Comprobado: Funciona el login sin forzar cambio._
+- [SI] **Caso 3 — Alumno válido con proyecto**: Indicar "Nombre Proyecto". El sistema lo procesa, inyecta y vincula del tirón.
+- [SI] **Caso 4 — Alumno sin nombre/apellidos**: Dejar Nombre y Apellido vacíos. El sistema traga limpiamente al ser opcionales.
+- [SI] **Caso 5 — Varios alumnos mezclados**: Bloque con algunos alumnos que tienen contraseña, otros no; unos con proyecto, otros no. 100% Correctos.
 
 ### 1.3 Casos Erróneos (Interceptación de Filas)
 
-- [ ] **Caso 6 — Falta nombre de usuario**: Fila marcada como inválida en ROJO.
-- [ ] **Caso 7 — Falta email**: Fila marcada como inválida en ROJO.
-- [ ] **Caso 8 — Faltan ambos obligatorios**: Ídem, el parser levanta bandera de falta grave.
-- [ ] **Caso 9 — Email inválido**: Usuario rellenado pero email tipo `no_es_email`. Formato no aceptado.
-- [ ] **Caso 10 — Username duplicado (en Excel)**: El mismo username escrito 2 veces en filas distintas. El inspector de colisiones en RAM lo debe cazar.
-- [ ] **Caso 11 — Email duplicado (en Excel)**: El mismo correo clonado 2 veces en filas distintas. Caza idéntica a la anterior.
+- [SI] **Caso 6 — Falta nombre de usuario**: Fila marcada como inválida en ROJO.
+- [SI] **Caso 7 — Falta email**: Fila marcada como inválida en ROJO.
+- [SI] **Caso 8 — Faltan ambos obligatorios**: Ídem, el parser levanta bandera de falta grave.
+- [SI] **Caso 9 — Email inválido**: Usuario rellenado pero email tipo `no_es_email`. Formato no aceptado.
+- [SI] **Caso 10 — Username duplicado (en Excel)**: El mismo username escrito 2 veces en filas distintas. El inspector de colisiones en RAM lo debe cazar.
+- [SI] **Caso 11 — Email duplicado (en Excel)**: El mismo correo clonado 2 veces en filas distintas. Caza idéntica a la anterior.
 
 ### 1.4 Casos Existentes y Frontera
 
-- [ ] **Caso 12 — Usuario ya existente en sistema**: Subir el email y usuario de `alumno2`. Debe marcar en AMARILLO el badge de `Vinculación`. (_Nota Técnica: PaaSify lo vincula limpiamente sin borrar ni destruir su UserProfile original_).
-- [ ] **Caso 13 — Trim de espacios**: Celda tipo `  usuario_trim  `. El backend debe barrer los espacios extra y sanearlos (Trim automático).
-- [ ] **Caso 14 — Espacios en el Proyecto**: Ejemplo "Proyecto Final TFG". Lo aceptará como nombre string literal.
-- [ ] **Caso 15 — Caracteres UTF-8 (Tildes/eñes)**: Rellenar celdas con eñes para garantizar que no peta la serialización de Preview (Ej: `Peña`).
+- [SI] **Caso 12 — Usuario ya existente en sistema (No matriculado)**: Subir un usuario que ya existe en la plataforma pero no en esta asignatura. Debe marcar en AMARILLO el badge de `Vinculación`.
+- [SI] **Fila Redundante (Ya matriculado)**: Subir un usuario que ya está en la asignatura. Ahora se muestra en **AZUL CLARITO** como `Matriculado` (antes era Error) y permite continuar la importación. ✅ _Ajustado según feedback._
+- [SI] **Caso 13 — Trim de espacios**: Celda tipo `  usuario_trim  `. El backend debe barrer los espacios extra y sanearlos (Trim automático).
+- [SI] **Caso 14 — Espacios en el Proyecto**: Ejemplo "Proyecto Final TFG". Lo aceptará como nombre string literal.
+- [SI] **Caso 15 — Caracteres UTF-8 (Tildes/eñes)**: Rellenar celdas con eñes para garantizar que no peta la serialización de Preview (Ej: `Peña`).
 
 ### 1.5 Caso Maestro Mixto (El Batiburrillo)
 
-- [ ] **Caso Final (Mixed)**: Tabla que contenga de todo. Usuarios OK, Usuarios sin correo, usuarios existentes.
+- [SI] **Caso Final (Mixed)**: Tabla que contenga de todo. Usuarios OK, Usuarios sin correo, usuarios existentes.
   - _Validación Exigida:_ El botón Confirmar **tiene que estar 100% deshabilitado**. La validación de PaaSify protege el Rollback total; si hay _una_ fila en rojo, no deja importar a nadie de forma parcial hasta que el profesor arregle su Excel.
 
 ---

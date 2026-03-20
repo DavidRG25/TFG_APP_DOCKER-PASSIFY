@@ -11,6 +11,12 @@
       --subject-primary: {{ subject.color|default:'#4e73df' }};
       --subject-secondary: {{ subject.color|default:'#224abe' }};
     }
+    .hover-text-danger:hover {
+        background-color: #fff1f0 !important;
+    }
+    .hover-text-danger:hover i {
+        color: #e74a3b !important;
+    }
   </style>
 
   {# Breadcrumbs - Ruta encima del banner #}
@@ -134,7 +140,10 @@
           <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
             <div class="input-group input-group-sm shadow-sm" style="max-width: 250px;">
               <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
-              <input type="text" id="search-students" class="form-control border-start-0" placeholder="Buscar alumno..." onkeyup="filterList('list-students', this.value)">
+              <input type="text" id="search-students" class="form-control border-start-0 border-end-0" placeholder="Buscar alumno..." onkeyup="filterList('list-students', this.value)">
+              <button class="input-group-text bg-white border-start-0 text-muted hover-text-danger" type="button" onclick="clearFilter('search-students', 'list-students')" title="Limpiar búsqueda">
+                <i class="fas fa-times-circle"></i>
+              </button>
             </div>
             
             <div class="d-inline-flex border rounded-pill p-1 bg-light">
@@ -169,7 +178,7 @@
               </button>
           </div>
         </div>
-        <div class="card-body p-0 scroll-area" style="max-height: 600px; overflow-y: auto;">
+        <div class="card-body p-0" style="max-height: 600px; overflow-y: auto; overflow-x: hidden;">
 {% if students %}
             <div class="list-group list-group-flush" id="list-students">
               {% for student in students %}
@@ -180,7 +189,15 @@
                       <i class="fas fa-user text-muted"></i>
                     </div>
                     <div>
-                      <div class="fw-semibold text-dark">{{ student.get_full_name|default:student.username }}</div>
+                      <div class="fw-semibold text-dark text-truncate" style="max-width: 250px;">
+                        {% if student.get_full_name %}
+                          {{ student.get_full_name }}
+                          <span class="text-muted small fw-normal ms-1">(@{{ student.username }})</span>
+                        {% else %}
+                          <span class="text-muted small fw-normal italic me-1" style="font-style: italic;">[Sin nombre]</span>
+                          <span class="fw-bold">@{{ student.username }}</span>
+                        {% endif %}
+                      </div>
                     </div>
                   </div>
                   <div>
@@ -215,7 +232,10 @@
           <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
             <div class="input-group input-group-sm shadow-sm" style="max-width: 250px;">
               <span class="input-group-text bg-white border-end-0 text-muted"><i class="fas fa-search"></i></span>
-              <input type="text" id="search-projects" class="form-control border-start-0" placeholder="Buscar proyecto o alumno..." onkeyup="filterList('list-projects', this.value)">
+              <input type="text" id="search-projects" class="form-control border-start-0 border-end-0" placeholder="Buscar proyecto o alumno..." onkeyup="filterList('list-projects', this.value)">
+              <button class="input-group-text bg-white border-start-0 text-muted hover-text-danger" type="button" onclick="clearFilter('search-projects', 'list-projects')" title="Limpiar búsqueda">
+                <i class="fas fa-times-circle"></i>
+              </button>
             </div>
             
             <div class="d-inline-flex border rounded-pill p-1 bg-light">
@@ -247,7 +267,7 @@
               </button>
           </div>
         </div>
-        <div class="card-body p-0 scroll-area" style="max-height: 500px; overflow-y: auto;">
+        <div class="card-body p-0" style="max-height: 500px; overflow-y: auto; overflow-x: hidden;">
           {% if projects %}
             <div class="list-group list-group-flush" id="list-projects">
               {% for project in projects %}
@@ -464,6 +484,7 @@
                     <h6 class="fw-bold mb-0 text-dark"><i class="fas fa-table me-2 text-primary" style="margin-right:8px;"></i>Previsualización de Datos</h6>
                     <div id="importStats" class="small fw-bold d-none">
                         <span class="badge bg-success bg-opacity-25 text-success me-2 rounded-pill px-2" style="margin-right: 5px;" id="statCreate">0 Nuevos</span>
+                        <span class="badge bg-info bg-opacity-25 text-info me-2 rounded-pill px-2" style="margin-right: 5px;" id="statMatriculado">0 Matriculados</span>
                         <span class="badge bg-warning bg-opacity-25 text-warning me-2 rounded-pill px-2" style="margin-right: 5px;" id="statLink">0 Vinculados</span>
                         <span class="badge bg-danger bg-opacity-25 text-danger rounded-pill px-2" id="statError">0 Errores</span>
                     </div>
@@ -574,6 +595,7 @@
       }
       
       let countCreate = 0;
+      let countMatriculado = 0;
       let countLink = 0;
       let countError = 0;
       
@@ -581,13 +603,17 @@
           let badgeColor = '';
           let badgeText = '';
           let iconState = '';
-          let bgRow = '';
           
           if (row.status === 'ok') {
               countCreate++;
               badgeColor = 'bg-success';
               badgeText = 'Nuevo';
               iconState = '<i class="fas fa-check-circle text-success"></i>';
+          } else if (row.status === 'matriculado') {
+              countMatriculado++;
+              badgeColor = 'bg-info';
+              badgeText = 'Matriculado';
+              iconState = '<i class="fas fa-user-check text-info"></i>';
           } else if (row.status === 'warning') {
               countLink++;
               badgeColor = 'bg-warning text-dark';
@@ -598,19 +624,24 @@
               badgeColor = 'bg-danger';
               badgeText = 'ERROR';
               iconState = '<i class="fas fa-times-circle text-danger"></i>';
-              bgRow = 'bg-danger bg-opacity-10';
           }
           
           const msgs = row.messages.map(m => `<div><i class="fas fa-caret-right opacity-50 me-1"></i> ${m}</div>`).join('');
           
           const tr = document.createElement('tr');
-          tr.className = bgRow;
           tr.innerHTML = `
               <td class="text-center fw-bold text-muted lh-lg">${row.row}</td>
               <td class="fw-bold lh-lg">${row.username ? '@'+row.username : '<span class="text-danger">Falta</span>'}</td>
               <td class="lh-lg">${row.email}</td>
               <td class="lh-lg">${row.name} ${row.lastname}</td>
-              <td class="lh-lg">${row.project_name ? '<span class="badge bg-secondary">' + row.project_name + '</span>' : '-'}</td>
+              <td class="lh-lg">
+                  ${row.project_name ? `
+                    <div class="d-flex flex-column align-items-start">
+                      <span class="badge bg-secondary mb-2">${row.project_name}</span>
+                      ${row.project_is_new ? '<span class="badge bg-success" style="font-size:0.6rem;">NUEVO</span>' : ''}
+                    </div>
+                  ` : '-'}
+              </td>
               <td class="lh-lg">${iconState} <span class="badge ${badgeColor}">${badgeText}</span></td>
               <td class="small text-muted" style="line-height:1.2;">${msgs}</td>
           `;
@@ -619,6 +650,7 @@
       
       // Update Stats
       document.getElementById('statCreate').innerText = `${countCreate} Nuevos`;
+      document.getElementById('statMatriculado').innerText = `${countMatriculado} Matriculados`;
       document.getElementById('statLink').innerText = `${countLink} Vinculados`;
       document.getElementById('statError').innerText = `${countError} Errores`;
       document.getElementById('importStats').classList.remove('d-none');
@@ -725,25 +757,37 @@
                 
                 <div class="input-group mb-3 shadow-sm border rounded-pill overflow-hidden bg-white">
                   <span class="input-group-text bg-transparent border-0 text-muted ps-3"><i class="fas fa-search"></i></span>
-                  <input type="text" class="form-control border-0 py-2 ps-0" placeholder="Filtrar por nombre o usuario..." oninput="filterProjectStudents(this.value)">
+                  <input type="text" id="project-students-search-input" class="form-control border-0 py-2 ps-0" placeholder="Filtrar por nombre o usuario..." oninput="filterProjectStudents(this.value)">
+                  <button class="input-group-text bg-transparent border-0 text-muted pe-3 hover-text-danger" type="button" onclick="clearProjectStudentsFilter()" title="Limpiar búsqueda">
+                    <i class="fas fa-times-circle"></i>
+                  </button>
                 </div>
 
-                <div class="border rounded-4 bg-white overflow-hidden shadow-sm" style="max-height: 280px; overflow-y: auto;">
+                <div class="border rounded-4 bg-white shadow-sm" style="max-height: 280px; overflow-y: auto; overflow-x: hidden;">
                   <div class="list-group list-group-flush" id="project-students-list">
                     {% for student in students %}
                       <label class="list-group-item list-group-item-action d-flex align-items-center py-3 px-4 border-0 student-selectable-item" style="cursor: pointer;">
-                        <input class="form-check-input me-3" type="radio" name="student_id" value="{{ student.id }}" required style="width: 1.2rem; height: 1.2rem; cursor: pointer;">
-                        <div class="d-flex align-items-center">
-                          <div class="avatar-xs me-3 bg-light rounded-circle d-flex align-items-center justify-content-center border" style="width: 35px; height: 35px;">
-                            <i class="fas fa-user opacity-50 small"></i>
-                          </div>
-                          <div class="student-info-box">
-                            <div class="fw-bold text-dark small student-name-searchable">{{ student.get_full_name|default:student.username }}</div>
-                            <div class="text-muted student-username-searchable" style="font-size: 0.75rem;">@{{ student.username }} · {{ student.email }}</div>
-                          </div>
+                        <!-- Forzamos margin:0 !important para evitar que Bootstrap aplique márgenes negativos -->
+                        <input class="form-check-input flex-shrink-0" type="checkbox" name="student_id_check" value="{{ student.id }}" 
+                               onchange="ensureSingleStudentSelection(this)" 
+                               style="width: 1.3rem; height: 1.3rem; cursor: pointer; border-radius: 4px !important; margin: 0 !important; position: static !important;">
+                        
+                        <!-- Margen izquierdo generoso en el avatar para separarlo del check -->
+                        <div class="avatar-xs flex-shrink-0 d-flex align-items-center justify-content-center border bg-light rounded-circle ms-4" 
+                             style="width: 42px; height: 42px; min-width: 42px; margin-left: 20px !important;">
+                          <i class="fas fa-user-graduate opacity-50"></i>
+                        </div>
+                        
+                        <div class="student-info-box ms-3" style="flex-grow: 1; margin-left: 15px !important;">
+                          <div class="fw-bold text-dark small student-name-searchable" style="line-height: 1.2;">{{ student.get_full_name|default:student.username }}</div>
+                          <div class="text-muted student-username-searchable" style="font-size: 0.75rem;">@{{ student.username }} · {{ student.email }}</div>
                         </div>
                       </label>
                     {% endfor %}
+                    
+                    <!-- Campo oculto para pasar el ID real en el POST si es necesario, 
+                         o simplemente usar el primer checkbox que encuentre el form -->
+                    <input type="hidden" name="student_id" id="selected-student-id">
                     <div id="no-students-found" class="p-4 text-center d-none">
                       <i class="fas fa-user-slash fa-2x text-muted opacity-20 mb-2"></i>
                       <p class="text-muted small mb-0 italic">No se encontraron alumnos con ese nombre.</p>
@@ -789,6 +833,28 @@
       noResults.classList.remove('d-none');
     } else {
       noResults.classList.add('d-none');
+    }
+  }
+  function clearProjectStudentsFilter() {
+    const input = document.getElementById('project-students-search-input');
+    if (input) {
+      input.value = '';
+      filterProjectStudents('');
+      input.focus();
+    }
+  }
+
+  function ensureSingleStudentSelection(current) {
+    const checkboxes = document.querySelectorAll('#project-students-list input[type="checkbox"]');
+    const hiddenInput = document.getElementById('selected-student-id');
+    
+    if (current.checked) {
+      checkboxes.forEach(cb => {
+        if (cb !== current) cb.checked = false;
+      });
+      if (hiddenInput) hiddenInput.value = current.value;
+    } else {
+      if (hiddenInput) hiddenInput.value = "";
     }
   }
 </script>
@@ -1097,6 +1163,9 @@
                 <div class="input-group shadow-sm border rounded-3 overflow-hidden">
                   <span class="input-group-text bg-white border-0 text-muted"><i class="fas fa-search"></i></span>
                   <input type="text" id="search-available-input" class="form-control border-0 ps-0 py-2" placeholder="Nombre, @usuario o correo..." onkeyup="filterAvailableStudents(this.value)">
+                  <button class="input-group-text bg-white border-0 text-muted hover-text-danger" type="button" onclick="clearAvailableFilter()" title="Limpiar búsqueda">
+                    <i class="fas fa-times-circle"></i>
+                  </button>
                 </div>
                 <div class="mt-4 p-3 rounded-3 bg-light border border-light">
                     <p class="small text-muted mb-0"><i class="fas fa-info-circle text-info" style="margin-right: 8px !important;"></i>Escribe cualquier dato del alumno para filtrar instantáneamente la lista de la derecha y seleccionarlo.</p>
@@ -1106,18 +1175,43 @@
             
             <div class="col-md-7">
               <div class="p-3 bg-white rounded-4 shadow-sm border">
-                <label class="form-label text-muted small fw-bold text-uppercase mb-3" style="letter-spacing: 0.5px;">2. Seleccionar Alumno</label>
-                <select name="student_id" id="available-students-select" class="form-select form-select-lg rounded-3 border bg-light bg-opacity-50" required multiple size="8" style="font-size: 0.95rem; cursor: pointer;">
-                  <option value="" disabled>Seleccione un alumno disponible...</option>
-                  {% for available in available_students %}
-                    <option value="{{ available.id }}" class="py-2 px-3 border-bottom-1" data-search="{{ available.get_full_name|lower }} {{ available.username|lower }} {{ available.email|lower }}">
-                      👤 {{ available.get_full_name|default:available.username }} (@{{ available.username }}) · {{ available.email }}
-                    </option>
-                  {% endfor %}
-                </select>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                  <label class="form-label text-muted small fw-bold text-uppercase mb-0" style="letter-spacing: 0.5px;">2. Seleccionar Alumno</label>
+                  <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-xs btn-link text-decoration-none p-0 small fw-bold" onclick="toggleAllAvailable(true)" style="font-size: 0.7rem;">Seleccionar Todos</button>
+                    <span class="text-muted small">|</span>
+                    <button type="button" class="btn btn-xs btn-link text-decoration-none p-0 small fw-bold text-muted" onclick="toggleAllAvailable(false)" style="font-size: 0.7rem;">Ninguno</button>
+                  </div>
+                </div>
+                
+                <div class="rounded-3 border bg-light bg-opacity-50" style="max-height: 280px; overflow-y: auto;">
+                  <div class="list-group list-group-flush" id="available-students-list">
+                    {% for available in available_students %}
+                      <div class="list-group-item bg-transparent border-bottom px-3 py-2 available-student-item" 
+                           style="cursor: pointer;" 
+                           onclick="toggleAvailableSelection(this)"
+                           data-search="{{ available.get_full_name|lower|default:available.username|lower }} {{ available.username|lower }} {{ available.email|lower }}">
+                        <div class="d-flex align-items-center">
+                          <div class="form-check mb-0">
+                            <input class="form-check-input available-checkbox" type="checkbox" name="student_id" value="{{ available.id }}" style="cursor: pointer;" onclick="event.stopPropagation()">
+                          </div>
+                          <div class="ms-2 text-truncate">
+                            <div class="fw-bold text-dark small text-truncate">
+                              👤 {{ available.get_full_name|default:available.username }}
+                            </div>
+                            <div class="text-muted small text-truncate" style="font-size: 0.75rem;">
+                              @{{ available.username }} · {{ available.email }}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+
                 {% if not available_students %}
-                  <div class="alert alert-warning border-0 mt-3 small fw-bold py-2 mb-0">
-                    <i class="fas fa-exclamation-triangle me-2"></i> No hay más alumnos en Passify para matricular.
+                  <div class="alert alert-warning border-0 mt-3 small fw-bold py-2 mb-0 text-center">
+                    <i class="fas fa-exclamation-triangle me-2"></i> No hay más alumnos en Passify.
                   </div>
                 {% endif %}
               </div>
@@ -1264,24 +1358,71 @@
     }
   }
 
+  function clearFilter(inputId, listId) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    input.value = '';
+    filterList(listId, '');
+    input.focus();
+  }
+
   function filterAvailableStudents(value) {
     const filter = value.toLowerCase();
-    const select = document.getElementById('available-students-select');
-    const options = select.getElementsByTagName('option');
+    const items = document.querySelectorAll('.available-student-item');
     
-    for (let i = 0; i < options.length; i++) {
-      const option = options[i];
-      if (option.disabled) continue; // Saltar el placeholder
-      
-      const searchText = option.getAttribute('data-search') || option.textContent.toLowerCase();
+    items.forEach(item => {
+      const searchText = item.getAttribute('data-search') || "";
       if (searchText.indexOf(filter) > -1) {
-        option.classList.remove('d-none');
-        option.style.display = "block";
+        item.style.display = "";
       } else {
-        option.classList.add('d-none');
-        option.style.display = "none";
+        item.style.display = "none";
       }
+    });
+  }
+
+  function clearAvailableFilter() {
+    const input = document.getElementById('search-available-input');
+    if (input) {
+      input.value = '';
+      filterAvailableStudents('');
+      input.focus();
     }
+  }
+
+  function toggleAvailableSelection(element) {
+    const cb = element.querySelector('.available-checkbox');
+    if (cb) {
+      cb.checked = !cb.checked;
+      updateAvailableRowStyle(element, cb.checked);
+    }
+  }
+
+  function updateAvailableRowStyle(element, isChecked) {
+    if (isChecked) {
+      element.style.backgroundColor = 'rgba(78, 115, 223, 0.08)';
+    } else {
+      element.style.backgroundColor = 'transparent';
+    }
+  }
+
+  // Sincronizar estilos si se clickea directamente el checkbox
+  document.addEventListener('change', function(e) {
+    if (e.target.classList.contains('available-checkbox')) {
+      const row = e.target.closest('.available-student-item');
+      if (row) updateAvailableRowStyle(row, e.target.checked);
+    }
+  });
+
+  function toggleAllAvailable(checked) {
+    document.querySelectorAll('.available-student-item').forEach(item => {
+      if (item.style.display !== 'none') {
+        const cb = item.querySelector('.available-checkbox');
+        if (cb) {
+          cb.checked = checked;
+          updateAvailableRowStyle(item, checked);
+        }
+      }
+    });
   }
 
   function handleStudentSelection() {
@@ -1325,8 +1466,11 @@
   }
 
   function selectAllStudents() {
-      document.querySelectorAll('.student-select-checkbox').forEach(cb => {
-          cb.checked = true;
+      document.querySelectorAll('#list-students .list-group-item').forEach(item => {
+          if (item.style.display !== 'none') {
+              const cb = item.querySelector('.student-select-checkbox');
+              if (cb) cb.checked = true;
+          }
       });
       handleStudentSelection();
   }
@@ -1539,8 +1683,11 @@
   }
 
   function selectAllProjects() {
-      document.querySelectorAll('.project-select-checkbox').forEach(cb => {
-          cb.checked = true;
+      document.querySelectorAll('#list-projects .list-group-item').forEach(item => {
+          if (item.style.display !== 'none') {
+              const cb = item.querySelector('.project-select-checkbox');
+              if (cb) cb.checked = true;
+          }
       });
       handleProjectSelection();
   }

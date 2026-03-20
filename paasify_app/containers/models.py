@@ -140,9 +140,11 @@ class Service(models.Model):
     def save(self, *args, **kwargs):
         """
         Sobrescribimos save para la gestión de archivos físicos.
-        Limpia archivos antiguos al subir nuevos o eliminarlos.
+        Limpia archivos antiguos al subir nuevos y organiza archivos nuevos tras la creación.
         """
-        if self.pk:
+        is_new = self.pk is None
+        
+        if not is_new:
             try:
                 # Obtenemos la instancia actual de la DB para comparar
                 old = Service.objects.get(pk=self.pk)
@@ -165,7 +167,38 @@ class Service(models.Model):
             except Service.DoesNotExist:
                 pass
 
+        # Primero guardamos para tener PK si es nuevo
         super().save(*args, **kwargs)
+
+        # Si era nuevo, mover archivos de 'services/tmp/' a 'services/<id>/'
+        if is_new:
+            import shutil
+            changed = False
+            for field_name in ['dockerfile', 'compose', 'code']:
+                file_field = getattr(self, field_name)
+                if file_field and 'services/tmp/' in file_field.name:
+                    old_path = file_field.path
+                    if os.path.exists(old_path):
+                        # Nueva ruta relativa y absoluta
+                        pure_name = os.path.basename(file_field.name)
+                        new_rel_path = f"services/{self.pk}/{pure_name}"
+                        new_abs_path = os.path.join(settings.MEDIA_ROOT, new_rel_path)
+                        
+                        # Asegurar directorio destino
+                        os.makedirs(os.path.dirname(new_abs_path), exist_ok=True)
+                        
+                        try:
+                            shutil.move(old_path, new_abs_path)
+                            # Actualizar el nombre en el campo (ruta relativa para Django)
+                            setattr(self, field_name, new_rel_path)
+                            changed = True
+                            print(f"[post-save] Movido archivo de tmp a destino: {new_rel_path}")
+                        except Exception as e:
+                            print(f"[error] No se pudo mover archivo de tmp: {e}")
+            
+            if changed:
+                # Volver a guardar SOLO los campos de archivos para actualizar rutas en DB
+                super().save(update_fields=['dockerfile', 'compose', 'code'])
 
     @property
     def has_compose(self) -> bool:
