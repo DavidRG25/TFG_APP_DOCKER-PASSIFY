@@ -204,6 +204,38 @@ class ServiceSerializer(serializers.ModelSerializer):
                     f"Máximo {MAX_CONTAINERS} contenedores permitidos. "
                     f"Tu docker-compose tiene {num_services} servicios: {service_names}"
                 )
+
+            # --- VALIDACIÓN ESTRICTA USANDO DOCKER CLI (Si está disponible) ---
+            try:
+                import subprocess
+                import os
+                # content es bytes; decodificar a str para pasarlo por stdin
+                content_str = content.decode('utf-8') if isinstance(content, bytes) else content
+                cmd = ["docker", "compose", "-f", "-", "config", "-q"]
+                creation_flags = subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
+                p = subprocess.run(
+                    cmd, 
+                    input=content_str, 
+                    capture_output=True, 
+                    text=True, 
+                    encoding='utf-8',
+                    timeout=15,
+                    creationflags=creation_flags,
+                )
+                if p.returncode != 0:
+                    error_msg = p.stderr.strip()
+                    # Limpiar prefijo si viene largo para hacerlo legible
+                    if "\n" in error_msg:
+                        error_msg = error_msg.split("\n")[0]
+                    raise serializers.ValidationError(
+                        f"Docker Compose inválido: {error_msg}"
+                    )
+            except serializers.ValidationError:
+                raise
+            except Exception as cli_e:
+                # Si falla docker (ej no está instalado), ignoramos y aplicamos la validación manual
+                print(f"[validate_compose] Docker CLI validation skipped: {cli_e}")
+                pass
             
             # SEGURIDAD CRÍTICA: Validar volúmenes para prevenir bind mounts
             for service_name, service_config in services.items():

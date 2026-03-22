@@ -51,11 +51,11 @@
 
 ### Feedback Tutor (20/03/2026) 🎓
 
-- [ ] **Optimizar Git Sparse-Checkout**: Revisar por qué se clona todo el repo en lugar de solo la carpeta `deploy` y corregir el comando en el README.
-- [ ] **Limpiar Warnings Docker**: Eliminar `version: "3.8"` de los archivos compose ya que es obsoleto y provoca advertencias.
-- [ ] **Documentación de Certificados**: Añadir guía paso a paso de cómo generar o sustituir los certificados SSL y el `server_name` de Nginx.
-- [ ] **Requisito apache2-utils**: Notificar o documentar que `htpasswd` requiere la instalación de `apache2-utils`.
-- [ ] **Fix UI: Spinner infinito en errores**: Corregir el bug donde el spinner de "Creando servicio..." no desaparece si falla el despliegue de un Docker Compose.
+- [Si] **Optimizar Git Sparse-Checkout**: Revisar por qué se clona todo el repo en lugar de solo la carpeta `deploy` y corregir el comando en el README.
+- [Si] **Limpiar Warnings Docker**: Eliminar `version: "3.8"` de los archivos compose ya que es obsoleto y provoca advertencias.
+- [Si] **Documentación de Certificados**: Añadir guía paso a paso de cómo generar o sustituir los certificados SSL y el `server_name` de Nginx.
+- [Si] **Requisito apache2-utils**: Notificar o documentar que `htpasswd` requiere la instalación de `apache2-utils`.
+- [Si] **Fix UI: Spinner infinito en errores**: Corregir el bug donde el spinner de "Creando servicio..." no desaparece si falla el despliegue de un Docker Compose.
 
 ### CI / CD
 

@@ -1,6 +1,5 @@
-version: '3.8'
-services:
-web:
+servicos:
+  web:
     build: ./web
     ports:
       - "5000"
@@ -8,7 +7,7 @@ web:
       - REDIS_HOST=db
     depends_on:
       - db
-  db:
+db:
     image: redis:alpine
     volumes:
       - redis_data:/data

@@ -36,7 +36,7 @@ El despliegue usa **Sparse Checkout** para descargar solo la carpeta `deploy/` d
 ```bash
 # 1. Clonar solo la configuración de deploy
 mkdir Paasify && cd Paasify
-git clone --no-checkout --sparse https://github.com/DavidRG25/TFG_APP_DOCKER-PASSIFY.git .
+git clone --filter=blob:none --no-checkout --sparse https://github.com/DavidRG25/TFG_APP_DOCKER-PASSIFY.git .
 git sparse-checkout set deploy
 git checkout main
 
@@ -123,7 +123,7 @@ El archivo `.env` dentro de `deploy/` configura **todos** los servicios. Variabl
 
 ## 5. Certificados TLS y Seguridad
 
-Para HTTPS, coloca los certificados en `deploy/nginx/certs/`:
+Para HTTPS, Nginx requiere que coloques los certificados en `deploy/nginx/certs/`:
 
 ```
 deploy/nginx/certs/
@@ -131,7 +131,30 @@ deploy/nginx/certs/
 └── server.key      # Clave privada
 ```
 
-La configuración de Nginx ya referencia estos ficheros automáticamente.
+### Guía para generar o sustituir certificados
+
+**Opción A: Certificados Autofirmados (Para pruebas locales)**
+Si no tienes un dominio público y quieres probar HTTPS localmente, genera un certificado autofirmado:
+```bash
+cd deploy/nginx/certs/
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout server.key -out server.crt -subj "/CN=localhost"
+```
+
+**Opción B: Certificados válidos (Let's Encrypt / Entidad Autorizada)**
+Si utilizas Let's Encrypt o tienes certificados comprados:
+1. Renombra tu archivo `.crt` o `.pem` a `server.crt` y cópialo en `deploy/nginx/certs/`.
+2. Renombra tu clave privada a `server.key` y cópiala en la misma carpeta.
+
+### Cambiar el server_name de Nginx
+Asegúrate de editar el archivo `deploy/nginx/conf.d/default.conf` y ajustar la directiva `server_name` a tu dominio real:
+```nginx
+server {
+    listen 80;
+    server_name tu-dominio.com; # <-- CÁMBIALO AQUÍ
+    ...
+```
+
+La configuración de Nginx ya referencia estos ficheros `server.crt` y `server.key` automáticamente.
 
 ---
 
@@ -144,6 +167,9 @@ PaaSify incluye **cAdvisor** para monitorizar los recursos de hardware de todos 
 - Muestra CPU, RAM, red y disco por contenedor en tiempo real
 
 ```bash
+# Requiere instalar apache2-utils (Ubuntu/Debian) o httpd-tools (CentOS/RHEL) para usar htpasswd:
+# sudo apt-get install apache2-utils
+
 # Generar contraseña para cAdvisor
 cd deploy/nginx/htpasswd/
 htpasswd -c .htpasswd admin

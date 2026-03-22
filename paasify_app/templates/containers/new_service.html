@@ -843,15 +843,59 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
 
-        // Asegurar que el loading desaparezca si hay un error o termina el proceso
+        // Asegurar que el loading desaparezca cuando termine la petición (sea error o éxito)
         form.addEventListener("htmx:afterRequest", function(evt) {
+            const overlay = document.getElementById("loadingOverlay");
+            if (overlay) overlay.style.display = "none";
+            const submitBtn = document.getElementById("submitBtn");
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '<i class="fas fa-rocket" style="margin-right: 8px !important;"></i>Crear Servicio';
+            }
+
+            // Si falla la petición (500, 400, etc), mostrar el error
             if (!evt.detail.successful) {
-                const overlay = document.getElementById("loadingOverlay");
-                if (overlay) overlay.style.display = "none";
-                const submitBtn = document.getElementById("submitBtn");
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = '<i class="fas fa-rocket" style="margin-right: 8px !important;"></i>Crear Servicio';
+                const errorDiv = document.getElementById("form-errors");
+                if (errorDiv) {
+                    let errorMsg = "Ocurrió un error inesperado. Revisa tus datos o los logs.";
+                    // 1. Intentar sacar el mensaje real insertado por HTMX en el header HX-Trigger
+                    try {
+                        const triggerHeader = evt.detail.xhr.getResponseHeader("HX-Trigger");
+                        if (triggerHeader) {
+                            const triggers = JSON.parse(triggerHeader);
+                            if (triggers["service:toast"] && triggers["service:toast"].message) {
+                                errorMsg = triggers["service:toast"].message;
+                            }
+                        }
+                    } catch (e) {}
+
+                    // 2. Intentar parsear JSON de la respuesta (DRF format)
+                    try {
+                        const responseObj = JSON.parse(evt.detail.xhr.response);
+                        if (responseObj.error) {
+                            errorMsg = responseObj.error;
+                        } else if (responseObj.detail) {
+                            errorMsg = responseObj.detail;
+                        } else {
+                            // Extraer el primer error que envíe DRF (diccionario con arrays)
+                            const keys = Object.keys(responseObj);
+                            if (keys.length > 0) {
+                                let val = responseObj[keys[0]];
+                                if (Array.isArray(val)) val = val[0];
+                                errorMsg = `<strong>${keys[0]}</strong>: ${val}`;
+                            }
+                        }
+                    } catch (e) {
+                        if (evt.detail.xhr.status === 413) {
+                            errorMsg = "El archivo subido es demasiado grande.";
+                        } else if (evt.detail.xhr.status === 500 && errorMsg === "Ocurrió un error inesperado. Revisa tus datos o los logs.") {
+                            errorMsg = "Error interno del servidor o sintaxis del Docker Compose inválida.";
+                        }
+                    }
+                    
+                    errorDiv.style.display = "block";
+                    errorDiv.innerHTML = '<div class="alert alert-danger mb-0"><i class="fas fa-exclamation-circle" style="margin-right:8px;"></i>' + errorMsg + '</div>';
+                    errorDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
             }
         });

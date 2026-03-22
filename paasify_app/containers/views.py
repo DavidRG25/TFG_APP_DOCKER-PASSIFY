@@ -310,10 +310,11 @@ class ServiceViewSet(viewsets.ModelViewSet):
             service.logs = str(exc)
             service.save(update_fields=["status", "logs"])
             if self._is_htmx(request):
+                # El error irá al frontend parseado gracias al Toast o JSON parser que añadimos
                 return self._htmx_response(
                     request,
                     status=500,
-                    message=f"Error al iniciar contenedor: {exc}",
+                    message=f"Error al iniciar tu infraestructura: {exc}",
                     level="text-bg-danger",
                 )
             return DRF_Response({"error": str(exc), "trace": error_trace}, status=500)

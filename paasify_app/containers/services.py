@@ -159,33 +159,7 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True, kee
     # IMPORTANTE: No refrescamos desde DB aquí para no perder los cambios pendientes 
     # de una transacción que aún no ha terminado o flags transitorios en el objeto.
 
-    # 1. Copiar Dockerfile
-    if service.dockerfile:
-        dest = workspace / "Dockerfile"
-        try:
-            if os.path.exists(service.dockerfile.path):
-                # Solo copiar si no es ya el mismo archivo (evita error en Windows si ya se movió en el save)
-                if not os.path.exists(dest) or not os.path.samefile(service.dockerfile.path, dest):
-                    shutil.copy2(service.dockerfile.path, dest)
-            else:
-                print(f"[warning] Archivo Dockerfile físico no hallado: {service.dockerfile.path}")
-        except Exception as e:
-            print(f"[ERROR] No se pudo copiar Dockerfile para servicio {service.id}: {e}")
-
-    # 2. Copiar docker-compose.yml
-    if service.has_compose and service.compose:
-        dest = workspace / "docker-compose.yml"
-        try:
-            if os.path.exists(service.compose.path):
-                # Solo copiar si no es ya el mismo archivo
-                if not os.path.exists(dest) or not os.path.samefile(service.compose.path, dest):
-                    shutil.copy2(service.compose.path, dest)
-            else:
-                print(f"[warning] Archivo Compose físico no hallado: {service.compose.path}")
-        except Exception as e:
-            print(f"[ERROR] No se pudo copiar docker-compose para servicio {service.id}: {e}")
-
-    # 3. Copiar y descomprimir Código
+    # 1. Copiar y descomprimir Código (Hacer esto PRIMERO para asegurar que no sobrescriba archivos subidos)
     if unpack_code and service.code:
         try:
             # Determinar extensión original
@@ -217,6 +191,30 @@ def prepare_service_workspace(service: Service, *, unpack_code: bool = True, kee
 
         except Exception as e:
             print(f"[ERROR] Fallo procesando código ZIP: {e}")
+
+    # 2. Copiar Dockerfile (Sobrescribe el ZIP si existe)
+    if service.dockerfile:
+        dest = workspace / "Dockerfile"
+        try:
+            if os.path.exists(service.dockerfile.path):
+                if not os.path.exists(dest) or not os.path.samefile(service.dockerfile.path, dest):
+                    shutil.copy2(service.dockerfile.path, dest)
+            else:
+                print(f"[warning] Archivo Dockerfile físico no hallado: {service.dockerfile.path}")
+        except Exception as e:
+            print(f"[ERROR] No se pudo copiar Dockerfile para servicio {service.id}: {e}")
+
+    # 3. Copiar docker-compose.yml (Sobrescribe el ZIP si existe)
+    if service.has_compose and service.compose:
+        dest = workspace / "docker-compose.yml"
+        try:
+            if os.path.exists(service.compose.path):
+                if not os.path.exists(dest) or not os.path.samefile(service.compose.path, dest):
+                    shutil.copy2(service.compose.path, dest)
+            else:
+                print(f"[warning] Archivo Compose físico no hallado: {service.compose.path}")
+        except Exception as e:
+            print(f"[ERROR] No se pudo copiar docker-compose para servicio {service.id}: {e}")
 
     return workspace
 

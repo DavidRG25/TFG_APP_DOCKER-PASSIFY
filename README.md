@@ -47,7 +47,7 @@ Diseñada para facilitar el aprendizaje de tecnologías de virtualización y des
 ```bash
 # 1. Descargar solo la carpeta de configuración de despliegue
 mkdir PaaSify && cd PaaSify
-git clone --no-checkout --sparse https://github.com/DavidRG25/TFG_APP_DOCKER-PASSIFY.git .
+git clone --filter=blob:none --no-checkout --sparse https://github.com/DavidRG25/TFG_APP_DOCKER-PASSIFY.git .
 git sparse-checkout set deploy
 git checkout main
 
