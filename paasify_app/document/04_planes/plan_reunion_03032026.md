@@ -71,6 +71,35 @@
 - [Si] **Seguimiento de Actividad de Alumnos**: Añadida una nueva columna "Última Actividad" en la tabla de proyectos del panel de profesor que calcula la fecha/hora en la que los servicios de un proyecto fueron editados o iniciados por última vez. Incluye un tooltip de información estilizado para aclarar su funcionamiento.
 - [Si] **Ajustes Flexbox en Modal de Asignatura**: Solucionados los problemas de clases CSS de Bootstrap que hacían que determinados iconos (sombrero principal, imágenes de logo y paletas de color) se acoplaran al texto adyacente dentro del formulario "Nueva Asignatura".
 - [Si] **Espaciado en Página de Perfil**: Refinamiento por todo el panel de Control de Cuenta, Seguridad y Token API separando exhaustivamente los iconos que se apilaban sobre los textos de los botones tras cargar las hojas de estilos personalizadas.
+- [Si] **DNS Dinámico y Conectividad Avanzada**: Implementación de un sistema de subdominios automáticos apoyado en Traefik, permitiendo el acceso a servicios mediante URLs nominales (`app-123.localhost`) además del puerto directo.
+
+---
+
+### 🌐 Implementación: DNS Dinámico y Networking (Esquema y Testing)
+
+Se ha desplegado una capa de infraestructura inteligente para gestionar la conectividad de los servicios de los alumnos sin configuraciones manuales:
+
+#### 1. Esquema Técnico de Conectividad
+
+- **Proxy Inverso (Traefik)**: Implementación de un contenedor `paasify_traefik` que actúa como puerta de enlace única en el puerto 80 del host.
+- **Red Aislada (`traefik-net`)**: Creación de una red Docker compartida donde PaaSify inyecta automáticamente cada nuevo servicio para que Traefik pueda "verlos" y enrutar el tráfico.
+- **Inyección Automática de Labels**: El motor de orquestación de PaaSify analiza el servicio (Dockerfile o Compose) y genera dinámicamente las reglas de routing:
+  - `Host(slug-id.localhost)`: Para resoluciones de nombre amigables.
+  - `traefik.docker.network`: Garantía de conectividad en entornos con múltiples redes privadas (`mega-net`).
+- **Acceso Dual en UI**: Se ha diseñado una interfaz de "Doble Botonera" para cada contenedor:
+  - 🌍 **Mundo**: Acceso DNS (Traefik).
+  - 🔌 **Enchufe/Red**: Acceso directo (Mapeo de puertos directo de Docker).
+
+#### 2. Testing y Validación Realizada
+
+- [SI] **Persistencia de Puertos**: Comprobado que los puertos asignados por PaaSify se mantienen consistentes tras reinicios del stack.
+  - _Resultado_: ✅ OK.
+- [SI] **Aislamiento Intra-Compose**: Verificado que los servicios sin puerto (ej: DB) siguen siendo inaccesibles desde el exterior pero visibles para sus compañeros de stack mediante nombres de servicio Docker.
+  - _Resultado_: ✅ OK.
+- [SI] **Resolución de Conflictos de Red (The Mega Stack)**: Pruebas con arquitecturas de 4 capas (Gateway, API, Redis, DB). Solucionado el error de "Gateway Timeout" mediante el forzado de red en las etiquetas de Traefik.
+  - _Resultado_: ✅ OK (Acceso instantáneo por subdominio).
+- [SI] **Unificación Estética**: Revisión visual y ajuste de espaciado (0.5rem) entre iconos y nombres de URL para garantizar que la interfaz mantenga el aire profesional de PaaSify.
+  - _Resultado_: ✅ OK.
 
 ---
 
@@ -88,39 +117,40 @@
 **Asunto**: Feedback revisión local y despliegue.
 
 > Buenas tardes David,
-> 
+>
 > Por fin he podido lanzarlo en local con calma. Algunos comentarios:
-> 
+>
 > **1. Despliegue Git Sparse**:
 > Al arrancar utilizas lo siguiente, pero creo que no consigue su objetivo de no clonar todo el proyecto (se acaba clonando todo completo)
+>
 > ```bash
 > mkdir PaaSify && cd PaaSify
 > git clone --no-checkout --sparse https://github.com/DavidRG25/TFG_APP_DOCKER-PASSIFY.git .
 > git sparse-checkout set deploy
 > git checkout main
 > ```
-> 
+>
 > **2. Compose Version Warning**:
 > Ya no es necesario usar el `version: "3.8"`, salta un warning.
-> 
+>
 > **3. Certificados y Configuración Nginx**:
 > Los certificados siguen a fuego en la configuración, debería indicarse cómo generar uno nuevo/sustituirlo. Los certificados incluidos son los de producción, al igual que el `server_name` de la config de nginx.
-> 
+>
 > **4. Herramientas del sistema**:
 > `htpasswd -c .htpasswd admin` -> La herramienta no está instalada por defecto en los sistemas: `sudo apt install apache2-utils`
-> 
+>
 > **5. Bug UI (Spinner Bloqueado)**:
 > He probado a subir un docker compose que parece que no es válido: me dices correctamente el error, sin embargo, como **se queda el spinner dando vueltas**, me toca recargar la página.
-> 
+>
 > He probado otro Docker Compose y parece que todo iba bien.
-> 
+>
 > **6. Postman**:
 > Respecto a lo de Postman, no he conseguido encontrarlo, quizás no estaba subido aún.
-> 
+>
 > Cuando tengas los cambios restantes, los puedo probar directamente en el de producción.
-> 
+>
 > Muchas gracias por tu trabajo, David, está quedando muy redondo.
-> 
+>
 > Un saludo.
 
 ### 🌟 Mejoras Adicionales y Evolución (Extra)

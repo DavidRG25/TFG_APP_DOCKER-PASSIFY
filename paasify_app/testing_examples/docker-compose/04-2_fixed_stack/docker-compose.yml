@@ -1,0 +1,46 @@
+
+
+services:
+  gateway:
+    build: ./web
+    ports:
+      - "80"
+    labels:
+      - "traefik.docker.network=traefik-net"
+    networks:
+      - mega-net
+
+  api-backend:
+    build: ./api
+    ports:
+      - "5000"
+    environment:
+      - REDIS_HOST=cache-layer
+    labels:
+      - "traefik.docker.network=traefik-net"
+    networks:
+      - mega-net
+
+  cache-layer:
+    image: redis:alpine
+    ports:
+      - "6379"
+    labels:
+      - "traefik.docker.network=traefik-net"
+    networks:
+      - mega-net
+
+  postgres-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_PASSWORD=passify_secret
+    ports:
+      - "5432"
+    labels:
+      - "traefik.docker.network=traefik-net"
+    networks:
+      - mega-net
+
+networks:
+  mega-net:
+    driver: bridge

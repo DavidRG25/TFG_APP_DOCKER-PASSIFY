@@ -1,10 +1,8 @@
 # 🌐 Plan: DNS Dinámico con Subdominios Automáticos
 
 > [!IMPORTANT]
-> **Estado: OPCIONAL / SECUNDARIO**
-> Esta funcionalidad es una mejora opcional que no forma parte del núcleo de PaaSify.
-> El sistema funciona perfectamente sin ella (acceso por puerto directo).
-> Se plantea como una mejora de UX que aporta un acabado profesional al proyecto.
+> **Estado: COMPLETADO ✅**
+> Funcionalidad implementada y lista para su uso en entornos locales y de producción.
 
 ---
 
@@ -175,8 +173,6 @@ Sin configuración manual por parte del alumno. El subdominio se genera automát
 Archivo `docker-compose.traefik.yml` (se levanta una sola vez en el servidor):
 
 ```yaml
-version: "3.8"
-
 services:
   traefik:
     image: traefik:v3.0

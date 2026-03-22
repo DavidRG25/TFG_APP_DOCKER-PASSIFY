@@ -11,6 +11,7 @@ Este directorio contiene todo lo necesario para montar la infraestructura comple
 | **Docker Engine**  | 20.10+          | [docs.docker.com/engine/install](https://docs.docker.com/engine/install/) |
 | **Docker Compose** | v2.12+ (Plugin) | Incluido con Docker Engine moderno                                        |
 | **htpasswd**       | —               | `sudo apt-get install apache2-utils -y`                                   |
+| **Red Docker**     | —               | `docker network create traefik-net` (Obligatorio para subdominios)        |
 
 > **No se necesita Python, pip ni ninguna dependencia adicional.** Todo el runtime de PaaSify está dentro de la imagen Docker.
 
@@ -84,9 +85,34 @@ DB_PORT=5432
 
 ---
 
-## 🔒 Paso 3: Certificados TLS (HTTPS)
+## 🌐 Paso 3: Configuración de Subdominios Dinámicos
 
-Para que el dominio funcione por HTTPS, Nginx necesita un certificado y su clave privada.
+PaaSify utiliza **Traefik** para asignar URLs automáticas a los servicios. La configuración depende de tu entorno:
+
+### A. Pruebas Locales (localhost)
+Deja `PAASIFY_BASE_URL` vacío o pon:
+```ini
+PAASIFY_BASE_URL=http://localhost:8000
+```
+Los servicios recibirán URLs del tipo `nombre-123.localhost`. Esto funciona sin tocar nada más, ya que los navegadores modernos redirigen `.localhost` a la IP local automáticamente.
+
+### B. Producción (Con Dominio Propio)
+Pon la URL pública de tu plataforma:
+```ini
+PAASIFY_BASE_URL=https://paas.tfg.etsii.urjc.es
+```
+Los servicios recibirán URLs del tipo `nombre-123.paas.tfg.etsii.urjc.es`. Recuerda que debes tener configurado un **Wildcard DNS** (`*.paas.tfg...`) que apunte a la IP de tu servidor.
+
+---
+
+## 🔒 Paso 4: Certificados TLS y HTTPS (Nginx y Traefik)
+
+PaaSify utiliza **Tráfico** tanto para el dominio principal como para subdominios, pero lo gestiona en dos capas:
+- **Nginx**: Carga el certificado de tu institución para el dominio principal (`paas.tu-dominio.com`).
+- **Traefik**: Gestiona automáticamente la generación de certificados HTTPS para los subdominios de los alumnos usando Let's Encrypt.
+
+### 4.1. Certificado del Dominio Principal (Nginx)
+Para que el dominio funcione por HTTPS, Nginx necesita el certificado proporcionado.
 
 ```bash
 # Crear directorio si no existe
@@ -99,12 +125,29 @@ sudo cp /ruta/a/la/clave_privada.key nginx/certs/server.key
 # Ajustar permisos
 sudo chown -R $(whoami):$(whoami) nginx/certs/
 ```
-
 > Si los nombres de tus archivos difieren, actualiza las rutas en `nginx/conf.d/paasify.conf`.
+
+### 4.2. HTTPS Automático para Subdominios (Traefik)
+Para que las aplicaciones de los alumnos tengan `https://...`, debes configurar Let's Encrypt en el archivo `docker-compose.yml`:
+
+1. Edita `deploy/docker-compose.yml`.
+2. En el servicio `traefik`, descomenta las líneas bajo `# Descomentar en producción para HTTPS real`:
+   ```yaml
+   - "--entrypoints.websecure.address=:443"
+   - "--certificatesresolvers.letsencrypt.acme.email=tu-correo@institucion.es"  # <-- IMPORTANTE: Cambia el email
+   - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+   - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+   ```
+3. Descomenta el puerto HTTPS en la misma sección:
+   ```yaml
+   ports:
+     - "80:80"
+     - "443:443" # <-- Descomentar esta línea
+   ```
 
 ---
 
-## 🛡️ Paso 4: Proteger el Panel de Monitorización (cAdvisor)
+## 🛡️ Paso 5: Proteger el Panel de Monitorización (cAdvisor)
 
 El panel de métricas de hardware (`/monitorizacion/`) está protegido por contraseña HTTP:
 
@@ -120,23 +163,27 @@ cd ../../
 
 ---
 
-## 🚀 Paso 5: Levantar el Ecosistema
+## 🚀 Paso 6: Levantar el Ecosistema
 
 ```bash
-# Desde la carpeta deploy/
+# De forma obligatoria, crear la red para el proxy inverso
+docker network create traefik-net
+
+# Levantar el ecosistema
 docker compose up -d
 ```
 
 Esto levanta simultáneamente:
 
+- **Traefik** (Punto de entrada, manejador de subdominios y proxy dinámico)
 - **PaaSify** (Django + Daphne, ASGI con WebSocket)
 - **PostgreSQL 15** (base de datos persistente)
-- **Nginx** (proxy inverso con TLS)
+- **Nginx** (proxy inverso con TLS para la aplicación principal)
 - **cAdvisor** (monitorización de contenedores)
 
 ---
 
-## 🗄️ Paso 6: Inicializar la Base de Datos (Solo la primera vez)
+## 🗄️ Paso 7: Inicializar la Base de Datos (Solo la primera vez)
 
 Tras levantar los servicios, espera ~10 segundos y ejecuta:
 

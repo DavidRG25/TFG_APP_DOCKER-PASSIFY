@@ -18,11 +18,41 @@ from rich.syntax import Syntax
 from rich.text import Text
 from io import StringIO
 import dateutil.parser
+from django.conf import settings
 
 from .docker_client import get_docker_client
 from .models import Service, ServiceContainer
 
 logger = logging.getLogger(__name__)
+
+
+def get_paasify_domain() -> str:
+    """Extrae el hostname de PAASIFY_BASE_URL configurado en settings."""
+    from urllib.parse import urlparse
+    base_url = getattr(settings, "PAASIFY_BASE_URL", "http://localhost:8000")
+    if not base_url:
+        return "localhost"
+    
+    parsed = urlparse(base_url)
+    # Si tiene puerto (ej: localhost:8000), devolvemos solo el host (localhost)
+    return parsed.hostname or "localhost"
+
+
+def ensure_subdomain(obj) -> str:
+    """
+    Genera y guarda un subdominio único para un Service o ServiceContainer si no lo tiene.
+    Formato: slug(nombre)-id
+    """
+    if obj.subdomain:
+        return obj.subdomain
+    
+    from django.utils.text import slugify
+    base = slugify(obj.name) or "svc"
+    
+    # Unicidad usando el ID del objeto
+    obj.subdomain = f"{base}-{obj.pk}"
+    obj.save(update_fields=["subdomain"])
+    return obj.subdomain
 
 
 def fetch_container_logs(service: Service, tail: int = 1000, since: str = None, container_name: str = None, force_refresh: bool = False) -> Tuple[List[str], bool]:

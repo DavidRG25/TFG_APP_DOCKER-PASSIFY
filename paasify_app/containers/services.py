@@ -18,6 +18,7 @@ from docker.errors import APIError, DockerException, NotFound
 
 from .docker_client import get_docker_client
 from .models import PORT_RANGE_END, PORT_RANGE_START, PortReservation, Service, ServiceContainer
+from .utils import get_paasify_domain, ensure_subdomain
 
 UNRAR_TOOL = os.environ.get("UNRAR_TOOL_PATH")
 if not UNRAR_TOOL:
@@ -1012,7 +1013,65 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool, c
         previous_ports = _previous_port_assignments(service)
         reserved_ports = _ensure_compose_ports(data, previous_ports)
         
-        # Guardar el YAML modificado con puertos asignados
+        # --- INYECCIÓN DE LABELS DE TRAEFIK Y RED (Fase DNS Dinámico) ---
+        domain = get_paasify_domain()
+        
+        # Asegurar que existe la red traefik-net en el compose
+        if "networks" not in data:
+            data["networks"] = {}
+        data["networks"]["traefik-net"] = {"external": True}
+        
+        # Inyectar labels solo en contenedores web
+        for svc_name, svc_config in data.get("services", {}).items():
+            # Obtener puerto asignado (si lo hay) para el loadbalancer
+            # _ensure_compose_ports ya modificó data['services'][svc_name]['ports']
+            port_mappings = svc_config.get("ports", [])
+            internal_port = 80 # default
+            if port_mappings:
+                p_map = port_mappings[0]
+                if isinstance(p_map, str) and ":" in p_map:
+                    internal_port = p_map.split(":")[1]
+                elif isinstance(p_map, dict):
+                    internal_port = p_map.get("target", 80)
+
+            # Verificamos si el usuario marcó este servicio como WEB en el panel
+            c_config = (container_configs or {}).get(svc_name, {})
+            # Si no hay config, intentamos heurística por nombre (igual que en la creación de registros luego)
+            is_web = c_config.get('is_web', False)
+            if not c_config and any(x in svc_name.lower() for x in ['web', 'front', 'nginx', 'apache', 'pwa']):
+                is_web = True
+
+            if is_web:
+                # Generar subdominio específico para este contenedor: slug(svc)-id
+                from django.utils.text import slugify
+                svc_subdomain = f"{slugify(svc_name)}-{service.id}"
+                router_name = svc_subdomain.replace("-", "_")
+                
+                labels = svc_config.get("labels", [])
+                if isinstance(labels, dict):
+                    labels = [f"{k}={v}" for k, v in labels.items()]
+                
+                labels.extend([
+                    "traefik.enable=true",
+                    f"traefik.http.routers.{router_name}.rule=Host(`{svc_subdomain}.{domain}`)",
+                    f"traefik.http.routers.{router_name}.entrypoints=web",
+                    f"traefik.http.services.{router_name}.loadbalancer.server.port={internal_port}",
+                    "traefik.docker.network=traefik-net",
+                ])
+                svc_config["labels"] = labels
+            
+            # Conectar a la red de Traefik
+            networks = svc_config.get("networks", [])
+            if isinstance(networks, list):
+                if "traefik-net" not in networks:
+                    networks.append("traefik-net")
+            elif isinstance(networks, dict):
+                networks["traefik-net"] = {}
+            else:
+                networks = ["default", "traefik-net"]
+            svc_config["networks"] = networks
+
+        # Guardar el YAML modificado con puertos asignados y labels Traefik
         with compose_path.open("w", encoding="utf-8") as fh:
             yaml.dump(data, fh)
         
@@ -1103,6 +1162,12 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool, c
             else:
                 c_type = 'misc'
 
+        # Guardar el subdominio en el record para mostrarlo en la UI
+        svc_subdomain = None
+        if c_web:
+            from django.utils.text import slugify
+            svc_subdomain = f"{slugify(svc_name)}-{service.id}"
+
         ServiceContainer.objects.update_or_create(
             service=service,
             name=svc_name,
@@ -1114,6 +1179,7 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool, c
                 "is_web": c_web,
                 "internal_ports": internal_ports,
                 "assigned_ports": assigned_ports,
+                "subdomain": svc_subdomain,
             }
         )
         _append_log(service, f"ServiceContainer creado: {svc_name} ({ctr.status})")
@@ -1325,6 +1391,20 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
                         pass
                     time.sleep(1)
 
+                # --- LABELS DE TRAEFIK (MODO SIMPLE) ---
+                labels = {}
+                domain = get_paasify_domain()
+                if getattr(service, 'is_web', True):
+                    sub = ensure_subdomain(service)
+                    router_name = sub.replace("-", "_")
+                    labels = {
+                        "traefik.enable": "true",
+                        f"traefik.http.routers.{router_name}.rule": f"Host(`{sub}.{domain}`)",
+                        f"traefik.http.routers.{router_name}.entrypoints": "web",
+                        f"traefik.http.services.{router_name}.loadbalancer.server.port": str(internal_port),
+                        "traefik.docker.network": "traefik-net",
+                    }
+
                 container = docker_client.containers.run(
                     image=image_to_run,
                     command=run_command,
@@ -1335,6 +1415,8 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
                     ports=ports,
                     volumes=volumes or None,
                     environment=env_vars or None,
+                    labels=labels,
+                    network="traefik-net" if labels else None
                 )
                 break
             except APIError as e:

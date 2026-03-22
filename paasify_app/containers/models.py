@@ -110,6 +110,15 @@ class Service(models.Model):
     env_vars = models.JSONField("Variables de entorno", blank=True, null=True)
     container_configs = models.JSONField("Configuración de contenedores", blank=True, null=True)
     build_context_dir = models.CharField("Directorio de build (tmp)", max_length=300, blank=True, null=True)
+    subdomain = models.CharField(
+        "Subdominio", 
+        max_length=120, 
+        unique=True, 
+        blank=True, 
+        null=True, 
+        editable=False,
+        help_text="Subdominio único generado para acceso web."
+    )
     mode = models.CharField(
         "Modo de despliegue",
         max_length=20,
@@ -244,6 +253,15 @@ class ServiceContainer(models.Model):
     is_web = models.BooleanField("¿Es una web accesible?", default=False)
     internal_ports = models.JSONField("Puertos internos", blank=True, null=True)
     assigned_ports = models.JSONField("Puertos asignados", blank=True, null=True)
+    subdomain = models.CharField(
+        "Subdominio", 
+        max_length=150, 
+        unique=True, 
+        blank=True, 
+        null=True, 
+        editable=False,
+        help_text="Subdominio específico para este contenedor (solo en Compose)."
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

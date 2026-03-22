@@ -20,7 +20,12 @@ def global_settings(request):
     if not base_url:
         base_url = f"{request.scheme}://{request.get_host()}"
     
+    # Extraer dominio puro para subdominios
+    from containers.utils import get_paasify_domain
+    domain = get_paasify_domain()
+
     return {
         "PAASIFY_BASE_URL": base_url,
         "PAASIFY_API_URL": f"{base_url}/api",
+        "PAASIFY_DOMAIN": domain,
     }

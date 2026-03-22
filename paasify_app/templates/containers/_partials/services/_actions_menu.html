@@ -124,14 +124,24 @@
     </button>
             {% endif %}
 
-        {# Web - respetar is_web sin filtrar por puerto #}
+        {# Web - priorizar subdominio si existe, sino host:puerto #}
         {% if host and service.assigned_port and service.is_web %}
             {% if service.status == 'running' %}
-    <a href="http://{{ host }}:{{ service.assigned_port }}" class="btn svc-action-btn text-white"
+                {% if service.subdomain %}
+    <a href="http://{{ service.subdomain }}.{{ PAASIFY_DOMAIN }}" class="btn svc-action-btn text-white"
         style="background-color: #3b82f6;"
-        target="_blank" rel="noopener" title="Acceder a la Web">
-        <i class="fas fa-external-link-alt"></i>
+        target="_blank" rel="noopener" title="Acceso DNS: {{ service.subdomain }}.{{ PAASIFY_DOMAIN }}">
+        <i class="fas fa-globe"></i>
     </a>
+                {% endif %}
+                
+                {% if service.assigned_port %}
+    <a href="http://{{ host }}:{{ service.assigned_port }}" class="btn svc-action-btn text-white"
+        style="background-color: #6366f1;"  {# Morado suave para distinguir del principal #}
+        target="_blank" rel="noopener" title="Acceso Directo (Puerto {{ service.assigned_port }})">
+        <i class="fas fa-network-wired"></i>
+    </a>
+                {% endif %}
             {% else %}
     <button class="btn svc-action-btn text-white" style="background-color: #3b82f6;" disabled title="Web requiere ejecucion">
         <i class="fas fa-external-link-alt"></i>

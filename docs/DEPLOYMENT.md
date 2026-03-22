@@ -58,32 +58,38 @@ docker compose up -d
 
 ## 3. Arquitectura de Producción
 
-PaaSify en producción se compone de **4 servicios orquestados** que se levantan con un solo `docker compose up -d`:
+PaaSify en producción se compone de **5 servicios orquestados** que se levantan con un solo `docker compose up -d`:
 
 ```mermaid
 graph TB
-    subgraph "Internet"
+    subgraph "Internet / DNS"
         USER["👨‍🎓 Usuarios"]
+        DNS["🌐 Wildcard DNS<br/>*.paasify.com"]
     end
 
     subgraph "Servidor / VM"
         subgraph "Docker Compose (deploy/)"
-            NGINX["🔒 Nginx<br/>Proxy inverso + TLS<br/>:80 / :443"]
+            TRAEFIK["🚀 Traefik v3<br/>Entrypoint + DNS Dinámico<br/>:80 / :443"]
+            NGINX["🔒 Nginx<br/>Proxy App Principal<br/>(Interno)"]
             APP["⚙️ PaaSify Core<br/>Django + Daphne (ASGI)<br/>:8000 (interno)"]
             DB["🗄️ PostgreSQL 15<br/>Base de datos<br/>:5432 (interno)"]
             CADV["📊 cAdvisor<br/>Monitorización HW<br/>/monitorizacion"]
         end
 
-        subgraph "Contenedores de Alumnos"
-            C1["📦 Servicio alumno 1<br/>:40001"]
-            C2["📦 Servicio alumno 2<br/>:40002"]
-            CN["📦 ...más servicios<br/>:40000-50000"]
+        subgraph "Contenedores de Alumnos (Red traefik-net)"
+            C1["📦 App Alumno 1<br/>sub-1.paasify.com"]
+            C2["📦 App Alumno 2<br/>sub-2.paasify.com"]
+            CN["📦 ...más servicios"]
         end
 
         SOCK["/var/run/docker.sock"]
     end
 
-    USER -->|HTTPS| NGINX
+    USER --> DNS
+    DNS --> TRAEFIK
+    TRAEFIK -->|Host Rule| NGINX
+    TRAEFIK -->|Dynamic Rule| C1
+    TRAEFIK -->|Dynamic Rule| C2
     NGINX -->|proxy_pass| APP
     NGINX -->|proxy_pass| CADV
     APP -->|SQL| DB
@@ -98,7 +104,8 @@ graph TB
 PaaSify **no ejecuta Docker dentro de Docker**. En su lugar, monta el socket del host (`/var/run/docker.sock`) para crear contenedores "hermanos" directamente en la máquina anfitriona. Esto proporciona:
 
 - **Rendimiento nativo:** los contenedores de alumnos no tienen overhead de virtualización adicional.
-- **Acceso a puertos reales:** cada servicio de alumno es accesible por un puerto del host (rango 40000-50000).
+- **Acceso por Subdominio:** Traefik detecta automáticamente cada contenedor y le asigna un subdominio (ej: `mi-app-5.paasify.com`).
+- **Acceso por puerto real:** el acceso directo por puerto host (rango 40000-50000) sigue disponible como fallback.
 - **Gestión centralizada:** PaaSify puede arrancar, parar, inspeccionar y eliminar contenedores directamente.
 
 ---
@@ -123,7 +130,13 @@ El archivo `.env` dentro de `deploy/` configura **todos** los servicios. Variabl
 
 ## 5. Certificados TLS y Seguridad
 
-Para HTTPS, Nginx requiere que coloques los certificados en `deploy/nginx/certs/`:
+PaaSify divide la responsabilidad del HTTPS en dos partes:
+- **Nginx**: Certificado estático proporcionado por tu institución para el dominio principal (`paas.tu-dominio.com`).
+- **Traefik**: Certificados dinámicos automáticos (Let's Encrypt) para los contenedores de los alumnos (`app-1.paas.tu-dominio.com`).
+
+### 5.1. Certificado del Dominio Principal (Nginx)
+
+Para HTTPS en tu dominio base, coloca los certificados estáticos en `deploy/nginx/certs/`:
 
 ```
 deploy/nginx/certs/
@@ -131,30 +144,38 @@ deploy/nginx/certs/
 └── server.key      # Clave privada
 ```
 
-### Guía para generar o sustituir certificados
-
 **Opción A: Certificados Autofirmados (Para pruebas locales)**
-Si no tienes un dominio público y quieres probar HTTPS localmente, genera un certificado autofirmado:
 ```bash
 cd deploy/nginx/certs/
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout server.key -out server.crt -subj "/CN=localhost"
 ```
 
-**Opción B: Certificados válidos (Let's Encrypt / Entidad Autorizada)**
-Si utilizas Let's Encrypt o tienes certificados comprados:
-1. Renombra tu archivo `.crt` o `.pem` a `server.crt` y cópialo en `deploy/nginx/certs/`.
-2. Renombra tu clave privada a `server.key` y cópiala en la misma carpeta.
+**Opción B: Certificados válidos (Let's Encrypt externo / Entidad Autorizada)**
+1. Cópialos a la carpeta `nginx/certs/` respetando los nombres `server.crt` y `server.key`.
+2. Opcional: edita `server_name` en `deploy/nginx/conf.d/paasify.conf` a tu dominio real.
 
-### Cambiar el server_name de Nginx
-Asegúrate de editar el archivo `deploy/nginx/conf.d/default.conf` y ajustar la directiva `server_name` a tu dominio real:
-```nginx
-server {
-    listen 80;
-    server_name tu-dominio.com; # <-- CÁMBIALO AQUÍ
-    ...
-```
+### 5.2. HTTPS Automático para Subdominios (Traefik / Let's Encrypt)
 
-La configuración de Nginx ya referencia estos ficheros `server.crt` y `server.key` automáticamente.
+Traefik es capaz de pedir certificados automáticamente a Let's Encrypt a medida que los alumnos crean contenedores.
+
+1. Abre `deploy/docker-compose.yml`.
+2. Busca la sección del servicio `traefik`.
+3. Descomenta y configura tu email en las siguientes líneas:
+   ```yaml
+   - "--entrypoints.websecure.address=:443"
+   - "--certificatesresolvers.letsencrypt.acme.email=tu-correo@institucion.es" # Cambia esto
+   - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+   - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+   ```
+4. Descomenta el puerto HTTPS exportado al host:
+   ```yaml
+   ports:
+     - "80:80"
+     - "443:443" # <-- Descomentar
+   ```
+5. Esto creará automáticamente certificados válidos cada vez que un servicio nuevo arranca en PaaSify.
+
+---
 
 ---
 

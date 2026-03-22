@@ -77,6 +77,19 @@
     </div>
     {% endif %}
 
+    {# URL de Subdominio - Mostrado si existe #}
+    {% if container.subdomain and PAASIFY_DOMAIN and container.status == 'running' %}
+    <div class="mb-3 p-2 rounded border-start border-success border-3 shadow-sm" style="background: #f0fdf4;">
+        <div class="small fw-bold text-success text-uppercase mb-1" style="font-size: 0.55rem; letter-spacing: 0.5px;">URL de Acceso</div>
+        <div class="d-flex align-items-center">
+            <a href="http://{{ container.subdomain }}.{{ PAASIFY_DOMAIN }}" target="_blank"
+               class="text-decoration-none fw-bold" style="color: #10b981; font-size: 0.72rem; word-break: break-all; transition: all 0.2s;">
+                <i class="fas fa-link opacity-75" style="margin-right: 0.5rem;"></i>{{ container.subdomain }}.{{ PAASIFY_DOMAIN }}
+            </a>
+        </div>
+    </div>
+    {% endif %}
+
     {# Botones de contenedor con estilo consistente #}
     <div class="d-flex gap-1 flex-wrap">
         <button class="btn btn-success svc-action-btn"
@@ -112,23 +125,29 @@
         {% endif %}
 
         {# Web por contenedor #}
-        {% if container.assigned_ports and host and container.is_web %}
-            {% with first_port_obj=container.assigned_ports.0 %}
-                {% with p_ext=first_port_obj.external %}
-                    {% if container.status == 'running' and container.container_id %}
+        {% if container.is_web and container.status == 'running' %}
+            {% if container.subdomain and PAASIFY_DOMAIN %}
+                <a href="http://{{ container.subdomain }}.{{ PAASIFY_DOMAIN }}" class="btn svc-action-btn text-white"
+                    style="background-color: #3b82f6; transition: all 0.2s;"
+                    target="_blank" rel="noopener" title="Acceso DNS: {{ container.subdomain }}.{{ PAASIFY_DOMAIN }}">
+                    <i class="fas fa-globe"></i>
+                </a>
+            {% endif %}
+            
+            {% if container.assigned_ports and host %}
+                {% with p_ext=container.assigned_ports.0.external %}
                     <a href="http://{{ host }}:{{ p_ext }}" class="btn svc-action-btn text-white"
-                        style="background-color: #3b82f6;"
-                        target="_blank" rel="noopener" title="Acceder a {{ container.name }}">
-                        <i class="fas fa-external-link-alt"></i>
+                        style="background-color: #6366f1;"
+                        target="_blank" rel="noopener" title="Acceso Directo (Puerto {{ p_ext }})">
+                        <i class="fas fa-network-wired"></i>
                     </a>
-                    {% else %}
-                    <button class="btn svc-action-btn text-white" style="background-color: #3b82f6;" disabled
-                        title="Acceso Web disponible solo cuando el contenedor está en ejecución">
-                        <i class="fas fa-external-link-alt"></i>
-                    </button>
-                    {% endif %}
                 {% endwith %}
-            {% endwith %}
+            {% endif %}
+        {% elif container.is_web %}
+            <button class="btn svc-action-btn text-white" style="background-color: #3b82f6;" disabled
+                title="Acceso Web disponible solo cuando el contenedor está en ejecución">
+                <i class="fas fa-external-link-alt"></i>
+            </button>
         {% endif %}
     </div>
 </div>

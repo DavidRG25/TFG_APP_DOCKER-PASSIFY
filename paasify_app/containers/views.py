@@ -2269,6 +2269,7 @@ def api_documentation_view(request, section_slug="introduccion"):
         {"slug": "containers_get",  "title": "3.3 Servicios",           "file": "03_gets/03_containers.md", "parent_slug": "gets", "icon": "🐳"},
         
         {"slug": "crear",           "title": "4. Crear Servicio",        "file": "04_create/00_intro.md"},
+        {"slug": "info-networking", "title": "4.0 Info: DNS y Red",      "file": "04_create/00.1_info_networking.md", "parent_slug": "crear", "icon": "🌐"},
         {"slug": "catalog",         "title": "4.1 Modo Catálogo",        "file": "04_create/01_catalog.md", "parent_slug": "crear", "icon": "🍱"},
         {"slug": "dockerhub",       "title": "4.2 Modo DockerHub",       "file": "04_create/02_dockerhub.md", "parent_slug": "crear", "icon": "🐳"},
         {"slug": "custom-df",       "title": "4.3 Dockerfile",           "file": "04_create/03_custom_dockerfile.md", "parent_slug": "crear", "icon": "🛠️"},

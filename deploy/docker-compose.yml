@@ -1,5 +1,31 @@
 services:
   # =========================================================
+  # 0. TRAEFIK (Reverse Proxy Dinámico para Subdominios)
+  # =========================================================
+  traefik:
+    image: traefik:v3.0
+    container_name: paasify_traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      # Descomentar en producción para HTTPS real
+      # - "--entrypoints.websecure.address=:443"
+      # - "--certificatesresolvers.letsencrypt.acme.email=tu@email.com"
+      # - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+    ports:
+      - "80:80"
+      # - "443:443" # Descomentar en producción
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./volumes/traefik_certs:/letsencrypt
+    networks:
+      - traefik-net
+
+  # =========================================================
   # 1. PAASIFY CORE (Backend Django / ASGI)
   # =========================================================
   paasify:
@@ -17,6 +43,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    networks:
+      - traefik-net
+      - default
 
   # =========================================================
   # 2. BASE DE DATOS (PostgreSQL)
@@ -38,6 +67,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - default
 
   # =========================================================
   # 3. PROXY INVERSO Y TLS (Nginx)
@@ -46,18 +77,28 @@ services:
     image: nginx:alpine
     container_name: paasify_proxy
     restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
+    # Quite ports explicitly to let Traefik handle them
+    # ports:
+    #   - "80:80"
+    #   - "443:443"
     volumes:
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/certs:/etc/nginx/certs:ro
       - ./nginx/htpasswd:/etc/nginx/htpasswd:ro # Archivo para contraseñas de cAdvisor
       - ./volumes/staticfiles:/app/staticfiles:ro
       - ./volumes/media:/app/media:ro
+    labels:
+      - "traefik.enable=true"
+      # Route both direct host and potential wildcard
+      - "traefik.http.routers.paasify_main.rule=Host(`localhost`) || Host(`paas.tfg.etsii.urjc.es`)"
+      - "traefik.http.routers.paasify_main.entrypoints=web"
+      - "traefik.http.services.paasify_main.loadbalancer.server.port=80"
     depends_on:
       - paasify
       - cadvisor
+    networks:
+      - traefik-net
+      - default
 
   # =========================================================
   # 4. MONITORIZACIÓN (cAdvisor)
@@ -76,5 +117,14 @@ services:
       - /sys:/sys:ro
       - /var/lib/docker/:/var/lib/docker:ro
       - /dev/disk/:/dev/disk:ro
+    networks:
+      - traefik-net
+      - default
+
+networks:
+  traefik-net:
+    external: true
+  default:
+    driver: bridge
 
 

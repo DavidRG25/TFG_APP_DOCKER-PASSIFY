@@ -40,3 +40,6 @@ CURL -X GET "{{ PAASIFY_API_URL }}/containers/?project=5" \
 - `assigned_port`: Puerto externo desde el que puedes acceder a tu app (ej: 40123).
 - `internal_port`: Puerto interno donde escucha tu app (ej: 3000).
 - `is_web`: Indica si la app tiene visibilidad externa.
+- `subdomain`: Si tienes el sistema DNS habilitado, PaaSify te proporcionará aquí un subdominio único (e.g. `prueba-305.localhost` o en producción `api-305.tfg.es`).
+
+
