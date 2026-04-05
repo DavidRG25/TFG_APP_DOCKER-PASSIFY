@@ -77,7 +77,9 @@ services:
     image: nginx:alpine
     container_name: paasify_proxy
     restart: unless-stopped
-    # Quite ports explicitly to let Traefik handle them
+    # IMPORTANTE: Traefik es el encargado de exponer los puertos 80 y 443 al exterior.
+    # Mantenlos comentados aquí para evitar conflictos ("puerto ya en uso").
+    # Solo debes descomentarlos si decides eliminar Traefik completamente de la arquitectura.
     # ports:
     #   - "80:80"
     #   - "443:443"
@@ -89,10 +91,16 @@ services:
       - ./volumes/media:/app/media:ro
     labels:
       - "traefik.enable=true"
-      # Route both direct host and potential wildcard
-      - "traefik.http.routers.paasify_main.rule=Host(`localhost`) || Host(`paas.tfg.etsii.urjc.es`)"
-      - "traefik.http.routers.paasify_main.entrypoints=web"
-      - "traefik.http.services.paasify_main.loadbalancer.server.port=80"
+      - "traefik.docker.network=traefik-net" # Asegura que Traefik use esta red para contactar a Nginx
+      # TCP Router (Tráfico HTTPS) -> Pasa la conexión TLS cruda a Nginx (Passthrough)
+      - "traefik.tcp.routers.paasify_https.rule=HostSNI(`paas.tfg.etsii.urjc.es`)"
+      - "traefik.tcp.routers.paasify_https.entrypoints=websecure"
+      - "traefik.tcp.routers.paasify_https.tls.passthrough=true"
+      - "traefik.tcp.services.paasify_https.loadbalancer.server.port=443"
+      # HTTP Router (Tráfico normal) -> Nginx lo coge en el 80 y redirige automáticamente al HTTPS
+      - "traefik.http.routers.paasify_http.rule=Host(`paas.tfg.etsii.urjc.es`)"
+      - "traefik.http.routers.paasify_http.entrypoints=web"
+      - "traefik.http.services.paasify_http.loadbalancer.server.port=80"
     depends_on:
       - paasify
       - cadvisor

@@ -1054,7 +1054,8 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool, c
                 labels.extend([
                     "traefik.enable=true",
                     f"traefik.http.routers.{router_name}.rule=Host(`{svc_subdomain}.{domain}`)",
-                    f"traefik.http.routers.{router_name}.entrypoints=web",
+                    f"traefik.http.routers.{router_name}.entrypoints=web,websecure",
+                    f"traefik.http.routers.{router_name}.tls.certresolver=letsencrypt",
                     f"traefik.http.services.{router_name}.loadbalancer.server.port={internal_port}",
                     "traefik.docker.network=traefik-net",
                 ])
@@ -1400,7 +1401,8 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
                     labels = {
                         "traefik.enable": "true",
                         f"traefik.http.routers.{router_name}.rule": f"Host(`{sub}.{domain}`)",
-                        f"traefik.http.routers.{router_name}.entrypoints": "web",
+                        f"traefik.http.routers.{router_name}.entrypoints": "web,websecure",
+                        f"traefik.http.routers.{router_name}.tls.certresolver": "letsencrypt",
                         f"traefik.http.services.{router_name}.loadbalancer.server.port": str(internal_port),
                         "traefik.docker.network": "traefik-net",
                     }
