@@ -48,7 +48,10 @@ nano .env  # Configura DJANGO_SECRET_KEY, credenciales BD, etc.
 # 3. (Opcional) Configurar certificados TLS
 # Copia tus certificados a deploy/nginx/certs/
 
-# 4. Levantar todo el ecosistema
+# 4. Crear red externa para Traefik (Obligatorio)
+docker network create traefik-net
+
+# 5. Levantar todo el ecosistema
 docker compose up -d
 ```
 

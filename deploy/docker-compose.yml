@@ -123,6 +123,9 @@ services:
 
 networks:
   traefik-net:
+    # IMPORTANTE: Traefik necesita que esta red exista previamente de forma externa.
+    # Debes crearla ejecutando este comando antes de hacer docker compose up:
+    # docker network create traefik-net
     external: true
   default:
     driver: bridge
