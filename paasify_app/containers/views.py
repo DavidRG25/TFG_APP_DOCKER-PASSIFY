@@ -2287,6 +2287,7 @@ def api_documentation_view(request, section_slug="introduccion"):
         {"slug": "logs",            "title": "7.1 Logs",                 "file": "07_logs/01_logs.md", "parent_slug": "logs-parent", "icon": "📄"},
         
         {"slug": "ci-cd",           "title": "8. Integración CI/CD",     "file": "08_cicd/01_intro.md"},
+        {"slug": "action-paasify",  "title": "8.0 Action Oficial de PaaSify", "file": "08_cicd/04_action_paasify.md", "parent_slug": "ci-cd", "icon": "fas fa-star text-warning"},
         {"slug": "github",          "title": "8.1 GitHub Actions",       "file": "08_cicd/02_github.md", "parent_slug": "ci-cd", "icon": "fab fa-github"},
         {"slug": "gitlab",          "title": "8.2 GitLab CI",            "file": "08_cicd/03_gitlab.md", "parent_slug": "ci-cd", "icon": "fab fa-gitlab"},
         

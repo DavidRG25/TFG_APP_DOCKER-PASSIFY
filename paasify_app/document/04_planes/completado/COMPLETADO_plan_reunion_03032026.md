@@ -1,7 +1,7 @@
 # Plan de Tareas - Reunión 03/03/2026
 
 **Fecha**: 04-03-2026
-**Estado**: Pendiente
+**Estado**: ✅ Completado
 **Origen**: Feedback de revisión final con el profesor.
 
 ---
@@ -59,7 +59,10 @@
 
 ### CI / CD
 
-- [ ] **Montar el modelo GitHub Action**: Establecer y configurar los flujos de GitHub Actions para el empaquetado y subida del contenedor directamente desde el refactor realizado.
+- [Si] **Montar el modelo GitHub Action**: Establecer y configurar los flujos de GitHub Actions para el empaquetado y subida del contenedor directamente desde el refactor realizado.
+  - **Implementación finalizada**: Se ha creado un repo satélite independiente (`paasify-deploy-action`).
+  - **3 modos soportados**: `dockerhub` (pull de imágenes públicas), `custom_dockerfile` (subida de código y build local) y `custom_compose` (subida de código y orquestación multi-contenedor).
+  - **Robustez y Seguridad**: Incorporado token-based auth (`Bearer`), envío unificado mediante peticiones multipart y JSON nativo desde Action a Django, manejos estrictos de puertos dinámicos e integración certificada libre de dependencias de terceros (como sub-workflows). Todo documentado interactivamente en la UI API-Docs de PaaSify.
 
 ---
 

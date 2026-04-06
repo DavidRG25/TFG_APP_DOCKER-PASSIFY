@@ -530,9 +530,9 @@ class ServiceSerializer(serializers.ModelSerializer):
                 )
 
         # ---- Puerto interno opcional ----
-        if internal_port is None:
+        if internal_port is None and not is_update:
             attrs["internal_port"] = 80
-        else:
+        elif internal_port is not None:
             try:
                 ip = int(internal_port)
             except (TypeError, ValueError):

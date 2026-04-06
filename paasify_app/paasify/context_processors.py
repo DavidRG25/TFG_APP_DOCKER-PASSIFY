@@ -24,8 +24,12 @@ def global_settings(request):
     from containers.utils import get_paasify_domain
     domain = get_paasify_domain()
 
+    # Determinar si es localhost para usar HTTP en desarrollo
+    protocol = "http" if "localhost" in domain or "127.0.0.1" in domain else "https"
+
     return {
         "PAASIFY_BASE_URL": base_url,
         "PAASIFY_API_URL": f"{base_url}/api",
         "PAASIFY_DOMAIN": domain,
+        "PAASIFY_PROTOCOL": protocol,
     }

@@ -128,7 +128,7 @@
         {% if host and service.assigned_port and service.is_web %}
             {% if service.status == 'running' %}
                 {% if service.subdomain %}
-    <a href="https://{{ service.subdomain }}.{{ PAASIFY_DOMAIN }}" class="btn svc-action-btn text-white"
+    <a href="{{ PAASIFY_PROTOCOL }}://{{ service.subdomain }}.{{ PAASIFY_DOMAIN }}" class="btn svc-action-btn text-white"
         style="background-color: #3b82f6;"
         target="_blank" rel="noopener" title="Acceso DNS: {{ service.subdomain }}.{{ PAASIFY_DOMAIN }}">
         <i class="fas fa-globe"></i>

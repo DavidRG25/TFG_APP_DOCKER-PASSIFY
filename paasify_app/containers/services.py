@@ -1054,8 +1054,16 @@ def _run_compose_service(service: Service, docker_client, force_restart: bool, c
                 labels.extend([
                     "traefik.enable=true",
                     f"traefik.http.routers.{router_name}.rule=Host(`{svc_subdomain}.{domain}`)",
-                    f"traefik.http.routers.{router_name}.entrypoints=web,websecure",
-                    f"traefik.http.routers.{router_name}.tls.certresolver=letsencrypt",
+                ])
+                if "localhost" in domain or "127.0.0.1" in domain:
+                    labels.append(f"traefik.http.routers.{router_name}.entrypoints=web")
+                else:
+                    labels.extend([
+                        f"traefik.http.routers.{router_name}.entrypoints=web,websecure",
+                        f"traefik.http.routers.{router_name}.tls.certresolver=letsencrypt",
+                    ])
+                
+                labels.extend([
                     f"traefik.http.services.{router_name}.loadbalancer.server.port={internal_port}",
                     "traefik.docker.network=traefik-net",
                 ])
@@ -1398,14 +1406,16 @@ def _run_simple_service(service: Service, docker_client, force_restart: bool, cu
                 if getattr(service, 'is_web', True):
                     sub = ensure_subdomain(service)
                     router_name = sub.replace("-", "_")
+                    entrypoints = "web" if "localhost" in domain or "127.0.0.1" in domain else "web,websecure"
                     labels = {
                         "traefik.enable": "true",
                         f"traefik.http.routers.{router_name}.rule": f"Host(`{sub}.{domain}`)",
-                        f"traefik.http.routers.{router_name}.entrypoints": "web,websecure",
-                        f"traefik.http.routers.{router_name}.tls.certresolver": "letsencrypt",
+                        f"traefik.http.routers.{router_name}.entrypoints": entrypoints,
                         f"traefik.http.services.{router_name}.loadbalancer.server.port": str(internal_port),
                         "traefik.docker.network": "traefik-net",
                     }
+                    if "localhost" not in domain and "127.0.0.1" not in domain:
+                        labels[f"traefik.http.routers.{router_name}.tls.certresolver"] = "letsencrypt"
 
                 container = docker_client.containers.run(
                     image=image_to_run,
