@@ -68,7 +68,7 @@ Usuario (HTTPS)
 
 | Requisito | Detalle |
 |-----------|---------|
-| **Dominio configurado** | El Wildcard DNS (`*.paasify.maes.dev`) debe apuntar a la IP pública de tu servidor |
+| **Dominio configurado** | El Wildcard DNS (`*.paasify.maes.dev`) debe apuntar a la IP pública de tu servidor mediante un **registro A** (Address), que vincula el nombre de dominio con la dirección IPv4 física de la máquina. |
 | **Puerto 443 abierto** | Let's Encrypt necesita que el puerto 443 esté accesible desde Internet |
 | **Docker + Docker Compose** | Versión 20.10+ de Docker Engine |
 | **Red externa de Traefik** | `docker network create traefik-net` (ejecutar una sola vez) |
