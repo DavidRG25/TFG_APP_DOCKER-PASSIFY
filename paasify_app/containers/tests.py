@@ -12,7 +12,15 @@ from rest_framework.test import APIClient
 from containers.consumers import DockerTerminalConsumer
 from containers.docker_client import get_docker_client
 from containers.models import AllowedImage, PortReservation, Service
-from containers.services import remove_container, run_container, stop_container
+from containers.services import (
+    _run_container_internal,
+    remove_container,
+    run_container,
+    stop_container,
+)
+from paasify.models.ProjectModel import UserProject
+from paasify.models.StudentModel import UserProfile
+from paasify.models.SubjectModel import Subject
 
 
 def _docker_available() -> bool:
@@ -63,6 +71,43 @@ def api_client(student_user):
     return client
 
 
+@pytest.fixture
+def student_profile(student_user):
+    """Perfil academico (UserProfile) asociado al estudiante autenticado.
+
+    Se usa get_or_create porque un signal post_save sobre auth.User puede
+    haber creado ya el UserProfile asociado.
+    """
+    profile, _ = UserProfile.objects.get_or_create(
+        user=student_user,
+        defaults={"nombre": "Test Student", "year": "2026"},
+    )
+    return profile
+
+
+@pytest.fixture
+def subject(student_user):
+    """Asignatura con el estudiante matriculado."""
+    subj = Subject.objects.create(
+        name="Test Subject",
+        players="Profesor de Prueba",
+        genero="2026",
+        category="Practicas",
+    )
+    subj.students.add(student_user)
+    return subj
+
+
+@pytest.fixture
+def project(student_profile, subject):
+    """Proyecto del estudiante asociado a la asignatura."""
+    return UserProject.objects.create(
+        place="Test Project",
+        user_profile=student_profile,
+        subject=subject,
+    )
+
+
 @pytest.mark.django_db
 def test_port_reservation_is_unique():
     """Comprueba que dos reservas consecutivas no devuelven el mismo puerto."""
@@ -77,17 +122,39 @@ def test_port_reservation_is_unique():
 class TestServiceCreation:
     """Grupo de tests para la creación de servicios vía API."""
 
-    def test_create_with_default_image(self, api_client):
+    @pytest.fixture(autouse=True)
+    def _silence_run_container(self, monkeypatch):
+        """Sustituye run_container por un noop durante los tests de API.
+
+        Estos tests solo validan el contrato HTTP (status 201/400, persistencia
+        del modelo); no comprueban que el contenedor arranque realmente, lo cual
+        ya cubren los tests E2E. Sin este mock, el thread pool asincrono de
+        run_container intenta tocar la BD mientras el test la mantiene bloqueada
+        en transaccion, generando ruido inocuo de 'database table is locked'
+        en el output.
+        """
+        monkeypatch.setattr(
+            "containers.views.run_container",
+            lambda *args, **kwargs: None,
+        )
+
+    def test_create_with_default_image(self, api_client, subject, project):
         AllowedImage.objects.create(name="nginx", tag="latest")
         url = reverse("service-list")
-        data = {"name": "test-nginx", "image": "nginx:latest", "mode": "default"}
+        data = {
+            "name": "test-nginx",
+            "image": "nginx:latest",
+            "mode": "default",
+            "subject": subject.pk,
+            "project": project.pk,
+        }
 
         response = api_client.post(url, data)
 
         assert response.status_code == 201
         assert Service.objects.filter(name="test-nginx").exists()
 
-    def test_create_with_dockerfile(self, api_client):
+    def test_create_with_dockerfile(self, api_client, subject, project):
         url = reverse("service-list")
         dockerfile = SimpleUploadedFile(
             "Dockerfile", b"FROM nginx:alpine\nCOPY . /usr/share/nginx/html"
@@ -98,6 +165,8 @@ class TestServiceCreation:
             "mode": "custom",
             "dockerfile": dockerfile,
             "code": code,
+            "subject": subject.pk,
+            "project": project.pk,
         }
 
         response = api_client.post(url, data, format="multipart")
@@ -105,12 +174,18 @@ class TestServiceCreation:
         svc = Service.objects.get(name="test-dockerfile")
         assert svc.dockerfile
 
-    def test_create_with_compose(self, api_client):
+    def test_create_with_compose(self, api_client, subject, project):
         url = reverse("service-list")
         compose = SimpleUploadedFile(
             "docker-compose.yml", b"services:\n  web:\n    image: nginx:alpine"
         )
-        data = {"name": "test-compose", "mode": "custom", "compose": compose}
+        data = {
+            "name": "test-compose",
+            "mode": "custom",
+            "compose": compose,
+            "subject": subject.pk,
+            "project": project.pk,
+        }
         response = api_client.post(url, data, format="multipart")
         assert response.status_code == 201
         svc = Service.objects.get(name="test-compose")
@@ -137,9 +212,19 @@ class TestServiceCreation:
 
     @pytest.mark.skipif(not DOCKER_AVAILABLE, reason="Docker no disponible")
     def test_get_service_logs(self, api_client, student_user):
-        svc = Service.objects.create(owner=student_user, name="test-logs", image="hello-world")
+        # Imagen alpine con un comando que escribe un mensaje conocido en los
+        # logs y se mantiene en estado 'running' para que el endpoint
+        # /service-logs/ pueda recuperarlos. Antes se usaba 'hello-world',
+        # pero esa imagen termina inmediatamente y el lifecycle actual la
+        # marca como 'exited'.
+        svc = Service.objects.create(owner=student_user, name="test-logs", image="alpine:latest")
         try:
-            run_container(svc, enqueue=False)
+            # Version sincrona interna para evitar el thread pool de
+            # run_container() y poder observar el resultado en el test.
+            _run_container_internal(
+                svc,
+                command=["sh", "-c", "echo 'Hello from Docker!' && sleep 60"],
+            )
             url = reverse("service-logs", kwargs={"pk": svc.pk})
             response = api_client.get(url)
             assert response.status_code == 200
@@ -154,7 +239,8 @@ def test_container_lifecycle(django_user_model, docker_client):
     user = django_user_model.objects.create_user("ci_user", "ci@local", "pass")
     svc = Service.objects.create(owner=user, name="nginx-ci", image="nginx:latest")
 
-    run_container(svc, enqueue=False)
+    # Version sincrona para que el test pueda observar el cambio de estado.
+    _run_container_internal(svc)
     svc.refresh_from_db()
     assert svc.status == "running"
     assert docker_client.containers.get(svc.container_id).status == "running"
@@ -180,7 +266,9 @@ async def test_terminal_websocket(student_user):
         owner=student_user, name="test-terminal", image="alpine:latest"
     )
     try:
-        await sync_to_async(run_container)(svc, command=["sleep", "60"], enqueue=False)
+        # Version sincrona ejecutada en hilo aparte (no usar run_container,
+        # que dispara un thread pool y deja el estado en 'pending').
+        await sync_to_async(_run_container_internal)(svc, command=["sleep", "60"])
         await sync_to_async(svc.refresh_from_db)()
         assert svc.status == "running"
 
